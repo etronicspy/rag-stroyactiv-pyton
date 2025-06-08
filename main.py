@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 import os
 from dotenv import load_dotenv
@@ -39,15 +39,13 @@ if TEST_MODE:
                 type('obj', (object,), {
                     'score': 0.95,
                     'payload': {
-                        'text': 'Это тестовый ответ для демонстрации работы API',
-                        'source': 'https://test-source.com/article1'
+                        'content': 'Это тестовый ответ для демонстрации работы API'
                     }
                 }),
                 type('obj', (object,), {
                     'score': 0.85,
                     'payload': {
-                        'text': 'Второй тестовый ответ для демонстрации',
-                        'source': 'https://test-source.com/article2'
+                        'content': 'Второй тестовый ответ для демонстрации'
                     }
                 })
             ]
@@ -62,17 +60,32 @@ else:
         api_key=os.getenv("QDRANT_API_KEY")
     )
 
-class SearchQuery(BaseModel):
-    query: str
-    limit: Optional[int] = 5
-
 class SearchResult(BaseModel):
-    query: str
-    matches: List[dict]
-    sources: List[str]
+    """Модель для одного результата поиска"""
+    score: float = Field(description="Оценка релевантности результата")
+    content: str = Field(description="Текстовое содержание результата")
 
-@app.post("/search", response_model=SearchResult)
+class SearchQuery(BaseModel):
+    """Модель для поискового запроса"""
+    query: str = Field(description="Поисковый запрос")
+    limit: Optional[int] = Field(default=5, description="Максимальное количество результатов")
+    min_score: Optional[float] = Field(default=0.0, description="Минимальный порог релевантности")
+
+class SearchResponse(BaseModel):
+    """Модель ответа API"""
+    query: str = Field(description="Исходный поисковый запрос")
+    results: List[SearchResult] = Field(description="Список найденных результатов")
+    total_found: int = Field(description="Общее количество найденных результатов")
+
+@app.post("/search", response_model=SearchResponse)
 async def search(search_query: SearchQuery):
+    """
+    Поиск релевантной информации по запросу.
+    
+    - Преобразует текстовый запрос в эмбеддинг
+    - Ищет похожие документы в Qdrant
+    - Возвращает отсортированный по релевантности список результатов
+    """
     try:
         # Get embeddings for the search query
         response = client.embeddings.create(
@@ -89,28 +102,26 @@ async def search(search_query: SearchQuery):
         )
 
         # Process results
-        matches = []
-        sources = []
+        results = []
         for result in search_results:
-            matches.append({
-                "score": result.score,
-                "payload": result.payload
-            })
-            if "source" in result.payload:
-                sources.append(result.payload["source"])
+            if result.score >= search_query.min_score:
+                results.append(SearchResult(
+                    score=result.score,
+                    content=result.payload.get("content", "")
+                ))
 
-        return SearchResult(
+        return SearchResponse(
             query=search_query.query,
-            matches=matches,
-            sources=list(set(sources))  # Remove duplicates
+            results=results,
+            total_found=len(results)
         )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Add health check endpoint
 @app.get("/health")
 async def health_check():
+    """Проверка состояния сервера"""
     return {
         "status": "ok",
         "mode": "test" if TEST_MODE else "production",
