@@ -1,11 +1,17 @@
+"""
+FastAPI приложение для семантического поиска с использованием RAG (Retrieval-Augmented Generation).
+Поддерживает тестовый и production режимы работы, интегрируется с OpenAI для эмбеддингов
+и Qdrant для векторного поиска.
+"""
+
+import os
+from typing import List, Optional
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional
-import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Filter
 
 # Load environment variables from .env.local
 load_dotenv('.env.local')
@@ -23,18 +29,25 @@ if TEST_MODE:
     print("Running in TEST MODE - using mock responses")
     # Mock clients for testing
     class MockEmbeddings:
+        """Мок-класс для эмуляции сервиса эмбеддингов"""
         def create(self, **kwargs):
+            """Создает мок-эмбеддинг фиксированной длины"""
             class MockResponse:
+                """Мок-класс для эмуляции ответа от сервиса эмбеддингов"""
                 class MockData:
+                    """Мок-класс для эмуляции данных эмбеддинга"""
                     embedding = [0.1] * 1536
                 data = [MockData()]
             return MockResponse()
 
     class MockOpenAI:
+        """Мок-класс для эмуляции клиента OpenAI"""
         embeddings = MockEmbeddings()
-    
+
     class MockQdrant:
+        """Мок-класс для эмуляции клиента Qdrant"""
         def search(self, **kwargs):
+            """Возвращает фиксированный набор тестовых результатов"""
             return [
                 type('obj', (object,), {
                     'score': 0.95,
@@ -49,7 +62,7 @@ if TEST_MODE:
                     }
                 })
             ]
-    
+
     client = MockOpenAI()
     qdrant_client = MockQdrant()
 else:
@@ -117,7 +130,7 @@ async def search(search_query: SearchQuery):
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.get("/health")
 async def health_check():
