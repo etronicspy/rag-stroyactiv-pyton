@@ -1,3 +1,25 @@
 [tool.pytest.ini_options]
 pythonpath = "."
-asyncio_mode = "auto" 
+asyncio_mode = "auto"
+# Terminal output configuration
+console_output_style = "progress"
+# Control test output verbosity and formatting
+addopts = [
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+    "-ra",
+    "--maxfail=10",
+    "--durations=10",
+    "--color=yes"
+]
+# Test discovery patterns
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# Filtering options
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+] 

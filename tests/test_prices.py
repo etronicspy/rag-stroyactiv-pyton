@@ -12,8 +12,10 @@ def test_process_price_list_success(client):
     with open(test_file_path, 'rb') as f:
         response = client.post(
             "/api/v1/prices/process",
-            files={"file": ("valid_prices.csv", f, "text/csv")},
-            data={"supplier_id": "test_supplier_success"}
+            files={
+                "file": ("valid_prices.csv", f, "text/csv"),
+                "supplier_id": (None, "test_supplier_success")
+            }
         )
     
     assert response.status_code == 200
@@ -31,8 +33,10 @@ def test_process_price_list_invalid_file_format(client):
     """Test price list processing with invalid file format"""
     response = client.post(
         "/api/v1/prices/process",
-        files={"file": ("test.txt", b"invalid content", "text/plain")},
-        data={"supplier_id": "test_supplier"}
+        files={
+            "file": ("test.txt", b"invalid content", "text/plain"),
+            "supplier_id": (None, "test_supplier")
+        }
     )
     
     assert response.status_code == 400
@@ -46,8 +50,10 @@ def test_get_latest_price_list_success(client):
     with open(test_file_path, 'rb') as f:
         client.post(
             "/api/v1/prices/process",
-            files={"file": ("valid_prices.csv", f, "text/csv")},
-            data={"supplier_id": "test_supplier_latest"}
+            files={
+                "file": ("valid_prices.csv", f, "text/csv"),
+                "supplier_id": (None, "test_supplier_latest")
+            }
         )
     
     # Получаем последний прайс-лист
@@ -80,8 +86,10 @@ def test_get_all_price_lists(client):
     with open(test_file1_path, 'rb') as f:
         client.post(
             "/api/v1/prices/process",
-            files={"file": ("valid_prices.csv", f, "text/csv")},
-            data={"supplier_id": "test_supplier_all"}
+            files={
+                "file": ("valid_prices.csv", f, "text/csv"),
+                "supplier_id": (None, "test_supplier_all")
+            }
         )
     
     # Небольшая задержка и второй файл
@@ -89,8 +97,10 @@ def test_get_all_price_lists(client):
     with open(test_file1_path, 'rb') as f:
         client.post(
             "/api/v1/prices/process",
-            files={"file": ("valid_prices2.csv", f, "text/csv")},
-            data={"supplier_id": "test_supplier_all"}
+            files={
+                "file": ("valid_prices2.csv", f, "text/csv"),
+                "supplier_id": (None, "test_supplier_all")
+            }
         )
     
     response = client.get("/api/v1/prices/test_supplier_all/all")
@@ -112,8 +122,10 @@ def test_delete_supplier_price_list_success(client):
     with open(test_file_path, 'rb') as f:
         client.post(
             "/api/v1/prices/process",
-            files={"file": ("valid_prices.csv", f, "text/csv")},
-            data={"supplier_id": "test_supplier_delete"}
+            files={
+                "file": ("valid_prices.csv", f, "text/csv"),
+                "supplier_id": (None, "test_supplier_delete")
+            }
         )
     
     # Удаляем прайс-листы
@@ -141,8 +153,10 @@ def test_price_list_replacement_logic(client):
             with open(filepath, 'rb') as f:
                 response = client.post(
                     "/api/v1/prices/process",
-                    files={"file": (filename, f, "text/csv")},
-                    data={"supplier_id": supplier_id}
+                    files={
+                        "file": (filename, f, "text/csv"),
+                        "supplier_id": (None, supplier_id)
+                    }
                 )
                 assert response.status_code == 200
             
@@ -171,8 +185,10 @@ def test_process_invalid_data_file(client):
     with open(test_file_path, 'rb') as f:
         response = client.post(
             "/api/v1/prices/process",
-            files={"file": ("invalid_price_data.csv", f, "text/csv")},
-            data={"supplier_id": "test_supplier_invalid"}
+            files={
+                "file": ("invalid_price_data.csv", f, "text/csv"),
+                "supplier_id": (None, "test_supplier_invalid")
+            }
         )
     
     # API должен обработать файл, пропустив невалидные строки
@@ -193,8 +209,10 @@ def test_process_empty_file(client):
     with open(test_file_path, 'rb') as f:
         response = client.post(
             "/api/v1/prices/process",
-            files={"file": ("empty_data.csv", f, "text/csv")},
-            data={"supplier_id": "test_supplier_empty"}
+            files={
+                "file": ("empty_data.csv", f, "text/csv"),
+                "supplier_id": (None, "test_supplier_empty")
+            }
         )
     
     # API возвращает ошибку для пустого файла
@@ -210,8 +228,10 @@ def test_process_missing_columns_file(client):
     with open(test_file_path, 'rb') as f:
         response = client.post(
             "/api/v1/prices/process",
-            files={"file": ("invalid_missing_columns.csv", f, "text/csv")},
-            data={"supplier_id": "test_supplier_missing_cols"}
+            files={
+                "file": ("invalid_missing_columns.csv", f, "text/csv"),
+                "supplier_id": (None, "test_supplier_missing_cols")
+            }
         )
     
     # API должен обработать файл с недостающими колонками

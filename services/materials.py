@@ -20,8 +20,12 @@ class MaterialsService:
     def _ensure_collection_exists(self):
         """Ensure the materials collection exists"""
         try:
+            # Get list of existing collections
             collections = self.qdrant_client.get_collections()
-            if not any(c.name == self.collection_name for c in collections.collections):
+            collection_names = [c.name for c in collections.collections]
+            
+            if self.collection_name not in collection_names:
+                print(f"Creating collection: {self.collection_name}")
                 self.qdrant_client.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=VectorParams(
@@ -29,8 +33,25 @@ class MaterialsService:
                         distance=Distance.COSINE
                     ),
                 )
+                print(f"Collection {self.collection_name} created successfully")
+            else:
+                print(f"Collection {self.collection_name} already exists")
         except Exception as e:
             print(f"Error ensuring collection exists: {e}")
+            # Try to create collection anyway
+            try:
+                print(f"Attempting to create collection: {self.collection_name}")
+                self.qdrant_client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=self.db_config["vector_size"], 
+                        distance=Distance.COSINE
+                    ),
+                )
+                print(f"Collection {self.collection_name} created successfully on retry")
+            except Exception as e2:
+                print(f"Failed to create collection on retry: {e2}")
+                raise e2
     
     async def _get_embedding(self, text: str) -> List[float]:
         """Get embedding for text using configured AI provider"""
@@ -63,12 +84,18 @@ class MaterialsService:
     async def create_material(self, material: MaterialCreate) -> Material:
         """Create a new material"""
         try:
+            # Ensure collection exists before creating material
+            self._ensure_collection_exists()
+            
             # Generate embedding
             text_for_embedding = f"{material.name} {material.category} {material.description or ''}"
             embedding = await self._get_embedding(text_for_embedding)
             
             # Create material ID
             material_id = str(uuid.uuid4())
+            
+            from datetime import datetime
+            current_time = datetime.utcnow()
             
             # Prepare point for Qdrant
             point = PointStruct(
@@ -79,6 +106,8 @@ class MaterialsService:
                     "category": material.category,
                     "unit": material.unit,
                     "description": material.description,
+                    "created_at": current_time.isoformat(),
+                    "updated_at": current_time.isoformat()
                 }
             )
             
@@ -87,9 +116,6 @@ class MaterialsService:
                 collection_name=self.collection_name,
                 points=[point]
             )
-            
-            from datetime import datetime
-            current_time = datetime.utcnow()
             
             return Material(
                 id=material_id,
@@ -108,6 +134,9 @@ class MaterialsService:
     async def get_material(self, material_id: str) -> Optional[Material]:
         """Get material by ID"""
         try:
+            # Ensure collection exists before querying
+            self._ensure_collection_exists()
+            
             results = self.qdrant_client.retrieve(
                 collection_name=self.collection_name,
                 ids=[material_id]
@@ -117,12 +146,35 @@ class MaterialsService:
                 return None
                 
             result = results[0]
+            from datetime import datetime
+            
+            # Parse timestamps or use current time as fallback
+            created_at = None
+            updated_at = None
+            if result.payload.get("created_at"):
+                try:
+                    created_at = datetime.fromisoformat(result.payload["created_at"])
+                except:
+                    created_at = datetime.utcnow()
+            else:
+                created_at = datetime.utcnow()
+                
+            if result.payload.get("updated_at"):
+                try:
+                    updated_at = datetime.fromisoformat(result.payload["updated_at"])
+                except:
+                    updated_at = datetime.utcnow()
+            else:
+                updated_at = datetime.utcnow()
+            
             return Material(
                 id=str(result.id),
                 name=result.payload.get("name"),
                 category=result.payload.get("category"),
                 unit=result.payload.get("unit"),
-                description=result.payload.get("description")
+                description=result.payload.get("description"),
+                created_at=created_at,
+                updated_at=updated_at
             )
         except Exception as e:
             print(f"Error getting material: {e}")
@@ -145,6 +197,10 @@ class MaterialsService:
             text_for_embedding = f"{updated_data['name']} {updated_data['category']} {updated_data.get('description', '')}"
             embedding = await self._get_embedding(text_for_embedding)
             
+            from datetime import datetime
+            current_time = datetime.utcnow()
+            updated_data["updated_at"] = current_time
+            
             # Update in Qdrant
             point = PointStruct(
                 id=material_id,
@@ -154,6 +210,8 @@ class MaterialsService:
                     "category": updated_data["category"],
                     "unit": updated_data["unit"],
                     "description": updated_data.get("description"),
+                    "created_at": updated_data["created_at"].isoformat(),
+                    "updated_at": current_time.isoformat()
                 }
             )
             
@@ -182,6 +240,9 @@ class MaterialsService:
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
         """Search materials using semantic search"""
         try:
+            # Ensure collection exists before searching
+            self._ensure_collection_exists()
+            
             # Get query embedding
             query_embedding = await self._get_embedding(query)
             
@@ -193,15 +254,38 @@ class MaterialsService:
                 with_payload=True
             )
             
+            from datetime import datetime
+            
             # Format results
             materials = []
             for result in results:
+                # Parse timestamps or use current time as fallback
+                created_at = None
+                updated_at = None
+                if result.payload.get("created_at"):
+                    try:
+                        created_at = datetime.fromisoformat(result.payload["created_at"])
+                    except:
+                        created_at = datetime.utcnow()
+                else:
+                    created_at = datetime.utcnow()
+                    
+                if result.payload.get("updated_at"):
+                    try:
+                        updated_at = datetime.fromisoformat(result.payload["updated_at"])
+                    except:
+                        updated_at = datetime.utcnow()
+                else:
+                    updated_at = datetime.utcnow()
+                
                 material = Material(
                     id=str(result.id),
                     name=result.payload.get("name"),
                     category=result.payload.get("category"),
                     unit=result.payload.get("unit"),
-                    description=result.payload.get("description")
+                    description=result.payload.get("description"),
+                    created_at=created_at,
+                    updated_at=updated_at
                 )
                 materials.append(material)
             
@@ -213,9 +297,14 @@ class MaterialsService:
     async def get_materials(self, skip: int = 0, limit: int = 100, category: Optional[str] = None) -> List[Material]:
         """Get all materials with optional category filter"""
         try:
+            # Ensure collection exists before querying
+            self._ensure_collection_exists()
+            
             # Use scroll to get all materials
             all_materials = []
             offset = None
+            
+            from datetime import datetime
             
             # Get all materials first
             while True:
@@ -233,12 +322,33 @@ class MaterialsService:
                     next_offset = None
                 
                 for point in points:
+                    # Parse timestamps or use current time as fallback
+                    created_at = None
+                    updated_at = None
+                    if point.payload.get("created_at"):
+                        try:
+                            created_at = datetime.fromisoformat(point.payload["created_at"])
+                        except:
+                            created_at = datetime.utcnow()
+                    else:
+                        created_at = datetime.utcnow()
+                        
+                    if point.payload.get("updated_at"):
+                        try:
+                            updated_at = datetime.fromisoformat(point.payload["updated_at"])
+                        except:
+                            updated_at = datetime.utcnow()
+                    else:
+                        updated_at = datetime.utcnow()
+                    
                     material = Material(
                         id=str(point.id),
                         name=point.payload.get("name"),
                         category=point.payload.get("category"),
                         unit=point.payload.get("unit"),
-                        description=point.payload.get("description")
+                        description=point.payload.get("description"),
+                        created_at=created_at,
+                        updated_at=updated_at
                     )
                     
                     # Apply category filter if specified
@@ -258,41 +368,275 @@ class MaterialsService:
             return []
 
 class CategoryService:
-    _categories: Dict[str, Category] = {}
+    def __init__(self):
+        # Use centralized client factories
+        self.qdrant_client = get_vector_db_client()
+        self.collection_name = "categories"
+        
+        # Initialize collection if needed
+        self._ensure_collection_exists()
     
-    @classmethod
-    async def create_category(cls, name: str, description: Optional[str] = None) -> Category:
-        category = Category(name=name, description=description)
-        cls._categories[name] = category
-        return category
+    def _ensure_collection_exists(self):
+        """Ensure the categories collection exists"""
+        try:
+            # Get list of existing collections
+            collections = self.qdrant_client.get_collections()
+            collection_names = [c.name for c in collections.collections]
+            
+            if self.collection_name not in collection_names:
+                print(f"Creating collection: {self.collection_name}")
+                self.qdrant_client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=1,  # Simple collection, just need 1D vector
+                        distance=Distance.COSINE
+                    ),
+                )
+                print(f"Collection {self.collection_name} created successfully")
+            else:
+                print(f"Collection {self.collection_name} already exists")
+        except Exception as e:
+            print(f"Error ensuring collection exists: {e}")
+            # Try to create collection anyway
+            try:
+                print(f"Attempting to create collection: {self.collection_name}")
+                self.qdrant_client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=1,  # Simple collection, just need 1D vector
+                        distance=Distance.COSINE
+                    ),
+                )
+                print(f"Collection {self.collection_name} created successfully on retry")
+            except Exception as e2:
+                print(f"Failed to create collection on retry: {e2}")
+                raise e2
     
-    @classmethod
-    async def get_categories(cls) -> List[Category]:
-        return list(cls._categories.values())
+    async def create_category(self, name: str, description: Optional[str] = None) -> Category:
+        """Create a new category"""
+        try:
+            # Ensure collection exists before creating category
+            self._ensure_collection_exists()
+            
+            category_id = str(uuid.uuid4())
+            
+            # Prepare point for Qdrant
+            point = PointStruct(
+                id=category_id,
+                vector=[1.0],  # Simple 1D vector
+                payload={
+                    "name": name,
+                    "description": description
+                }
+            )
+            
+            # Store in Qdrant
+            self.qdrant_client.upsert(
+                collection_name=self.collection_name,
+                points=[point]
+            )
+            
+            return Category(name=name, description=description)
+        except Exception as e:
+            print(f"Error creating category: {e}")
+            raise
     
-    @classmethod
-    async def delete_category(cls, name: str) -> bool:
-        if name in cls._categories:
-            del cls._categories[name]
-            return True
-        return False
+    async def get_categories(self) -> List[Category]:
+        """Get all categories"""
+        try:
+            # Ensure collection exists before querying
+            self._ensure_collection_exists()
+            
+            # Use scroll to get all categories
+            results = self.qdrant_client.scroll(
+                collection_name=self.collection_name,
+                limit=1000,
+                with_payload=True
+            )
+            
+            categories = []
+            if isinstance(results, tuple):
+                points, _ = results
+            else:
+                points = results
+                
+            for point in points:
+                category = Category(
+                    name=point.payload.get("name"),
+                    description=point.payload.get("description")
+                )
+                categories.append(category)
+            
+            return categories
+        except Exception as e:
+            print(f"Error getting categories: {e}")
+            return []
+    
+    async def delete_category(self, name: str) -> bool:
+        """Delete a category"""
+        try:
+            # Ensure collection exists before querying
+            self._ensure_collection_exists()
+            
+            # Find category by name
+            results = self.qdrant_client.scroll(
+                collection_name=self.collection_name,
+                limit=1000,
+                with_payload=True
+            )
+            
+            if isinstance(results, tuple):
+                points, _ = results
+            else:
+                points = results
+                
+            for point in points:
+                if point.payload.get("name") == name:
+                    # Delete the point
+                    self.qdrant_client.delete(
+                        collection_name=self.collection_name,
+                        points_selector=[str(point.id)]
+                    )
+                    return True
+            
+            return False
+        except Exception as e:
+            print(f"Error deleting category: {e}")
+            return False
 
 class UnitService:
-    _units: Dict[str, Unit] = {}
+    def __init__(self):
+        # Use centralized client factories
+        self.qdrant_client = get_vector_db_client()
+        self.collection_name = "units"
+        
+        # Initialize collection if needed
+        self._ensure_collection_exists()
     
-    @classmethod
-    async def create_unit(cls, name: str, description: Optional[str] = None) -> Unit:
-        unit = Unit(name=name, description=description)
-        cls._units[name] = unit
-        return unit
+    def _ensure_collection_exists(self):
+        """Ensure the units collection exists"""
+        try:
+            # Get list of existing collections
+            collections = self.qdrant_client.get_collections()
+            collection_names = [c.name for c in collections.collections]
+            
+            if self.collection_name not in collection_names:
+                print(f"Creating collection: {self.collection_name}")
+                self.qdrant_client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=1,  # Simple collection, just need 1D vector
+                        distance=Distance.COSINE
+                    ),
+                )
+                print(f"Collection {self.collection_name} created successfully")
+            else:
+                print(f"Collection {self.collection_name} already exists")
+        except Exception as e:
+            print(f"Error ensuring collection exists: {e}")
+            # Try to create collection anyway
+            try:
+                print(f"Attempting to create collection: {self.collection_name}")
+                self.qdrant_client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=1,  # Simple collection, just need 1D vector
+                        distance=Distance.COSINE
+                    ),
+                )
+                print(f"Collection {self.collection_name} created successfully on retry")
+            except Exception as e2:
+                print(f"Failed to create collection on retry: {e2}")
+                raise e2
     
-    @classmethod
-    async def get_units(cls) -> List[Unit]:
-        return list(cls._units.values())
+    async def create_unit(self, name: str, description: Optional[str] = None) -> Unit:
+        """Create a new unit"""
+        try:
+            # Ensure collection exists before creating unit
+            self._ensure_collection_exists()
+            
+            unit_id = str(uuid.uuid4())
+            
+            # Prepare point for Qdrant
+            point = PointStruct(
+                id=unit_id,
+                vector=[1.0],  # Simple 1D vector
+                payload={
+                    "name": name,
+                    "description": description
+                }
+            )
+            
+            # Store in Qdrant
+            self.qdrant_client.upsert(
+                collection_name=self.collection_name,
+                points=[point]
+            )
+            
+            return Unit(name=name, description=description)
+        except Exception as e:
+            print(f"Error creating unit: {e}")
+            raise
     
-    @classmethod
-    async def delete_unit(cls, name: str) -> bool:
-        if name in cls._units:
-            del cls._units[name]
-            return True
-        return False 
+    async def get_units(self) -> List[Unit]:
+        """Get all units"""
+        try:
+            # Ensure collection exists before querying
+            self._ensure_collection_exists()
+            
+            # Use scroll to get all units
+            results = self.qdrant_client.scroll(
+                collection_name=self.collection_name,
+                limit=1000,
+                with_payload=True
+            )
+            
+            units = []
+            if isinstance(results, tuple):
+                points, _ = results
+            else:
+                points = results
+                
+            for point in points:
+                unit = Unit(
+                    name=point.payload.get("name"),
+                    description=point.payload.get("description")
+                )
+                units.append(unit)
+            
+            return units
+        except Exception as e:
+            print(f"Error getting units: {e}")
+            return []
+    
+    async def delete_unit(self, name: str) -> bool:
+        """Delete a unit"""
+        try:
+            # Ensure collection exists before querying
+            self._ensure_collection_exists()
+            
+            # Find unit by name
+            results = self.qdrant_client.scroll(
+                collection_name=self.collection_name,
+                limit=1000,
+                with_payload=True
+            )
+            
+            if isinstance(results, tuple):
+                points, _ = results
+            else:
+                points = results
+                
+            for point in points:
+                if point.payload.get("name") == name:
+                    # Delete the point
+                    self.qdrant_client.delete(
+                        collection_name=self.collection_name,
+                        points_selector=[str(point.id)]
+                    )
+                    return True
+            
+            return False
+        except Exception as e:
+            print(f"Error deleting unit: {e}")
+            return False 

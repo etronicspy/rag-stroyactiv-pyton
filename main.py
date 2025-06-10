@@ -1,10 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from core.config import settings
 from api.routes import reference, health, materials, prices, search
 
 app = FastAPI()
+
+# Custom JSON response class to ensure UTF-8 encoding
+class UTF8JSONResponse(JSONResponse):
+    media_type = "application/json; charset=utf-8"
+
+# Set default response class
+app.default_response_class = UTF8JSONResponse
 
 # Add CORS middleware
 app.add_middleware(

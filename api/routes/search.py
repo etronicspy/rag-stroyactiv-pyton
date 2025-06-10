@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, HTTPException
 from typing import List
 import logging
 
-from core.models.materials import Material
+from core.schemas.materials import Material
 from services.materials import MaterialsService
 
 logger = logging.getLogger(__name__)
