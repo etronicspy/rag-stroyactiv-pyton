@@ -29,6 +29,7 @@ wheels/
 # Virtual Environment
 .env
 .venv
+env/
 venv/
 ENV/
 
@@ -42,8 +43,9 @@ ENV/
 *.log
 
 # Local development
-.DS_Store
 .env.local
+env(copy).local
+*.DS_Store
 .env.development.local
 .env.test.local
 .env.production.local
@@ -55,4 +57,11 @@ htmlcov/
 
 # Temporary files
 temp/
-tmp/ 
+tmp/
+
+# Utils temporary files and outputs
+utils/temp/
+utils/output/
+utils/*.log
+utils/*.json
+utils/*.csv 

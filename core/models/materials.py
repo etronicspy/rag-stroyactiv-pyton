@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 class Material(BaseModel):
@@ -12,8 +12,8 @@ class Material(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "name": "Портландцемент М500",
                 "category": "Cement",
@@ -21,6 +21,7 @@ class Material(BaseModel):
                 "description": "Высококачественный цемент для строительных работ"
             }
         }
+    )
 
 class Category(BaseModel):
     name: str

@@ -1,170 +1,261 @@
 from typing import List, Optional, Dict, Any
-from datetime import datetime
-import openai
-from qdrant_client import QdrantClient
-from qdrant_client.http import models
+from qdrant_client.models import Distance, VectorParams, PointStruct
+from core.schemas.materials import Material, MaterialCreate, MaterialUpdate, Category, Unit
+from core.config import get_vector_db_client, get_ai_client, settings
 import uuid
-
-from core.models.materials import Material, Category, Unit
-from core.schemas.materials import MaterialCreate, MaterialUpdate
-from core.config import settings
 
 class MaterialsService:
     def __init__(self):
-        self.client = QdrantClient(
-            url=settings.QDRANT_URL,
-            api_key=settings.QDRANT_API_KEY
-        )
-        self.openai_client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        # Use centralized client factories
+        self.qdrant_client = get_vector_db_client()
+        self.ai_client = get_ai_client()
         
-        # Ensure collection exists
-        self._init_collection()
+        # Get database configuration
+        self.db_config = settings.get_vector_db_config()
+        self.collection_name = self.db_config["collection_name"]
+        
+        # Initialize collection if needed
+        self._ensure_collection_exists()
     
-    def _init_collection(self):
-        """Initialize Qdrant collection if it doesn't exist"""
-        collections = self.client.get_collections().collections
-        if not any(c.name == settings.QDRANT_COLLECTION_NAME for c in collections):
-            self.client.create_collection(
-                collection_name=settings.QDRANT_COLLECTION_NAME,
-                vectors_config=models.VectorParams(
-                    size=1536,  # OpenAI embedding dimension
-                    distance=models.Distance.COSINE
+    def _ensure_collection_exists(self):
+        """Ensure the materials collection exists"""
+        try:
+            collections = self.qdrant_client.get_collections()
+            if not any(c.name == self.collection_name for c in collections.collections):
+                self.qdrant_client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=self.db_config["vector_size"], 
+                        distance=Distance.COSINE
+                    ),
                 )
-            )
+        except Exception as e:
+            print(f"Error ensuring collection exists: {e}")
     
     async def _get_embedding(self, text: str) -> List[float]:
-        """Get embedding from OpenAI API"""
-        response = await self.openai_client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=text
-        )
-        return response.data[0].embedding
+        """Get embedding for text using configured AI provider"""
+        try:
+            if settings.AI_PROVIDER.value == "openai":
+                ai_config = settings.get_ai_config()
+                # For text-embedding-3-small, specify dimensions to get 1536-dimensional vectors
+                if "text-embedding-3" in ai_config["model"]:
+                    response = await self.ai_client.embeddings.create(
+                        input=text,
+                        model=ai_config["model"],
+                        dimensions=1536
+                    )
+                else:
+                    response = await self.ai_client.embeddings.create(
+                        input=text,
+                        model=ai_config["model"]
+                    )
+                return response.data[0].embedding
+            elif settings.AI_PROVIDER.value == "huggingface":
+                # For HuggingFace, client is SentenceTransformer
+                embedding = self.ai_client.encode([text])
+                return embedding[0].tolist()
+            else:
+                raise ValueError(f"Unsupported AI provider: {settings.AI_PROVIDER}")
+        except Exception as e:
+            print(f"Error getting embedding: {e}")
+            raise
     
     async def create_material(self, material: MaterialCreate) -> Material:
-        # Generate embedding
-        text = f"{material.name} {material.description or ''}"
-        embedding = await self._get_embedding(text)
-        
-        # Create material with ID
-        material_id = str(uuid.uuid4())
-        material_dict = material.model_dump()
-        material_dict.update({
-            "id": material_id,
-            "embedding": embedding,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
-        })
-        
-        # Store in Qdrant
-        self.client.upsert(
-            collection_name=settings.QDRANT_COLLECTION_NAME,
-            points=[models.PointStruct(
+        """Create a new material"""
+        try:
+            # Generate embedding
+            text_for_embedding = f"{material.name} {material.category} {material.description or ''}"
+            embedding = await self._get_embedding(text_for_embedding)
+            
+            # Create material ID
+            material_id = str(uuid.uuid4())
+            
+            # Prepare point for Qdrant
+            point = PointStruct(
                 id=material_id,
                 vector=embedding,
-                payload=material_dict
-            )]
-        )
-        
-        return Material(**material_dict)
+                payload={
+                    "name": material.name,
+                    "category": material.category,
+                    "unit": material.unit,
+                    "description": material.description,
+                }
+            )
+            
+            # Store in Qdrant
+            self.qdrant_client.upsert(
+                collection_name=self.collection_name,
+                points=[point]
+            )
+            
+            from datetime import datetime
+            current_time = datetime.utcnow()
+            
+            return Material(
+                id=material_id,
+                name=material.name,
+                category=material.category,
+                unit=material.unit,
+                description=material.description,
+                embedding=embedding,
+                created_at=current_time,
+                updated_at=current_time
+            )
+        except Exception as e:
+            print(f"Error creating material: {e}")
+            raise
     
     async def get_material(self, material_id: str) -> Optional[Material]:
-        response = self.client.retrieve(
-            collection_name=settings.QDRANT_COLLECTION_NAME,
-            ids=[material_id]
-        )
-        if not response:
-            return None
-        return Material(**response[0].payload)
-    
-    async def get_materials(
-        self, 
-        skip: int = 0, 
-        limit: int = 10,
-        category: Optional[str] = None
-    ) -> List[Material]:
-        # Prepare filter conditions
-        filter_conditions = []
-        if category:
-            filter_conditions.append(
-                models.FieldCondition(
-                    key="category",
-                    match=models.MatchValue(value=category)
-                )
+        """Get material by ID"""
+        try:
+            results = self.qdrant_client.retrieve(
+                collection_name=self.collection_name,
+                ids=[material_id]
             )
-        
-        # Get materials from Qdrant
-        response = self.client.scroll(
-            collection_name=settings.QDRANT_COLLECTION_NAME,
-            scroll_filter=models.Filter(
-                must=filter_conditions
-            ) if filter_conditions else None,
-            limit=limit,
-            offset=skip
-        )
-        
-        return [Material(**point.payload) for point in response[0]]
-    
-    async def update_material(
-        self, 
-        material_id: str, 
-        material_update: MaterialUpdate
-    ) -> Optional[Material]:
-        # Get existing material
-        existing = await self.get_material(material_id)
-        if not existing:
+            
+            if not results:
+                return None
+                
+            result = results[0]
+            return Material(
+                id=str(result.id),
+                name=result.payload.get("name"),
+                category=result.payload.get("category"),
+                unit=result.payload.get("unit"),
+                description=result.payload.get("description")
+            )
+        except Exception as e:
+            print(f"Error getting material: {e}")
             return None
-        
-        # Update fields
-        update_data = material_update.model_dump(exclude_unset=True)
-        
-        # If name or description changed, update embedding
-        if "name" in update_data or "description" in update_data:
-            name = update_data.get("name", existing.name)
-            description = update_data.get("description", existing.description)
-            text = f"{name} {description or ''}"
-            update_data["embedding"] = await self._get_embedding(text)
-        
-        update_data["updated_at"] = datetime.utcnow()
-        
-        # Update in Qdrant
-        material_dict = existing.model_dump()
-        material_dict.update(update_data)
-        
-        self.client.upsert(
-            collection_name=settings.QDRANT_COLLECTION_NAME,
-            points=[models.PointStruct(
+    
+    async def update_material(self, material_id: str, material_update: MaterialUpdate) -> Optional[Material]:
+        """Update an existing material"""
+        try:
+            # Get existing material
+            existing = await self.get_material(material_id)
+            if not existing:
+                return None
+            
+            # Update fields
+            updated_data = existing.model_dump()
+            for field, value in material_update.model_dump(exclude_unset=True).items():
+                updated_data[field] = value
+            
+            # Generate new embedding if content changed
+            text_for_embedding = f"{updated_data['name']} {updated_data['category']} {updated_data.get('description', '')}"
+            embedding = await self._get_embedding(text_for_embedding)
+            
+            # Update in Qdrant
+            point = PointStruct(
                 id=material_id,
-                vector=material_dict["embedding"],
-                payload=material_dict
-            )]
-        )
-        
-        return Material(**material_dict)
+                vector=embedding,
+                payload={
+                    "name": updated_data["name"],
+                    "category": updated_data["category"],
+                    "unit": updated_data["unit"],
+                    "description": updated_data.get("description"),
+                }
+            )
+            
+            self.qdrant_client.upsert(
+                collection_name=self.collection_name,
+                points=[point]
+            )
+            
+            return Material(**updated_data)
+        except Exception as e:
+            print(f"Error updating material: {e}")
+            raise
     
     async def delete_material(self, material_id: str) -> bool:
+        """Delete a material"""
         try:
-            self.client.delete(
-                collection_name=settings.QDRANT_COLLECTION_NAME,
-                points_selector=models.PointIdsList(
-                    points=[material_id]
-                )
+            self.qdrant_client.delete(
+                collection_name=self.collection_name,
+                points_selector=[material_id]
             )
             return True
-        except Exception:
+        except Exception as e:
+            print(f"Error deleting material: {e}")
             return False
     
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
-        # Get query embedding
-        query_embedding = await self._get_embedding(query)
-        
-        # Search in Qdrant
-        response = self.client.search(
-            collection_name=settings.QDRANT_COLLECTION_NAME,
-            query_vector=query_embedding,
-            limit=limit
-        )
-        
-        return [Material(**point.payload) for point in response]
+        """Search materials using semantic search"""
+        try:
+            # Get query embedding
+            query_embedding = await self._get_embedding(query)
+            
+            # Search in Qdrant
+            results = self.qdrant_client.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                limit=limit,
+                with_payload=True
+            )
+            
+            # Format results
+            materials = []
+            for result in results:
+                material = Material(
+                    id=str(result.id),
+                    name=result.payload.get("name"),
+                    category=result.payload.get("category"),
+                    unit=result.payload.get("unit"),
+                    description=result.payload.get("description")
+                )
+                materials.append(material)
+            
+            return materials
+        except Exception as e:
+            print(f"Error searching materials: {e}")
+            return []
+    
+    async def get_materials(self, skip: int = 0, limit: int = 100, category: Optional[str] = None) -> List[Material]:
+        """Get all materials with optional category filter"""
+        try:
+            # Use scroll to get all materials
+            all_materials = []
+            offset = None
+            
+            # Get all materials first
+            while True:
+                results = self.qdrant_client.scroll(
+                    collection_name=self.collection_name,
+                    limit=100,
+                    offset=offset,
+                    with_payload=True
+                )
+                
+                if isinstance(results, tuple):
+                    points, next_offset = results
+                else:
+                    points = results
+                    next_offset = None
+                
+                for point in points:
+                    material = Material(
+                        id=str(point.id),
+                        name=point.payload.get("name"),
+                        category=point.payload.get("category"),
+                        unit=point.payload.get("unit"),
+                        description=point.payload.get("description")
+                    )
+                    
+                    # Apply category filter if specified
+                    if category is None or material.category == category:
+                        all_materials.append(material)
+                
+                # Break if no more results
+                if next_offset is None or not points:
+                    break
+                
+                offset = next_offset
+            
+            # Apply skip and limit
+            return all_materials[skip:skip + limit]
+        except Exception as e:
+            print(f"Error getting materials: {e}")
+            return []
 
 class CategoryService:
     _categories: Dict[str, Category] = {}

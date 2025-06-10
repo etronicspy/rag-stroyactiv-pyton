@@ -2,24 +2,22 @@
 Утилита для просмотра содержимого конкретной коллекции в Qdrant и получения списка коллекций
 """
 
-import os
-from dotenv import load_dotenv
-from qdrant_client import QdrantClient
 import json
 import argparse
+import sys
+import os
 from typing import List, Dict, Any
 
-# Load environment variables
-load_dotenv('.env.local')
+# Добавляем корневую папку проекта в путь для импортов
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.config import get_vector_db_client
 
 def get_collections() -> List[Dict[str, Any]]:
     """Получает список всех коллекций"""
     try:
-        # Initialize Qdrant client
-        client = QdrantClient(
-            url=os.getenv("QDRANT_URL"),
-            api_key=os.getenv("QDRANT_API_KEY")
-        )
+        # Initialize Qdrant client using centralized config
+        client = get_vector_db_client()
         
         # Get collections list
         collections = client.get_collections()
@@ -58,11 +56,8 @@ def format_vector(vector: List[float], max_items: int = 5) -> str:
 def get_collection_points(collection_name: str, limit: int = 100) -> List[Dict[str, Any]]:
     """Получает точки из указанной коллекции"""
     try:
-        # Initialize Qdrant client
-        client = QdrantClient(
-            url=os.getenv("QDRANT_URL"),
-            api_key=os.getenv("QDRANT_API_KEY")
-        )
+        # Initialize Qdrant client using centralized config
+        client = get_vector_db_client()
         
         # Get points using scroll
         response = client.scroll(
@@ -101,8 +96,6 @@ def get_collection_points(collection_name: str, limit: int = 100) -> List[Dict[s
         
     except Exception as e:
         print(f"Error: {str(e)}")
-        print(f"Response type: {type(response)}")
-        print(f"Response: {response}")
         return [{"error": str(e)}]
 
 if __name__ == "__main__":
@@ -126,17 +119,17 @@ if __name__ == "__main__":
         print("\nAvailable collections:")
         print(json.dumps(collections, indent=2, ensure_ascii=False))
     elif args.command == 'view':
-    points = get_collection_points(args.collection, args.limit)
-    print(f"\nContents of collection '{args.collection}':")
-    
-    # Format output
-    formatted_points = []
-    for point in points:
-        formatted_point = point.copy()
-        if "vector" in formatted_point and not args.show_vectors:
-            formatted_point["vector"] = format_vector(formatted_point["vector"], args.vector_preview)
-        formatted_points.append(formatted_point)
-    
-    print(json.dumps(formatted_points, indent=2, ensure_ascii=False)) 
+        points = get_collection_points(args.collection, args.limit)
+        print(f"\nContents of collection '{args.collection}':")
+        
+        # Format output
+        formatted_points = []
+        for point in points:
+            formatted_point = point.copy()
+            if "vector" in formatted_point and not args.show_vectors:
+                formatted_point["vector"] = format_vector(formatted_point["vector"], args.vector_preview)
+            formatted_points.append(formatted_point)
+        
+        print(json.dumps(formatted_points, indent=2, ensure_ascii=False)) 
     else:
         parser.print_help() 

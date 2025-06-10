@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 class MaterialBase(BaseModel):
@@ -19,12 +19,11 @@ class MaterialUpdate(BaseModel):
 
 class Material(MaterialBase):
     id: str
-    embedding: List[float]
-    created_at: datetime
-    updated_at: datetime
+    embedding: Optional[List[float]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MaterialSearchQuery(BaseModel):
     query: str = Field(..., min_length=1)

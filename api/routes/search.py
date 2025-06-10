@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from typing import List
+import logging
 
 from core.models.materials import Material
 from services.materials import MaterialsService
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/", response_model=List[Material])
@@ -14,5 +16,9 @@ async def search_materials(
     """
     Search materials using semantic search
     """
-    service = MaterialsService()
-    return await service.search_materials(query=q, limit=limit) 
+    try:
+        service = MaterialsService()
+        return await service.search_materials(query=q, limit=limit)
+    except Exception as e:
+        logger.error(f"Search error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during search") 
