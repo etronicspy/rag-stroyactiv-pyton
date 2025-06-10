@@ -10,6 +10,14 @@ class Settings(BaseSettings):
     # CORS Configuration
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
     
+    # OpenAI settings
+    OPENAI_API_KEY: str
+    
+    # Qdrant settings
+    QDRANT_URL: str
+    QDRANT_API_KEY: str
+    QDRANT_COLLECTION_NAME: str = "materials"
+    
     # MongoDB settings
     MONGODB_URL: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "construction_materials"
@@ -19,6 +27,6 @@ class Settings(BaseSettings):
     
     class Config:
         case_sensitive = True
-        env_file = ".env"
+        env_file = ".env.local"
 
 settings = Settings() 

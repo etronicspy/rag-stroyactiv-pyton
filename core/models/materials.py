@@ -1,20 +1,17 @@
 from typing import Optional, List
-from beanie import Document
 from pydantic import BaseModel, Field
-import datetime
+from datetime import datetime
 
-class Material(Document):
+class Material(BaseModel):
+    id: Optional[str] = None
     name: str = Field(..., min_length=2, max_length=200)
     category: str
     unit: str
     description: Optional[str] = None
     embedding: Optional[List[float]] = None
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-
-    class Settings:
-        name = "materials"
-        
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
     class Config:
         json_schema_extra = {
             "example": {
@@ -25,16 +22,10 @@ class Material(Document):
             }
         }
 
-class Category(Document):
-    name: str = Field(..., min_length=2, max_length=50)
+class Category(BaseModel):
+    name: str
     description: Optional[str] = None
 
-    class Settings:
-        name = "categories"
-
-class Unit(Document):
-    name: str = Field(..., min_length=1, max_length=20)
-    description: Optional[str] = None
-
-    class Settings:
-        name = "units" 
+class Unit(BaseModel):
+    name: str
+    description: Optional[str] = None 

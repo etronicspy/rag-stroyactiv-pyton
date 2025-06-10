@@ -1,33 +1,51 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from typing import Dict
+import httpx
 from core.config import settings
-from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
 
 router = APIRouter()
 
 @router.get("/")
-async def health_check():
-    return {
+async def health_check() -> Dict:
+    """
+    Check the health of all services
+    """
+    health_status = {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": settings.VERSION
+        "services": {
+            "api": "healthy",
+            "openai": "unknown",
+            "qdrant": "unknown"
+        }
     }
-
-@router.get("/config")
-async def get_config():
-    # Test database connection
-    client = AsyncIOMotorClient(settings.MONGODB_URL)
-    try:
-        await client.admin.command('ping')
-        db_status = "connected"
-    except Exception as e:
-        db_status = f"error: {str(e)}"
-    finally:
-        client.close()
     
-    return {
-        "project_name": settings.PROJECT_NAME,
-        "version": settings.VERSION,
-        "database_status": db_status,
-        "embedding_model": settings.EMBEDDING_MODEL
-    } 
+    # Check OpenAI
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get("https://api.openai.com/v1/models",
+                                      headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"})
+            if response.status_code == 200:
+                health_status["services"]["openai"] = "healthy"
+            else:
+                health_status["services"]["openai"] = "unhealthy"
+    except Exception as e:
+        health_status["services"]["openai"] = f"error: {str(e)}"
+    
+    # Check Qdrant
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{settings.QDRANT_URL}/collections",
+                                      headers={"api-key": settings.QDRANT_API_KEY})
+            if response.status_code == 200:
+                health_status["services"]["qdrant"] = "healthy"
+            else:
+                health_status["services"]["qdrant"] = "unhealthy"
+    except Exception as e:
+        health_status["services"]["qdrant"] = f"error: {str(e)}"
+    
+    # If any service is unhealthy, return 503
+    if any(status != "healthy" for status in health_status["services"].values()):
+        health_status["status"] = "unhealthy"
+        raise HTTPException(status_code=503, detail=health_status)
+    
+    return health_status 

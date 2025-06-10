@@ -1,14 +1,18 @@
-from fastapi import APIRouter
-from core.schemas.materials import MaterialSearchQuery, MaterialResponse
-from services.materials import MaterialsService
+from fastapi import APIRouter, Query
 from typing import List
 
-router = APIRouter()
-materials_service = MaterialsService()
+from core.models.materials import Material
+from services.materials import MaterialsService
 
-@router.post("/search", response_model=List[MaterialResponse])
-async def search_materials(query: MaterialSearchQuery):
-    return await materials_service.search_materials(
-        query=query.query,
-        limit=query.limit
-    ) 
+router = APIRouter()
+
+@router.get("/", response_model=List[Material])
+async def search_materials(
+    q: str = Query(..., description="Search query"),
+    limit: int = Query(10, description="Maximum number of results to return")
+) -> List[Material]:
+    """
+    Search materials using semantic search
+    """
+    service = MaterialsService()
+    return await service.search_materials(query=q, limit=limit) 

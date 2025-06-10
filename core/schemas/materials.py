@@ -11,48 +11,29 @@ class MaterialBase(BaseModel):
 class MaterialCreate(MaterialBase):
     pass
 
-class MaterialUpdate(MaterialBase):
+class MaterialUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=200)
     category: Optional[str] = None
     unit: Optional[str] = None
+    description: Optional[str] = None
 
-class MaterialInDB(MaterialBase):
+class Material(MaterialBase):
     id: str
+    embedding: List[float]
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
 
-class MaterialResponse(MaterialInDB):
-    pass
-
 class MaterialSearchQuery(BaseModel):
     query: str = Field(..., min_length=1)
     limit: int = Field(default=10, ge=1, le=100)
 
-class CategoryBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=50)
+class Category(BaseModel):
+    name: str
     description: Optional[str] = None
 
-class CategoryCreate(CategoryBase):
-    pass
-
-class CategoryInDB(CategoryBase):
-    id: str
-
-    class Config:
-        from_attributes = True
-
-class UnitBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=20)
-    description: Optional[str] = None
-
-class UnitCreate(UnitBase):
-    pass
-
-class UnitInDB(UnitBase):
-    id: str
-
-    class Config:
-        from_attributes = True 
+class Unit(BaseModel):
+    name: str
+    description: Optional[str] = None 

@@ -1,7 +1,9 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
-from sentence_transformers import SentenceTransformer
-import numpy as np
+import openai
+from qdrant_client import QdrantClient
+from qdrant_client.http import models
+import uuid
 
 from core.models.materials import Material, Category, Unit
 from core.schemas.materials import MaterialCreate, MaterialUpdate
@@ -9,21 +11,70 @@ from core.config import settings
 
 class MaterialsService:
     def __init__(self):
-        self.model = SentenceTransformer(settings.EMBEDDING_MODEL)
+        self.client = QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY
+        )
+        self.openai_client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        
+        # Ensure collection exists
+        self._init_collection()
+    
+    def _init_collection(self):
+        """Initialize Qdrant collection if it doesn't exist"""
+        collections = self.client.get_collections().collections
+        if not any(c.name == settings.QDRANT_COLLECTION_NAME for c in collections):
+            self.client.create_collection(
+                collection_name=settings.QDRANT_COLLECTION_NAME,
+                vectors_config=models.VectorParams(
+                    size=1536,  # OpenAI embedding dimension
+                    distance=models.Distance.COSINE
+                )
+            )
+    
+    async def _get_embedding(self, text: str) -> List[float]:
+        """Get embedding from OpenAI API"""
+        response = await self.openai_client.embeddings.create(
+            model="text-embedding-ada-002",
+            input=text
+        )
+        return response.data[0].embedding
     
     async def create_material(self, material: MaterialCreate) -> Material:
-        # Generate embedding for the material
-        embedding = self.model.encode(f"{material.name} {material.description or ''}")
+        # Generate embedding
+        text = f"{material.name} {material.description or ''}"
+        embedding = await self._get_embedding(text)
         
-        db_material = Material(
-            **material.model_dump(),
-            embedding=embedding.tolist()
+        # Create material with ID
+        material_id = str(uuid.uuid4())
+        material_dict = material.model_dump()
+        material_dict.update({
+            "id": material_id,
+            "embedding": embedding,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        })
+        
+        # Store in Qdrant
+        self.client.upsert(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            points=[models.PointStruct(
+                id=material_id,
+                vector=embedding,
+                payload=material_dict
+            )]
         )
-        await db_material.insert()
-        return db_material
+        
+        return Material(**material_dict)
     
     async def get_material(self, material_id: str) -> Optional[Material]:
-        return await Material.get(material_id)
+        response = self.client.retrieve(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            ids=[material_id]
+        )
+        if not response:
+            return None
+        return Material(**response[0].payload)
     
     async def get_materials(
         self, 
@@ -31,97 +82,126 @@ class MaterialsService:
         limit: int = 10,
         category: Optional[str] = None
     ) -> List[Material]:
-        query = {}
+        # Prepare filter conditions
+        filter_conditions = []
         if category:
-            query["category"] = category
+            filter_conditions.append(
+                models.FieldCondition(
+                    key="category",
+                    match=models.MatchValue(value=category)
+                )
+            )
         
-        return await Material.find(query).skip(skip).limit(limit).to_list()
+        # Get materials from Qdrant
+        response = self.client.scroll(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            scroll_filter=models.Filter(
+                must=filter_conditions
+            ) if filter_conditions else None,
+            limit=limit,
+            offset=skip
+        )
+        
+        return [Material(**point.payload) for point in response[0]]
     
     async def update_material(
         self, 
         material_id: str, 
         material_update: MaterialUpdate
     ) -> Optional[Material]:
-        material = await self.get_material(material_id)
-        if not material:
+        # Get existing material
+        existing = await self.get_material(material_id)
+        if not existing:
             return None
-            
+        
+        # Update fields
         update_data = material_update.model_dump(exclude_unset=True)
         
+        # If name or description changed, update embedding
         if "name" in update_data or "description" in update_data:
-            # Re-generate embedding if name or description changed
-            embedding = self.model.encode(
-                f"{update_data.get('name', material.name)} {update_data.get('description', material.description or '')}"
-            )
-            update_data["embedding"] = embedding.tolist()
+            name = update_data.get("name", existing.name)
+            description = update_data.get("description", existing.description)
+            text = f"{name} {description or ''}"
+            update_data["embedding"] = await self._get_embedding(text)
         
         update_data["updated_at"] = datetime.utcnow()
         
-        await material.update({"$set": update_data})
-        return material
+        # Update in Qdrant
+        material_dict = existing.model_dump()
+        material_dict.update(update_data)
+        
+        self.client.upsert(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            points=[models.PointStruct(
+                id=material_id,
+                vector=material_dict["embedding"],
+                payload=material_dict
+            )]
+        )
+        
+        return Material(**material_dict)
     
     async def delete_material(self, material_id: str) -> bool:
-        material = await self.get_material(material_id)
-        if not material:
+        try:
+            self.client.delete(
+                collection_name=settings.QDRANT_COLLECTION_NAME,
+                points_selector=models.PointIdsList(
+                    points=[material_id]
+                )
+            )
+            return True
+        except Exception:
             return False
-        await material.delete()
-        return True
     
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
-        # Generate embedding for the search query
-        query_embedding = self.model.encode(query)
+        # Get query embedding
+        query_embedding = await self._get_embedding(query)
         
-        # Get all materials (in a real application, you'd want to optimize this)
-        all_materials = await Material.find_all().to_list()
+        # Search in Qdrant
+        response = self.client.search(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            query_vector=query_embedding,
+            limit=limit
+        )
         
-        if not all_materials:
-            return []
-        
-        # Calculate similarities
-        similarities = []
-        for material in all_materials:
-            if material.embedding:
-                similarity = np.dot(query_embedding, material.embedding)
-                similarities.append((similarity, material))
-        
-        # Sort by similarity and return top matches
-        similarities.sort(key=lambda x: x[0], reverse=True)
-        return [material for _, material in similarities[:limit]]
+        return [Material(**point.payload) for point in response]
 
 class CategoryService:
-    @staticmethod
-    async def create_category(name: str, description: Optional[str] = None) -> Category:
+    _categories: Dict[str, Category] = {}
+    
+    @classmethod
+    async def create_category(cls, name: str, description: Optional[str] = None) -> Category:
         category = Category(name=name, description=description)
-        await category.insert()
+        cls._categories[name] = category
         return category
     
-    @staticmethod
-    async def get_categories() -> List[Category]:
-        return await Category.find_all().to_list()
+    @classmethod
+    async def get_categories(cls) -> List[Category]:
+        return list(cls._categories.values())
     
-    @staticmethod
-    async def delete_category(name: str) -> bool:
-        category = await Category.find_one(Category.name == name)
-        if not category:
-            return False
-        await category.delete()
-        return True
+    @classmethod
+    async def delete_category(cls, name: str) -> bool:
+        if name in cls._categories:
+            del cls._categories[name]
+            return True
+        return False
 
 class UnitService:
-    @staticmethod
-    async def create_unit(name: str, description: Optional[str] = None) -> Unit:
+    _units: Dict[str, Unit] = {}
+    
+    @classmethod
+    async def create_unit(cls, name: str, description: Optional[str] = None) -> Unit:
         unit = Unit(name=name, description=description)
-        await unit.insert()
+        cls._units[name] = unit
         return unit
     
-    @staticmethod
-    async def get_units() -> List[Unit]:
-        return await Unit.find_all().to_list()
+    @classmethod
+    async def get_units(cls) -> List[Unit]:
+        return list(cls._units.values())
     
-    @staticmethod
-    async def delete_unit(name: str) -> bool:
-        unit = await Unit.find_one(Unit.name == name)
-        if not unit:
-            return False
-        await unit.delete()
-        return True 
+    @classmethod
+    async def delete_unit(cls, name: str) -> bool:
+        if name in cls._units:
+            del cls._units[name]
+            return True
+        return False 

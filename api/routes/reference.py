@@ -1,76 +1,38 @@
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query
-from core.schemas.materials import (
-    MaterialCreate, MaterialUpdate, MaterialResponse,
-    CategoryCreate, CategoryInDB, UnitCreate, UnitInDB
-)
-from services.materials import MaterialsService, CategoryService, UnitService
+from typing import List
+from fastapi import APIRouter
+from core.schemas.materials import Category, Unit
+from services.materials import CategoryService, UnitService
 
 router = APIRouter()
-materials_service = MaterialsService()
 
-# Materials endpoints
-@router.post("/materials", response_model=MaterialResponse)
-async def create_material(material: MaterialCreate):
-    return await materials_service.create_material(material)
+@router.post("/categories/", response_model=Category)
+async def create_category(category: Category):
+    """Create a new category"""
+    return await CategoryService.create_category(category.name, category.description)
 
-@router.get("/materials", response_model=List[MaterialResponse])
-async def get_materials(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(10, ge=1, le=100),
-    category: Optional[str] = None
-):
-    return await materials_service.get_materials(skip, limit, category)
-
-@router.get("/materials/{material_id}", response_model=MaterialResponse)
-async def get_material(material_id: str):
-    material = await materials_service.get_material(material_id)
-    if not material:
-        raise HTTPException(status_code=404, detail="Material not found")
-    return material
-
-@router.put("/materials/{material_id}", response_model=MaterialResponse)
-async def update_material(material_id: str, material: MaterialUpdate):
-    updated_material = await materials_service.update_material(material_id, material)
-    if not updated_material:
-        raise HTTPException(status_code=404, detail="Material not found")
-    return updated_material
-
-@router.delete("/materials/{material_id}")
-async def delete_material(material_id: str):
-    deleted = await materials_service.delete_material(material_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Material not found")
-    return {"message": "Material deleted successfully"}
-
-# Categories endpoints
-@router.get("/categories", response_model=List[CategoryInDB])
+@router.get("/categories/", response_model=List[Category])
 async def get_categories():
+    """Get all categories"""
     return await CategoryService.get_categories()
-
-@router.post("/categories", response_model=CategoryInDB)
-async def create_category(category: CategoryCreate):
-    return await CategoryService.create_category(**category.model_dump())
 
 @router.delete("/categories/{name}")
 async def delete_category(name: str):
-    deleted = await CategoryService.delete_category(name)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Category not found")
-    return {"message": "Category deleted successfully"}
+    """Delete a category"""
+    success = await CategoryService.delete_category(name)
+    return {"success": success}
 
-# Units endpoints
-@router.get("/units", response_model=List[UnitInDB])
+@router.post("/units/", response_model=Unit)
+async def create_unit(unit: Unit):
+    """Create a new unit"""
+    return await UnitService.create_unit(unit.name, unit.description)
+
+@router.get("/units/", response_model=List[Unit])
 async def get_units():
+    """Get all units"""
     return await UnitService.get_units()
-
-@router.post("/units", response_model=UnitInDB)
-async def create_unit(unit: UnitCreate):
-    return await UnitService.create_unit(**unit.model_dump())
 
 @router.delete("/units/{name}")
 async def delete_unit(name: str):
-    deleted = await UnitService.delete_unit(name)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Unit not found")
-    return {"message": "Unit deleted successfully"} 
+    """Delete a unit"""
+    success = await UnitService.delete_unit(name)
+    return {"success": success} 
