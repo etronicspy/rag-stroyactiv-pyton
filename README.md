@@ -1,105 +1,122 @@
-# RAG Search API
+# RAG Construction Materials API
 
-REST API сервис для семантического поиска с использованием RAG (Retrieval-Augmented Generation) на основе OpenAI и Qdrant.
+API для управления строительными материалами с семантическим поиском и обработкой прайс-листов.
 
 ## Функциональность
 
-- Семантический поиск по базе знаний
-- Возвращает релевантные результаты с источниками
-- Использует embeddings от OpenAI для векторного поиска
-- Хранение векторов в Qdrant
+### Поиск
+- `POST /api/v1/search` - Семантический поиск по материалам
 
-## Технологии
+### Обработка прайс-листов
+- `POST /api/v1/prices/process` - Обработка и валидация прайс-листов
 
-- FastAPI
-- OpenAI API (embeddings)
-- Qdrant Vector Database
-- Python 3.8+
+### Справочные данные
+#### Материалы
+- `GET /api/v1/reference/materials` - Список материалов с фильтрацией
+- `GET /api/v1/reference/materials/{id}` - Получение материала по ID
+- `POST /api/v1/reference/materials` - Создание материала
+- `PUT /api/v1/reference/materials/{id}` - Обновление материала
+- `DELETE /api/v1/reference/materials/{id}` - Удаление материала
 
-## Установка
+#### Категории
+- `GET /api/v1/reference/categories` - Список категорий
+- `POST /api/v1/reference/categories` - Создание категории
+- `DELETE /api/v1/reference/categories/{name}` - Удаление категории
+
+#### Единицы измерения
+- `GET /api/v1/reference/units` - Список единиц измерения
+- `POST /api/v1/reference/units` - Создание единицы измерения
+- `DELETE /api/v1/reference/units/{name}` - Удаление единицы измерения
+
+### Мониторинг
+- `GET /api/v1/health` - Проверка здоровья системы
+- `GET /api/v1/health/config` - Статус конфигурации
+
+## Установка и запуск
 
 1. Клонируйте репозиторий:
 ```bash
-git clone [your-repo-url]
-cd [your-repo-name]
+git clone <repository-url>
+cd rag-construction-materials
 ```
 
-2. Создайте виртуальное окружение:
+2. Создайте виртуальное окружение и установите зависимости:
 ```bash
-python -m venv venv
-source venv/bin/activate  # для Linux/MacOS
-# или
-.\venv\Scripts\activate  # для Windows
-```
-
-3. Установите зависимости:
-```bash
+python -m venv .venv
+source .venv/bin/activate  # для Linux/MacOS
+.venv\Scripts\activate  # для Windows
 pip install -r requirements.txt
 ```
 
-4. Настройте переменные окружения:
-   - Создайте файл `env.local` на основе примера ниже:
-```
-OPENAI_API_KEY=your_openai_key_here
-QDRANT_URL=your_qdrant_url_here
-QDRANT_API_KEY=your_qdrant_api_key_here
-```
-
-## Запуск
-
-1. Активируйте виртуальное окружение (если еще не активировано):
+3. Настройте переменные окружения:
 ```bash
-source venv/bin/activate  # для Linux/MacOS
-# или
-.\venv\Scripts\activate  # для Windows
+cp .env.example .env
+# Отредактируйте .env под свои нужды
 ```
 
-2. Запустите сервер:
+4. Запустите MongoDB:
 ```bash
-python main.py
+# Убедитесь, что MongoDB запущен на localhost:27017
 ```
 
-Сервер будет доступен по адресу: `http://localhost:8000`
+5. Запустите приложение:
+```bash
+uvicorn main:app --reload
+```
 
-## API Endpoints
+API будет доступно по адресу: http://localhost:8000
+Swagger документация: http://localhost:8000/docs
 
-### POST /search
+## Форматы данных
 
-Поиск релевантной информации по запросу.
-
-**Request:**
+### Материал
 ```json
 {
-    "query": "ваш поисковый запрос",
-    "limit": 5
+  "name": "Портландцемент М500",
+  "category": "Cement",
+  "unit": "bag",
+  "description": "Высококачественный цемент для строительных работ"
 }
 ```
 
-**Response:**
-```json
-{
-    "query": "ваш поисковый запрос",
-    "matches": [
-        {
-            "score": 0.95,
-            "payload": {
-                "text": "найденный текст",
-                "source": "url источника"
-            }
-        }
-    ],
-    "sources": ["url1", "url2"]
-}
-```
-
-## Swagger Documentation
-
-API документация доступна по адресу: `http://localhost:8000/docs`
+### Прайс-лист
+Поддерживаются форматы CSV и Excel (xls, xlsx) со следующими обязательными колонками:
+- name
+- category
+- unit
+- description (опционально)
 
 ## Разработка
 
-1. Убедитесь, что все зависимости установлены
-2. Создайте новую ветку для ваших изменений
-3. Следуйте PEP 8 для Python кода
-4. Добавьте тесты для новой функциональности
-5. Обновите документацию при необходимости 
+### Структура проекта
+```
+.
+├── api/
+│   └── routes/
+│       ├── health.py
+│       ├── prices.py
+│       ├── reference.py
+│       └── search.py
+├── core/
+│   ├── config.py
+│   ├── models/
+│   │   └── materials.py
+│   └── schemas/
+│       └── materials.py
+├── services/
+│   ├── materials.py
+│   └── price_processor.py
+├── tests/
+│   └── ...
+├── .env
+├── main.py
+└── requirements.txt
+```
+
+### Запуск тестов
+```bash
+pytest
+```
+
+## Лицензия
+MIT 
