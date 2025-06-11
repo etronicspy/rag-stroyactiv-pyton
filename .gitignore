@@ -59,6 +59,9 @@ htmlcov/
 temp/
 tmp/
 
+# Utils directory (optimized utilities)
+utils/
+
 # Utils temporary files and outputs
 utils/temp/
 utils/output/
