@@ -88,7 +88,7 @@ class MaterialsService:
             self._ensure_collection_exists()
             
             # Generate embedding
-            text_for_embedding = f"{material.name} {material.category} {material.article or ''} {material.description or ''}"
+            text_for_embedding = f"{material.name} {material.use_category} {material.article or ''} {material.description or ''}"
             embedding = await self._get_embedding(text_for_embedding)
             
             # Create material ID
@@ -103,7 +103,7 @@ class MaterialsService:
                 vector=embedding,
                 payload={
                     "name": material.name,
-                    "category": material.category,
+                    "use_category": material.use_category,
                     "unit": material.unit,
                     "article": material.article,
                     "description": material.description,
@@ -121,7 +121,7 @@ class MaterialsService:
             return Material(
                 id=material_id,
                 name=material.name,
-                category=material.category,
+                use_category=material.use_category,
                 unit=material.unit,
                 article=material.article,
                 description=material.description,
@@ -173,7 +173,7 @@ class MaterialsService:
             return Material(
                 id=str(result.id),
                 name=result.payload.get("name"),
-                category=result.payload.get("category"),
+                use_category=result.payload.get("use_category", ""),
                 unit=result.payload.get("unit"),
                 article=result.payload.get("article"),
                 description=result.payload.get("description"),
@@ -199,7 +199,7 @@ class MaterialsService:
                 updated_data[field] = value
             
             # Generate new embedding if content changed
-            text_for_embedding = f"{updated_data['name']} {updated_data['category']} {updated_data.get('article', '')} {updated_data.get('description', '')}"
+            text_for_embedding = f"{updated_data['name']} {updated_data['use_category']} {updated_data.get('article', '')} {updated_data.get('description', '')}"
             embedding = await self._get_embedding(text_for_embedding)
             
             from datetime import datetime
@@ -212,7 +212,7 @@ class MaterialsService:
                 vector=embedding,
                 payload={
                     "name": updated_data["name"],
-                    "category": updated_data["category"],
+                    "use_category": updated_data["use_category"],
                     "unit": updated_data["unit"],
                     "article": updated_data.get("article"),
                     "description": updated_data.get("description"),
@@ -287,7 +287,7 @@ class MaterialsService:
                 material = Material(
                     id=str(result.id),
                     name=result.payload.get("name"),
-                    category=result.payload.get("category"),
+                    use_category=result.payload.get("use_category", ""),
                     unit=result.payload.get("unit"),
                     article=result.payload.get("article"),
                     description=result.payload.get("description"),
@@ -351,7 +351,7 @@ class MaterialsService:
                     material = Material(
                         id=str(point.id),
                         name=point.payload.get("name"),
-                        category=point.payload.get("category"),
+                        use_category=point.payload.get("use_category", ""),
                         unit=point.payload.get("unit"),
                         article=point.payload.get("article"),
                         description=point.payload.get("description"),
@@ -360,7 +360,7 @@ class MaterialsService:
                     )
                     
                     # Apply category filter if specified
-                    if category is None or material.category == category:
+                    if category is None or material.use_category == category:
                         all_materials.append(material)
                 
                 # Break if no more results
@@ -399,7 +399,7 @@ class MaterialsService:
                 # Generate embeddings in parallel for the chunk
                 embedding_tasks = []
                 for material in chunk:
-                    text_for_embedding = f"{material.name} {material.category} {material.article or ''} {material.description or ''}"
+                    text_for_embedding = f"{material.name} {material.use_category} {material.article or ''} {material.description or ''}"
                     embedding_tasks.append(self._get_embedding(text_for_embedding))
                 
                 try:
@@ -424,7 +424,7 @@ class MaterialsService:
                             vector=embedding,
                             payload={
                                 "name": material.name,
-                                "category": material.category,
+                                "use_category": material.use_category,
                                 "unit": material.unit,
                                 "article": material.article,
                                 "description": material.description,
@@ -438,7 +438,7 @@ class MaterialsService:
                         created_material = Material(
                             id=material_id,
                             name=material.name,
-                            category=material.category,
+                            use_category=material.use_category,
                             unit=material.unit,
                             article=material.article,
                             description=material.description,
@@ -519,7 +519,7 @@ class MaterialsService:
             
             material = MaterialCreate(
                 name=item.name,
-                category=category,
+                use_category=category,
                 unit=unit,
                 article=item.article,
                 description=None

@@ -14,7 +14,7 @@ def test_create_material(client, setup_references):
         "/api/v1/materials/",
         json={
             "name": "Портландцемент М500",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": "Высококачественный цемент для строительных работ"
         }
@@ -22,7 +22,7 @@ def test_create_material(client, setup_references):
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Портландцемент М500"
-    assert data["category"] == "Цемент"
+    assert data["use_category"] == "Цемент"
     assert data["unit"] == "кг"
     assert "id" in data
     assert "embedding" in data
@@ -34,7 +34,7 @@ def test_get_material(client, setup_references):
         "/api/v1/materials/",
         json={
             "name": "Портландцемент М400",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": "Стандартный цемент для общих работ"
         }
@@ -55,7 +55,7 @@ def test_get_materials(client, setup_references):
         "/api/v1/materials/",
         json={
             "name": "Цемент М500",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": "Описание 1"
         }
@@ -64,7 +64,7 @@ def test_get_materials(client, setup_references):
         "/api/v1/materials/",
         json={
             "name": "Цемент М400",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": "Описание 2"
         }
@@ -83,7 +83,7 @@ def test_update_material(client, setup_references):
         "/api/v1/materials/",
         json={
             "name": "Старое название",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": "Старое описание"
         }
@@ -111,7 +111,7 @@ def test_delete_material(client, setup_references):
         "/api/v1/materials/",
         json={
             "name": "Для удаления",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": "Тестовый материал для удаления"
         }
@@ -135,7 +135,7 @@ def test_search_materials(client, setup_references):
         "/api/v1/materials/",
         json={
             "name": "Портландцемент белый",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": "Белый цемент для декоративных работ"
         }
@@ -144,7 +144,7 @@ def test_search_materials(client, setup_references):
         "/api/v1/materials/",
         json={
             "name": "Портландцемент серый",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": "Серый цемент для общих работ"
         }
@@ -167,21 +167,21 @@ def test_create_materials_batch(client, setup_references):
     materials_data = [
         {
             "name": "Цемент М500 batch 1",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "article": "BTH0001",
             "description": "Тест батч 1"
         },
         {
             "name": "Цемент М400 batch 2",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "article": "BTH0002",
             "description": "Тест батч 2"
         },
         {
             "name": "Песок речной batch 3",
-            "category": "Песок",
+            "use_category": "Песок",
             "unit": "м³",
             "article": "BTH0003",
             "description": "Тест батч 3"
@@ -208,7 +208,7 @@ def test_create_materials_batch(client, setup_references):
     # Verify all materials were created with proper data
     for i, created_material in enumerate(data["created_materials"]):
         assert created_material["name"] == materials_data[i]["name"]
-        assert created_material["category"] == materials_data[i]["category"]
+        assert created_material["use_category"] == materials_data[i]["use_category"]
         assert "id" in created_material
 
 def test_import_materials_from_json(client, setup_references):
@@ -224,7 +224,7 @@ def test_import_materials_from_json(client, setup_references):
         "/api/v1/materials/import",
         json={
             "materials": import_data,
-            "default_category": "Стройматериалы",
+            "default_use_category": "Стройматериалы",
             "default_unit": "шт",
             "batch_size": 2
         }
@@ -243,16 +243,16 @@ def test_import_materials_from_json(client, setup_references):
     
     # Check that smart categorization worked
     cement_material = next(m for m in materials if "цемент" in m["name"].lower())
-    assert cement_material["category"] == "Цемент"
+    assert cement_material["use_category"] == "Цемент"
     
     sand_material = next(m for m in materials if "песок" in m["name"].lower())
-    assert sand_material["category"] == "Песок"
+    assert sand_material["use_category"] == "Песок"
     
     brick_material = next(m for m in materials if "кирпич" in m["name"].lower())
-    assert brick_material["category"] == "Кирпич"
+    assert brick_material["use_category"] == "Кирпич"
     
     rebar_material = next(m for m in materials if "арматура" in m["name"].lower())
-    assert rebar_material["category"] == "Арматура"
+    assert rebar_material["use_category"] == "Арматура"
     
     # Check that articles are stored in separate field
     for i, material in enumerate(materials):
@@ -264,21 +264,21 @@ def test_batch_with_errors(client, setup_references):
     materials_data = [
         {
             "name": "Валидный материал",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "article": "TST0001",
             "description": "Корректный материал"
         },
         {
             "name": "Валидное имя материала",  # Valid name
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "article": "TST0002",
             "description": "Корректный материал"
         },
         {
             "name": "Еще один валидный материал",
-            "category": "Песок",
+            "use_category": "Песок",
             "unit": "м³",
             "article": "TST0003",
             "description": "Еще корректный материал"
@@ -319,7 +319,7 @@ def test_large_batch_size_limit(client, setup_references):
     materials_data = [
         {
             "name": f"Материал {i}",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": f"Описание {i}"
         }

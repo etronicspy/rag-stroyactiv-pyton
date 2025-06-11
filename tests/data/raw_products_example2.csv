@@ -1,0 +1,4 @@
+name,use_category,sku,unit_price,unit_price_currency,unit_calc_price,unit_calc_price_currency,buy_price,buy_price_currency,sale_price,sale_price_currency,calc_unit,count,date_price_change
+Гипсокартон 12мм,Отделочные материалы,GYPSUM001,250.00,RUB,255.00,RUB,240.00,RUB,260.00,RUB,м²,800,2024-02-01
+Утеплитель минвата,Теплоизоляция,INSUL001,1500.00,RUB,1520.00,RUB,1450.00,RUB,1550.00,RUB,м³,200,2024-02-01
+Профиль направляющий,Металлопрокат,PROFILE001,180.00,RUB,182.00,RUB,175.00,RUB,185.00,RUB,м,1500,2024-02-01 

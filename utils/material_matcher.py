@@ -28,10 +28,10 @@ class MaterialMatch:
     """Класс для хранения результата сопоставления материалов"""
     reference_id: str
     reference_name: str
-    reference_category: str
+    reference_use_category: str
     reference_unit: str
     price_item_name: str
-    price_item_category: str  
+    price_item_use_category: str  
     price_item_unit: str
     price_item_price: float
     price_item_supplier: str
@@ -85,7 +85,7 @@ class MaterialMatcher:
                 {
                     "id": material.id,
                     "name": material.name,
-                    "category": material.category,
+                    "use_category": material.use_category,
                     "unit": material.unit,
                     "description": material.description or "",
                     "embedding": material.embedding
@@ -114,7 +114,7 @@ class MaterialMatcher:
                 materials.append({
                     "id": str(point.id),
                     "name": point.payload.get("name"),
-                    "category": point.payload.get("category"), 
+                    "use_category": point.payload.get("use_category", ""), 
                     "unit": point.payload.get("unit"),
                     "price": point.payload.get("price"),
                     "description": point.payload.get("description", ""),
@@ -209,10 +209,10 @@ class MaterialMatcher:
                         best_match = MaterialMatch(
                             reference_id=ref_material.get('id', ''),
                             reference_name=ref_material['name'],
-                            reference_category=ref_material['category'],
+                            reference_use_category=ref_material['use_category'],
                             reference_unit=ref_material['unit'],
                             price_item_name=price_item['name'],
-                            price_item_category=price_item['category'],
+                            price_item_use_category=price_item['use_category'],
                             price_item_unit=price_item['unit'],
                             price_item_price=price_item['price'],
                             price_item_supplier=supplier_id,
@@ -306,10 +306,10 @@ class MaterialMatcher:
                             best_match = MaterialMatch(
                                 reference_id=str(result.id),
                                 reference_name=ref_material['name'],
-                                reference_category=ref_material['category'],
+                                reference_use_category=ref_material.get('use_category', ''),
                                 reference_unit=ref_material['unit'],
                                 price_item_name=price_item['name'],
-                                price_item_category=price_item['category'],
+                                price_item_use_category=price_item['use_category'],
                                 price_item_unit=price_item['unit'],
                                 price_item_price=price_item['price'],
                                 price_item_supplier=supplier_id,
@@ -349,7 +349,7 @@ class MaterialMatcher:
             # Подготовить тексты для батчевого получения эмбеддингов
             match_texts = []
             for match in matches:
-                match_text = f"{match.reference_name} {match.price_item_name} {match.reference_category} {match.price_item_category}"
+                match_text = f"{match.reference_name} {match.price_item_name} {match.reference_use_category} {match.price_item_use_category}"
                 match_texts.append(match_text)
             
             # Получить все эмбеддинги за один раз
@@ -478,7 +478,7 @@ async def main():
         high_confidence_matches = [m for m in matches_fast if m.match_confidence == "high"]
         for match in high_confidence_matches[:5]:  # Показать топ-5
             print(f"   • {match.price_item_name} → {match.reference_name}")
-            print(f"     Категории: {match.price_item_category} → {match.reference_category}")
+            print(f"     Категории: {match.price_item_use_category} → {match.reference_use_category}")
             print(f"     Единицы: {match.price_item_unit} → {match.reference_unit}")
             print(f"     Скор: {match.combined_score:.3f}, Цена: {match.price_item_price}₽")
             print()

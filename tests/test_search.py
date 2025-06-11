@@ -16,7 +16,7 @@ def test_search_materials_success(client, mock_materials_service):
         {
             "id": "1",
             "name": "Портландцемент М500",
-            "category": "Цемент", 
+            "use_category": "Цемент", 
             "unit": "кг",
             "description": "Высококачественный цемент",
             "created_at": "2024-01-01T12:00:00",
@@ -25,7 +25,7 @@ def test_search_materials_success(client, mock_materials_service):
         {
             "id": "2", 
             "name": "Цемент белый",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг", 
             "description": "Белый цемент для декоративных работ",
             "created_at": "2024-01-01T12:00:00",
@@ -65,7 +65,7 @@ def test_search_materials_custom_limit(client, mock_materials_service):
         {
             "id": "1",
             "name": "Песок речной",
-            "category": "Песок",
+            "use_category": "Песок",
             "unit": "м³",
             "description": "Чистый речной песок",
             "created_at": "2024-01-01T12:00:00",

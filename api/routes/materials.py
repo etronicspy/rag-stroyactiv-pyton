@@ -57,7 +57,7 @@ async def import_materials_from_json(import_data: MaterialImportRequest):
     try:
         return await materials_service.import_materials_from_json(
             import_data.materials,
-            import_data.default_category,
+            import_data.default_use_category,
             import_data.default_unit,
             import_data.batch_size
         )

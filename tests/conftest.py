@@ -90,14 +90,14 @@ def sample_price_data():
     return [
         {
             "name": "Cement Portland Test",
-            "category": "Building Materials", 
+            "use_category": "Building Materials", 
             "unit": "kg",
             "price": 45.50,
             "description": "High quality cement for testing"
         },
         {
             "name": "Sand Construction Test",
-            "category": "Building Materials",
+            "use_category": "Building Materials",
             "unit": "m3", 
             "price": 1200.00,
             "description": "Washed construction sand for testing"

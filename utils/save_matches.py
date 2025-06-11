@@ -32,7 +32,7 @@ async def save_and_view_matches(supplier_id: str):
     # Подготовить тексты для батчевого получения эмбеддингов
     match_texts = []
     for match in matches:
-        match_text = f"{match.reference_name} {match.price_item_name} {match.reference_category} {match.price_item_category}"
+        match_text = f"{match.reference_name} {match.price_item_name} {match.reference_use_category} {match.price_item_use_category}"
         match_texts.append(match_text)
     
     # Получить все эмбеддинги за один раз
@@ -167,7 +167,7 @@ async def view_saved_matches():
             print(f"\n🏆 ЛУЧШЕЕ СОВПАДЕНИЕ:")
             print(f"   Материал из прайса: {best_match.get('price_item_name')}")
             print(f"   Эталонный материал: {best_match.get('reference_name')}")
-            print(f"   Категории: {best_match.get('price_item_category')} → {best_match.get('reference_category')}")
+            print(f"   Категории: {best_match.get('price_item_use_category')} → {best_match.get('reference_use_category')}")
             print(f"   Единицы: {best_match.get('price_item_unit')} → {best_match.get('reference_unit')}")
             print(f"   Сходство названий: {best_match.get('name_similarity', 0):.3f}")
             print(f"   Сходство единиц: {best_match.get('unit_similarity', 0):.3f}")

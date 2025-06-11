@@ -115,7 +115,7 @@ class TestBasicUtilities:
         first_material = temp_materials_data[0]
         assert 'article' in first_material
         assert 'name' in first_material
-        assert 'category' in first_material
+        assert 'use_category' in first_material
         assert 'unit' in first_material
 
 

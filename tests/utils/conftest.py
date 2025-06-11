@@ -48,21 +48,21 @@ def temp_materials_data():
         {
             "article": "TEST001",
             "name": "Тестовый цемент М400",
-            "category": "Цемент",
+            "use_category": "Цемент",
             "unit": "кг",
             "description": None
         },
         {
             "article": "TEST002", 
             "name": "Тестовый песок речной",
-            "category": "Песок",
+            "use_category": "Песок",
             "unit": "м³",
             "description": None
         },
         {
             "article": "TEST003",
             "name": "Тестовый кирпич красный",
-            "category": "Кирпич", 
+            "use_category": "Кирпич", 
             "unit": "шт",
             "description": None
         }
@@ -79,7 +79,7 @@ def sample_search_results():
             "payload": {
                 "name": "Цемент портландский М500",
                 "article": "CEM001",
-                "category": "Цемент",
+                "use_category": "Цемент",
                 "unit": "кг"
             }
         },
@@ -89,7 +89,7 @@ def sample_search_results():
             "payload": {
                 "name": "Песок строительный мытый",
                 "article": "SND001",
-                "category": "Песок",
+                "use_category": "Песок",
                 "unit": "м³"
             }
         }

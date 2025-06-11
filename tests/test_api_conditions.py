@@ -53,7 +53,7 @@ class TestAPIBasicFunctionality:
             "/api/v1/materials/",
             json={
                 "name": "Бетон М300",
-                "category": "Бетон",
+                "use_category": "Бетон",
                 "unit": "м³",
                 "description": "Товарный бетон марки М300"
             }
@@ -61,7 +61,7 @@ class TestAPIBasicFunctionality:
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Бетон М300"
-        assert data["category"] == "Бетон"
+        assert data["use_category"] == "Бетон"
         assert data["unit"] == "м³"
         assert "id" in data
         assert "created_at" in data
@@ -135,7 +135,7 @@ class TestAPIValidation:
             "/api/v1/materials/",
             json={
                 "name": "",
-                "category": "",
+                "use_category": "",
                 "unit": "",
                 "description": ""
             }
@@ -289,7 +289,7 @@ class TestAPIResponseStructure:
             "/api/v1/materials/",
             json={
                 "name": "Тестовый материал",
-                "category": "Тест",
+                "use_category": "Тест",
                 "unit": "шт",
                 "description": "Описание"
             }
@@ -297,7 +297,7 @@ class TestAPIResponseStructure:
         
         if response.status_code == 200:
             data = response.json()
-            required_fields = ["id", "name", "category", "unit", "description", "created_at", "updated_at"]
+            required_fields = ["id", "name", "use_category", "unit", "description", "created_at", "updated_at"]
             for field in required_fields:
                 assert field in data, f"Field {field} missing in response"
     
@@ -342,7 +342,7 @@ class TestAPIResponseStructure:
             assert isinstance(data, list)
             if data:  # If there are results
                 item = data[0]
-                expected_fields = ["id", "name", "category", "unit", "description"]
+                expected_fields = ["id", "name", "use_category", "unit", "description"]
                 for field in expected_fields:
                     assert field in item, f"Field {field} missing in search result"
 
@@ -392,7 +392,7 @@ class TestAPIEdgeCases:
             "/api/v1/materials/",
             json={
                 "name": long_name,
-                "category": "Тест",
+                "use_category": "Тест",
                 "unit": "шт",
                 "description": "Описание"
             }
@@ -406,7 +406,7 @@ class TestAPIEdgeCases:
             "/api/v1/materials/",
             json={
                 "name": "Материал с символами: ✓ ★ ♦ ◊ €",
-                "category": "Специальная категория 中文",
+                "use_category": "Специальная категория 中文",
                 "unit": "шт",
                 "description": "Описание с эмодзи 🏠🔨"
             }

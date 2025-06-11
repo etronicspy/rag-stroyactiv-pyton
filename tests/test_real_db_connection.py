@@ -70,7 +70,7 @@ class TestRealDBConnection:
             test_vector = [0.1] * 384  # Простой тестовый вектор
             test_payload = {
                 "name": "Test Material",
-                "category": "Test Category",
+                "use_category": "Test Category",
                 "price": 100.0,
                 "supplier": "TEST_SUPPLIER"
             }

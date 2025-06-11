@@ -5,7 +5,7 @@ from datetime import datetime
 class Material(BaseModel):
     id: Optional[str] = None
     name: str = Field(..., min_length=2, max_length=200)
-    category: str
+    use_category: str  # Renamed from category
     unit: str
     article: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = None
@@ -17,7 +17,7 @@ class Material(BaseModel):
         json_schema_extra={
             "example": {
                 "name": "Портландцемент М500",
-                "category": "Cement",
+                "use_category": "Cement",  # Updated field name
                 "unit": "bag",
                 "article": "CEM0001",
                 "description": "Высококачественный цемент для строительных работ"
