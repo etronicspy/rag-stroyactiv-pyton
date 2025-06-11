@@ -598,14 +598,49 @@ class PriceProcessor:
                 if upload_date not in price_lists_by_date:
                     price_lists_by_date[upload_date] = []
                 
-                price_lists_by_date[upload_date].append({
+                # Create material entry supporting both legacy and extended formats
+                material = {
                     "id": str(point.id),
                     "name": point.payload.get("name"),
                     "use_category": point.payload.get("use_category"),
-                    "unit": point.payload.get("unit"),
-                    "price": point.payload.get("price"),
-                    "description": point.payload.get("description", "")
-                })
+                    "upload_date": point.payload.get("upload_date")
+                }
+                
+                # Legacy format fields
+                if point.payload.get("unit") is not None:
+                    material["unit"] = point.payload.get("unit")
+                if point.payload.get("price") is not None:
+                    material["price"] = point.payload.get("price")
+                if point.payload.get("description") is not None:
+                    material["description"] = point.payload.get("description", "")
+                
+                # Extended format fields
+                if point.payload.get("sku") is not None:
+                    material["sku"] = point.payload.get("sku")
+                if point.payload.get("unit_price") is not None:
+                    material["unit_price"] = point.payload.get("unit_price")
+                    material["unit_price_currency"] = point.payload.get("unit_price_currency")
+                if point.payload.get("unit_calc_price") is not None:
+                    material["unit_calc_price"] = point.payload.get("unit_calc_price")
+                    material["unit_calc_price_currency"] = point.payload.get("unit_calc_price_currency")
+                if point.payload.get("buy_price") is not None:
+                    material["buy_price"] = point.payload.get("buy_price")
+                    material["buy_price_currency"] = point.payload.get("buy_price_currency")
+                if point.payload.get("sale_price") is not None:
+                    material["sale_price"] = point.payload.get("sale_price")
+                    material["sale_price_currency"] = point.payload.get("sale_price_currency")
+                if point.payload.get("calc_unit") is not None:
+                    material["calc_unit"] = point.payload.get("calc_unit")
+                if point.payload.get("count") is not None:
+                    material["count"] = point.payload.get("count")
+                if point.payload.get("pricelistid") is not None:
+                    material["pricelistid"] = point.payload.get("pricelistid")
+                if point.payload.get("is_processed") is not None:
+                    material["is_processed"] = point.payload.get("is_processed")
+                if point.payload.get("date_price_change") is not None:
+                    material["date_price_change"] = point.payload.get("date_price_change")
+                
+                price_lists_by_date[upload_date].append(material)
             
             # Format response
             price_lists = []

@@ -105,4 +105,38 @@ try:
     from .load_materials import MaterialsLoader
     __all__.append('MaterialsLoader')
 except ImportError:
+    pass
+
+# Безопасные импорты утилит анализа данных
+try:
+    from .load_building_materials import load_materials
+    __all__.append('load_materials')
+except ImportError:
+    pass
+
+try:
+    from .check_loaded_materials import check_materials
+    __all__.append('check_materials')
+except ImportError:
+    pass
+
+# Безопасный импорт менеджера утилит
+try:
+    from .run_utility import main as run_utility_manager
+    __all__.append('run_utility_manager')
+except ImportError:
+    pass
+
+# Безопасный импорт утилит просмотра прайсов
+try:
+    from .show_supplier_prices import show_supplier_prices
+    __all__.append('show_supplier_prices')
+except ImportError:
+    pass
+
+# Безопасный импорт утилиты экспорта прайсов
+try:
+    from .export_supplier_prices import export_supplier_prices_to_csv
+    __all__.append('export_supplier_prices_to_csv')
+except ImportError:
     pass 

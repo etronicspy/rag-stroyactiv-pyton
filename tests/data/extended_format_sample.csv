@@ -1,0 +1,4 @@
+name,sku,use_category,unit_price,unit_price_currency,unit_calc_price,unit_calc_price_currency,buy_price,buy_price_currency,sale_price,sale_price_currency,calc_unit,count,date_price_change
+Цемент М400,CEM400,Вяжущие материалы,360.000,RUB,365.500,RUB,340.000,RUB,380.000,RUB,кг,1000,2024-01-15
+Песок речной,SAND_RIVER,Сыпучие материалы,1300.000,RUB,1320.000,RUB,1250.000,RUB,1350.000,RUB,м³,500,2024-01-15
+Кирпич красный,BRICK_RED,Кладочные материалы,15.000,RUB,15.500,RUB,14.000,RUB,16.000,RUB,шт,10000,2024-01-15 
