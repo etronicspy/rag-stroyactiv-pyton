@@ -7,6 +7,7 @@ class Material(BaseModel):
     name: str = Field(..., min_length=2, max_length=200)
     category: str
     unit: str
+    article: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = None
     embedding: Optional[List[float]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -18,6 +19,7 @@ class Material(BaseModel):
                 "name": "Портландцемент М500",
                 "category": "Cement",
                 "unit": "bag",
+                "article": "CEM0001",
                 "description": "Высококачественный цемент для строительных работ"
             }
         }

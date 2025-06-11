@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException
-from core.schemas.materials import MaterialCreate, MaterialUpdate, Material, MaterialSearchQuery
+from core.schemas.materials import MaterialCreate, MaterialUpdate, Material, MaterialSearchQuery, MaterialBatchCreate, MaterialBatchResponse, MaterialImportRequest
 from services.materials import MaterialsService
 
 router = APIRouter()
@@ -39,6 +39,30 @@ async def delete_material(material_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Material not found")
     return {"success": success}
+
+@router.post("/batch", response_model=MaterialBatchResponse)
+async def create_materials_batch(batch_data: MaterialBatchCreate):
+    """Batch create materials"""
+    try:
+        return await materials_service.create_materials_batch(
+            batch_data.materials, 
+            batch_data.batch_size
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch creation failed: {str(e)}")
+
+@router.post("/import", response_model=MaterialBatchResponse)
+async def import_materials_from_json(import_data: MaterialImportRequest):
+    """Import materials from JSON format (article + name)"""
+    try:
+        return await materials_service.import_materials_from_json(
+            import_data.materials,
+            import_data.default_category,
+            import_data.default_unit,
+            import_data.batch_size
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 @router.post("/search", response_model=List[Material])
 async def search_materials(query: MaterialSearchQuery):

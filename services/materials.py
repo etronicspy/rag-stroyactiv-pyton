@@ -88,7 +88,7 @@ class MaterialsService:
             self._ensure_collection_exists()
             
             # Generate embedding
-            text_for_embedding = f"{material.name} {material.category} {material.description or ''}"
+            text_for_embedding = f"{material.name} {material.category} {material.article or ''} {material.description or ''}"
             embedding = await self._get_embedding(text_for_embedding)
             
             # Create material ID
@@ -105,6 +105,7 @@ class MaterialsService:
                     "name": material.name,
                     "category": material.category,
                     "unit": material.unit,
+                    "article": material.article,
                     "description": material.description,
                     "created_at": current_time.isoformat(),
                     "updated_at": current_time.isoformat()
@@ -122,6 +123,7 @@ class MaterialsService:
                 name=material.name,
                 category=material.category,
                 unit=material.unit,
+                article=material.article,
                 description=material.description,
                 embedding=embedding,
                 created_at=current_time,
@@ -139,7 +141,8 @@ class MaterialsService:
             
             results = self.qdrant_client.retrieve(
                 collection_name=self.collection_name,
-                ids=[material_id]
+                ids=[material_id],
+                with_vectors=True
             )
             
             if not results:
@@ -172,7 +175,9 @@ class MaterialsService:
                 name=result.payload.get("name"),
                 category=result.payload.get("category"),
                 unit=result.payload.get("unit"),
+                article=result.payload.get("article"),
                 description=result.payload.get("description"),
+                embedding=result.vector if result.vector else None,
                 created_at=created_at,
                 updated_at=updated_at
             )
@@ -194,7 +199,7 @@ class MaterialsService:
                 updated_data[field] = value
             
             # Generate new embedding if content changed
-            text_for_embedding = f"{updated_data['name']} {updated_data['category']} {updated_data.get('description', '')}"
+            text_for_embedding = f"{updated_data['name']} {updated_data['category']} {updated_data.get('article', '')} {updated_data.get('description', '')}"
             embedding = await self._get_embedding(text_for_embedding)
             
             from datetime import datetime
@@ -209,6 +214,7 @@ class MaterialsService:
                     "name": updated_data["name"],
                     "category": updated_data["category"],
                     "unit": updated_data["unit"],
+                    "article": updated_data.get("article"),
                     "description": updated_data.get("description"),
                     "created_at": updated_data["created_at"].isoformat(),
                     "updated_at": current_time.isoformat()
@@ -283,6 +289,7 @@ class MaterialsService:
                     name=result.payload.get("name"),
                     category=result.payload.get("category"),
                     unit=result.payload.get("unit"),
+                    article=result.payload.get("article"),
                     description=result.payload.get("description"),
                     created_at=created_at,
                     updated_at=updated_at
@@ -346,6 +353,7 @@ class MaterialsService:
                         name=point.payload.get("name"),
                         category=point.payload.get("category"),
                         unit=point.payload.get("unit"),
+                        article=point.payload.get("article"),
                         description=point.payload.get("description"),
                         created_at=created_at,
                         updated_at=updated_at
@@ -366,6 +374,230 @@ class MaterialsService:
         except Exception as e:
             print(f"Error getting materials: {e}")
             return []
+
+    async def create_materials_batch(self, materials: List['MaterialCreate'], batch_size: int = 100) -> 'MaterialBatchResponse':
+        """Batch create materials with optimized performance"""
+        import time
+        import asyncio
+        from core.schemas.materials import MaterialBatchResponse
+        
+        start_time = time.time()
+        successful_creates = 0
+        failed_creates = 0
+        errors = []
+        created_materials = []
+        
+        try:
+            # Ensure collection exists
+            self._ensure_collection_exists()
+            
+            # Process materials in chunks
+            for i in range(0, len(materials), batch_size):
+                chunk = materials[i:i + batch_size]
+                print(f"Processing batch {i//batch_size + 1}: {len(chunk)} materials")
+                
+                # Generate embeddings in parallel for the chunk
+                embedding_tasks = []
+                for material in chunk:
+                    text_for_embedding = f"{material.name} {material.category} {material.article or ''} {material.description or ''}"
+                    embedding_tasks.append(self._get_embedding(text_for_embedding))
+                
+                try:
+                    embeddings = await asyncio.gather(*embedding_tasks)
+                except Exception as e:
+                    print(f"Error generating embeddings for batch: {e}")
+                    failed_creates += len(chunk)
+                    errors.append(f"Batch {i//batch_size + 1}: Failed to generate embeddings - {str(e)}")
+                    continue
+                
+                # Prepare points for bulk insert
+                points = []
+                current_time = time.time()
+                for j, (material, embedding) in enumerate(zip(chunk, embeddings)):
+                    try:
+                        material_id = str(uuid.uuid4())
+                        from datetime import datetime
+                        current_datetime = datetime.utcnow()
+                        
+                        point = PointStruct(
+                            id=material_id,
+                            vector=embedding,
+                            payload={
+                                "name": material.name,
+                                "category": material.category,
+                                "unit": material.unit,
+                                "article": material.article,
+                                "description": material.description,
+                                "created_at": current_datetime.isoformat(),
+                                "updated_at": current_datetime.isoformat()
+                            }
+                        )
+                        points.append(point)
+                        
+                        # Create Material object for response
+                        created_material = Material(
+                            id=material_id,
+                            name=material.name,
+                            category=material.category,
+                            unit=material.unit,
+                            article=material.article,
+                            description=material.description,
+                            embedding=embedding[:10] if embedding else None,  # Truncate for response
+                            created_at=current_datetime,
+                            updated_at=current_datetime
+                        )
+                        created_materials.append(created_material)
+                        
+                    except Exception as e:
+                        failed_creates += 1
+                        errors.append(f"Material '{material.name}': {str(e)}")
+                        continue
+                
+                # Bulk insert to Qdrant
+                if points:
+                    try:
+                        self.qdrant_client.upsert(
+                            collection_name=self.collection_name,
+                            points=points
+                        )
+                        successful_creates += len(points)
+                        print(f"Successfully inserted {len(points)} materials")
+                    except Exception as e:
+                        failed_creates += len(points)
+                        errors.append(f"Batch {i//batch_size + 1}: Failed to insert to Qdrant - {str(e)}")
+                        # Remove from created materials if insert failed
+                        created_materials = created_materials[:-len(points)]
+                        continue
+                
+                # Small delay between batches to avoid overwhelming the system
+                await asyncio.sleep(0.1)
+            
+            processing_time = time.time() - start_time
+            success = failed_creates == 0
+            
+            return MaterialBatchResponse(
+                success=success,
+                total_processed=len(materials),
+                successful_creates=successful_creates,
+                failed_creates=failed_creates,
+                processing_time_seconds=round(processing_time, 2),
+                errors=errors,
+                created_materials=created_materials
+            )
+            
+        except Exception as e:
+            processing_time = time.time() - start_time
+            return MaterialBatchResponse(
+                success=False,
+                total_processed=len(materials),
+                successful_creates=successful_creates,
+                failed_creates=len(materials) - successful_creates,
+                processing_time_seconds=round(processing_time, 2),
+                errors=[f"Batch processing failed: {str(e)}"] + errors,
+                created_materials=created_materials
+            )
+
+    async def import_materials_from_json(self, 
+                                       import_items: List['MaterialImportItem'], 
+                                       default_category: str = "Стройматериалы",
+                                       default_unit: str = "шт",
+                                       batch_size: int = 100) -> 'MaterialBatchResponse':
+        """Import materials from JSON format with article and name"""
+        from core.schemas.materials import MaterialCreate, MaterialImportItem
+        
+        # Convert import items to MaterialCreate objects
+        materials_to_create = []
+        category_map = self._get_category_mapping()
+        unit_map = self._get_unit_mapping()
+        
+        for item in import_items:
+            # Try to infer category from name or use default
+            category = self._infer_category(item.name, category_map) or default_category
+            
+            # Try to infer unit from name or use default  
+            unit = self._infer_unit(item.name, unit_map) or default_unit
+            
+            material = MaterialCreate(
+                name=item.name,
+                category=category,
+                unit=unit,
+                article=item.article,
+                description=None
+            )
+            materials_to_create.append(material)
+        
+        # Use existing batch create method
+        return await self.create_materials_batch(materials_to_create, batch_size)
+    
+    def _get_category_mapping(self) -> Dict[str, str]:
+        """Get category mapping based on keywords"""
+        return {
+            "цемент": "Цемент",
+            "бетон": "Бетон", 
+            "кирпич": "Кирпич",
+            "блок": "Блоки",
+            "песок": "Песок",
+            "щебень": "Щебень",
+            "арматура": "Арматура",
+            "металл": "Металлопрокат",
+            "доска": "Пиломатериалы",
+            "брус": "Пиломатериалы",
+            "фанера": "Листовые материалы",
+            "гипсокартон": "Листовые материалы",
+            "плитка": "Плитка",
+            "краска": "Лакокрасочные материалы",
+            "эмаль": "Лакокрасочные материалы",
+            "шпатлевка": "Сухие смеси",
+            "штукатурка": "Сухие смеси",
+            "утеплитель": "Теплоизоляция",
+            "черепица": "Кровельные материалы",
+            "профнастил": "Кровельные материалы",
+            "труба": "Трубы и фитинги",
+            "кабель": "Электротехника",
+            "провод": "Электротехника",
+            "окно": "Окна и двери",
+            "дверь": "Окна и двери",
+            "саморез": "Крепеж",
+            "гвоздь": "Крепеж",
+            "болт": "Крепеж"
+        }
+    
+    def _get_unit_mapping(self) -> Dict[str, str]:
+        """Get unit mapping based on keywords"""
+        return {
+            "цемент": "кг",
+            "песок": "м³",
+            "щебень": "м³",
+            "бетон": "м³",
+            "доска": "м³",
+            "брус": "м³",
+            "кирпич": "шт",
+            "блок": "шт",
+            "плитка": "м²",
+            "краска": "кг",
+            "эмаль": "кг",
+            "лист": "м²",
+            "рулон": "м²",
+            "труба": "м",
+            "кабель": "м",
+            "провод": "м"
+        }
+    
+    def _infer_category(self, name: str, category_map: Dict[str, str]) -> Optional[str]:
+        """Infer category from material name"""
+        name_lower = name.lower()
+        for keyword, category in category_map.items():
+            if keyword in name_lower:
+                return category
+        return None
+    
+    def _infer_unit(self, name: str, unit_map: Dict[str, str]) -> Optional[str]:
+        """Infer unit from material name"""
+        name_lower = name.lower()
+        for keyword, unit in unit_map.items():
+            if keyword in name_lower:
+                return unit
+        return None
 
 class CategoryService:
     def __init__(self):
