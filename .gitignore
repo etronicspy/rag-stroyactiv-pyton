@@ -59,12 +59,27 @@ htmlcov/
 temp/
 tmp/
 
-# Utils directory (optimized utilities)
-utils/
-
-# Utils temporary files and outputs
+# Utils temporary files and outputs (но не сами утилиты)
 utils/temp/
 utils/output/
 utils/*.log
-utils/*.json
-utils/*.csv 
+utils/*.csv
+!utils/load_materials.py
+!utils/material_matcher.py
+!utils/common.py
+!utils/create_test_data.py
+!utils/test_russian_search.py
+!utils/test_all_services.py
+!utils/check_db_connection.py
+!utils/cleanup_collections.py
+!utils/view_collection.py
+!utils/show_material.py
+!utils/show_real_material.py
+!utils/material_summary.py
+!utils/save_matches.py
+!utils/save_simple_matches.py
+!utils/README.md
+!utils/__init__.py
+
+# Тесты утилит теперь включены
+!tests/utils/ 
