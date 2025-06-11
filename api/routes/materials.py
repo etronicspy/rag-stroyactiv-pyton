@@ -53,7 +53,7 @@ async def create_materials_batch(batch_data: MaterialBatchCreate):
 
 @router.post("/import", response_model=MaterialBatchResponse)
 async def import_materials_from_json(import_data: MaterialImportRequest):
-    """Import materials from JSON format (article + name)"""
+    """Import materials from JSON format (sku + name)"""
     try:
         return await materials_service.import_materials_from_json(
             import_data.materials,

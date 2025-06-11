@@ -110,7 +110,7 @@ class MaterialsLoader:
             return False
     
     def convert_json_format(self, materials_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Convert JSON format from {article, name} to MaterialCreate format"""
+        """Convert JSON format from {sku, name} to MaterialCreate format"""
         converted = []
         for item in materials_data:
             # Auto-categorize based on name
@@ -121,7 +121,7 @@ class MaterialsLoader:
                 "name": item['name'],
                 "category": category,
                 "unit": unit,
-                "article": item['article'],
+                "sku": item['sku'],
                 "description": None
             })
         return converted

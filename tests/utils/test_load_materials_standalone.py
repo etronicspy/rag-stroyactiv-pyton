@@ -25,9 +25,9 @@ class TestMaterialsLoaderStandalone:
     def sample_materials_json(self):
         """Создание временного JSON файла с тестовыми материалами"""
         materials = [
-            {"article": "TEST001", "name": "Тестовый цемент М400"},
-            {"article": "TEST002", "name": "Тестовый песок речной"},
-            {"article": "TEST003", "name": "Тестовый кирпич красный"},
+            {"sku": "TEST001", "name": "Тестовый цемент М400"},
+            {"sku": "TEST002", "name": "Тестовый песок речной"},
+            {"sku": "TEST003", "name": "Тестовый кирпич красный"},
         ]
         
         # Создаем временный файл
@@ -108,7 +108,7 @@ class TestMaterialsLoaderStandalone:
                 
                 converted_material = {
                     'name': material['name'],
-                    'article': material['article'],
+                    'sku': material['sku'],
                     'category': category,
                     'unit': unit,
                     'description': None
@@ -120,9 +120,9 @@ class TestMaterialsLoaderStandalone:
         
         # Тестовые данные
         input_data = [
-            {"article": "CEM001", "name": "Цемент М500"},
-            {"article": "SND001", "name": "Песок строительный"},
-            {"article": "BRK001", "name": "Кирпич керамический"},
+            {"sku": "CEM001", "name": "Цемент М500"},
+            {"sku": "SND001", "name": "Песок строительный"},
+            {"sku": "BRK001", "name": "Кирпич керамический"},
         ]
         
         # Конвертируем
@@ -134,7 +134,7 @@ class TestMaterialsLoaderStandalone:
         # Проверяем цемент
         cement = converted[0]
         assert cement["name"] == "Цемент М500"
-        assert cement["article"] == "CEM001"
+        assert cement["sku"] == "CEM001"
         assert cement["category"] == "Цемент"
         assert cement["unit"] == "кг"
         assert cement["description"] is None
@@ -234,11 +234,11 @@ class TestMaterialsLoaderStandalone:
             data = json.load(f)
         
         assert len(data) == 3
-        assert all('article' in item for item in data)
+        assert all('sku' in item for item in data)
         assert all('name' in item for item in data)
         
         # Проверяем конкретные значения
-        assert data[0]['article'] == 'TEST001'
+        assert data[0]['sku'] == 'TEST001'
         assert data[0]['name'] == 'Тестовый цемент М400'
     
     @pytest.mark.asyncio
@@ -255,15 +255,15 @@ class TestMaterialsLoaderStandalone:
             # Проверяем что каждый материал имеет нужные поля
             for material in materials_data:
                 assert 'name' in material
-                assert 'article' in material
+                assert 'sku' in material
             
             # Имитируем успешный API ответ
             return {"success": True, "count": len(materials_data)}
         
         # Тестовые данные
         test_materials = [
-            {"name": "Test Material 1", "article": "TEST001"},
-            {"name": "Test Material 2", "article": "TEST002"}
+            {"name": "Test Material 1", "sku": "TEST001"},
+            {"name": "Test Material 2", "sku": "TEST002"}
         ]
         
         result = await mock_load_materials(test_materials)

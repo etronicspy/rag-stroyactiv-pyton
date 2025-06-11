@@ -7,7 +7,7 @@ class MaterialBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=200)
     use_category: str = Field(..., max_length=200)  # Renamed from category
     unit: str
-    article: Optional[str] = Field(None, min_length=3, max_length=50)
+    sku: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = None
 
 # Extended schema for raw products from supplier price lists
@@ -41,7 +41,7 @@ class MaterialUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=200)
     use_category: Optional[str] = None  # Renamed from category
     unit: Optional[str] = None
-    article: Optional[str] = Field(None, min_length=3, max_length=50)
+    sku: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = None
 
 class Material(MaterialBase):
@@ -80,7 +80,7 @@ class MaterialBatchResponse(BaseModel):
 
 # Schema for importing from JSON file format
 class MaterialImportItem(BaseModel):
-    article: str = Field(..., min_length=3, max_length=50)
+    sku: str = Field(..., min_length=3, max_length=50)
     name: str = Field(..., min_length=2, max_length=200)
 
 class MaterialImportRequest(BaseModel):

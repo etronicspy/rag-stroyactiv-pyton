@@ -88,7 +88,7 @@ class MaterialsService:
             self._ensure_collection_exists()
             
             # Generate embedding
-            text_for_embedding = f"{material.name} {material.use_category} {material.article or ''} {material.description or ''}"
+            text_for_embedding = f"{material.name} {material.use_category} {material.sku or ''} {material.description or ''}"
             embedding = await self._get_embedding(text_for_embedding)
             
             # Create material ID
@@ -105,7 +105,7 @@ class MaterialsService:
                     "name": material.name,
                     "use_category": material.use_category,
                     "unit": material.unit,
-                    "article": material.article,
+                    "sku": material.sku,
                     "description": material.description,
                     "created_at": current_time.isoformat(),
                     "updated_at": current_time.isoformat()
@@ -123,7 +123,7 @@ class MaterialsService:
                 name=material.name,
                 use_category=material.use_category,
                 unit=material.unit,
-                article=material.article,
+                sku=material.sku,
                 description=material.description,
                 embedding=embedding,
                 created_at=current_time,
@@ -175,7 +175,7 @@ class MaterialsService:
                 name=result.payload.get("name"),
                 use_category=result.payload.get("use_category", ""),
                 unit=result.payload.get("unit"),
-                article=result.payload.get("article"),
+                sku=result.payload.get("sku"),
                 description=result.payload.get("description"),
                 embedding=result.vector if result.vector else None,
                 created_at=created_at,
@@ -199,7 +199,7 @@ class MaterialsService:
                 updated_data[field] = value
             
             # Generate new embedding if content changed
-            text_for_embedding = f"{updated_data['name']} {updated_data['use_category']} {updated_data.get('article', '')} {updated_data.get('description', '')}"
+            text_for_embedding = f"{updated_data['name']} {updated_data['use_category']} {updated_data.get('sku', '')} {updated_data.get('description', '')}"
             embedding = await self._get_embedding(text_for_embedding)
             
             from datetime import datetime
@@ -214,7 +214,7 @@ class MaterialsService:
                     "name": updated_data["name"],
                     "use_category": updated_data["use_category"],
                     "unit": updated_data["unit"],
-                    "article": updated_data.get("article"),
+                    "sku": updated_data.get("sku"),
                     "description": updated_data.get("description"),
                     "created_at": updated_data["created_at"].isoformat(),
                     "updated_at": current_time.isoformat()
@@ -289,8 +289,9 @@ class MaterialsService:
                     name=result.payload.get("name"),
                     use_category=result.payload.get("use_category", ""),
                     unit=result.payload.get("unit"),
-                    article=result.payload.get("article"),
+                    sku=result.payload.get("sku"),
                     description=result.payload.get("description"),
+                    embedding=result.vector if result.vector else None,
                     created_at=created_at,
                     updated_at=updated_at
                 )
@@ -353,8 +354,9 @@ class MaterialsService:
                         name=point.payload.get("name"),
                         use_category=point.payload.get("use_category", ""),
                         unit=point.payload.get("unit"),
-                        article=point.payload.get("article"),
+                        sku=point.payload.get("sku"),
                         description=point.payload.get("description"),
+                        embedding=None,  # Don't include embeddings in list responses
                         created_at=created_at,
                         updated_at=updated_at
                     )
@@ -399,7 +401,7 @@ class MaterialsService:
                 # Generate embeddings in parallel for the chunk
                 embedding_tasks = []
                 for material in chunk:
-                    text_for_embedding = f"{material.name} {material.use_category} {material.article or ''} {material.description or ''}"
+                    text_for_embedding = f"{material.name} {material.use_category} {material.sku or ''} {material.description or ''}"
                     embedding_tasks.append(self._get_embedding(text_for_embedding))
                 
                 try:
@@ -426,7 +428,7 @@ class MaterialsService:
                                 "name": material.name,
                                 "use_category": material.use_category,
                                 "unit": material.unit,
-                                "article": material.article,
+                                "sku": material.sku,
                                 "description": material.description,
                                 "created_at": current_datetime.isoformat(),
                                 "updated_at": current_datetime.isoformat()
@@ -440,7 +442,7 @@ class MaterialsService:
                             name=material.name,
                             use_category=material.use_category,
                             unit=material.unit,
-                            article=material.article,
+                            sku=material.sku,
                             description=material.description,
                             embedding=embedding[:10] if embedding else None,  # Truncate for response
                             created_at=current_datetime,
@@ -502,7 +504,7 @@ class MaterialsService:
                                        default_category: str = "Стройматериалы",
                                        default_unit: str = "шт",
                                        batch_size: int = 100) -> 'MaterialBatchResponse':
-        """Import materials from JSON format with article and name"""
+        """Import materials from JSON format with sku and name"""
         from core.schemas.materials import MaterialCreate, MaterialImportItem
         
         # Convert import items to MaterialCreate objects
@@ -521,7 +523,7 @@ class MaterialsService:
                 name=item.name,
                 use_category=category,
                 unit=unit,
-                article=item.article,
+                sku=item.sku,
                 description=None
             )
             materials_to_create.append(material)

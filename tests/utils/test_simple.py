@@ -41,17 +41,17 @@ class TestBasicUtilities:
     def test_json_processing(self):
         """Тест обработки JSON данных"""
         materials_data = [
-            {"article": "TEST001", "name": "Тестовый материал 1"},
-            {"article": "TEST002", "name": "Тестовый материал 2"},
+            {"sku": "TEST001", "name": "Тестовый материал 1"},
+            {"sku": "TEST002", "name": "Тестовый материал 2"},
         ]
         
         # Проверяем структуру данных
         assert len(materials_data) == 2
-        assert all('article' in item for item in materials_data)
+        assert all('sku' in item for item in materials_data)
         assert all('name' in item for item in materials_data)
         
         # Проверяем конкретные значения
-        assert materials_data[0]['article'] == 'TEST001'
+        assert materials_data[0]['sku'] == 'TEST001'
         assert materials_data[1]['name'] == 'Тестовый материал 2'
     
     def test_string_operations(self):
@@ -113,7 +113,7 @@ class TestBasicUtilities:
         
         # Проверяем структуру тестовых данных
         first_material = temp_materials_data[0]
-        assert 'article' in first_material
+        assert 'sku' in first_material
         assert 'name' in first_material
         assert 'use_category' in first_material
         assert 'unit' in first_material

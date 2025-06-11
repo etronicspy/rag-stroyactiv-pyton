@@ -1,7 +1,7 @@
 import requests
 import json
 
-# Запрос к API для реального материала с article
+# Запрос к API для реального материала с sku
 response = requests.get('http://localhost:8000/api/v1/materials/0031014c-2034-4963-9ff6-ecca63565954')
 data = response.json()
 

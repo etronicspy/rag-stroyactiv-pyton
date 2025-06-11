@@ -169,21 +169,21 @@ def test_create_materials_batch(client, setup_references):
             "name": "Цемент М500 batch 1",
             "use_category": "Цемент",
             "unit": "кг",
-            "article": "BTH0001",
+            "sku": "BTH0001",
             "description": "Тест батч 1"
         },
         {
             "name": "Цемент М400 batch 2",
             "use_category": "Цемент",
             "unit": "кг",
-            "article": "BTH0002",
+            "sku": "BTH0002",
             "description": "Тест батч 2"
         },
         {
             "name": "Песок речной batch 3",
             "use_category": "Песок",
             "unit": "м³",
-            "article": "BTH0003",
+            "sku": "BTH0003",
             "description": "Тест батч 3"
         }
     ]
@@ -214,10 +214,10 @@ def test_create_materials_batch(client, setup_references):
 def test_import_materials_from_json(client, setup_references):
     """Test importing materials from JSON format"""
     import_data = [
-        {"article": "CEM0001", "name": "Цемент портландский М400"},
-        {"article": "SND0001", "name": "Песок строительный мытый"},
-        {"article": "BRK0001", "name": "Кирпич керамический красный"},
-        {"article": "ARM0001", "name": "Арматура А500С Ø12мм"},
+        {"sku": "CEM0001", "name": "Цемент портландский М400"},
+        {"sku": "SND0001", "name": "Песок строительный мытый"},
+        {"sku": "BRK0001", "name": "Кирпич керамический красный"},
+        {"sku": "ARM0001", "name": "Арматура А500С Ø12мм"},
     ]
     
     response = client.post(
@@ -254,10 +254,10 @@ def test_import_materials_from_json(client, setup_references):
     rebar_material = next(m for m in materials if "арматура" in m["name"].lower())
     assert rebar_material["use_category"] == "Арматура"
     
-    # Check that articles are stored in separate field
+    # Check that skus are stored in separate field
     for i, material in enumerate(materials):
-        expected_article = import_data[i]["article"]
-        assert material["article"] == expected_article
+        expected_sku = import_data[i]["sku"]
+        assert material["sku"] == expected_sku
 
 def test_batch_with_errors(client, setup_references):
     """Test batch creation with some invalid materials"""
@@ -266,21 +266,21 @@ def test_batch_with_errors(client, setup_references):
             "name": "Валидный материал",
             "use_category": "Цемент",
             "unit": "кг",
-            "article": "TST0001",
+            "sku": "TST0001",
             "description": "Корректный материал"
         },
         {
             "name": "Валидное имя материала",  # Valid name
             "use_category": "Цемент",
             "unit": "кг",
-            "article": "TST0002",
+            "sku": "TST0002",
             "description": "Корректный материал"
         },
         {
             "name": "Еще один валидный материал",
             "use_category": "Песок",
             "unit": "м³",
-            "article": "TST0003",
+            "sku": "TST0003",
             "description": "Еще корректный материал"
         }
     ]

@@ -34,7 +34,7 @@ def check_materials():
             print(f"{i:2}. {material['name']}")
             print(f"    └─ Категория: {material['use_category']}")
             print(f"    └─ Единица: {material['unit']}")
-            print(f"    └─ Артикул: {material['article']}")
+            print(f"    └─ Артикул: {material['sku']}")
             print()
         
         # Проверяем материалы с разными категориями
