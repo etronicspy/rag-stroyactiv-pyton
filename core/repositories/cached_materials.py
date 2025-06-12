@@ -13,8 +13,16 @@ import asyncio
 from core.repositories.hybrid_materials import HybridMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import DatabaseError, CacheError
-from core.schemas.materials import MaterialCreate, MaterialResponse, MaterialSearchRequest
-from core.schemas.search import SearchResponse
+from core.schemas.materials import MaterialCreate, Material, SearchResponse
+from typing import Dict, Any
+
+# Simple replacement for MaterialSearchRequest
+class MaterialSearchRequest:
+    def __init__(self, query: str = "", limit: int = 10, **kwargs):
+        self.query = query
+        self.limit = limit
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 
 logger = logging.getLogger(__name__)
@@ -128,7 +136,7 @@ class CachedMaterialsRepository:
         limit: int = 10,
         threshold: float = 0.7,
         use_cache: bool = True
-    ) -> List[MaterialResponse]:
+    ) -> List[Material]:
         """Vector search with caching.
         
         Args:
@@ -176,7 +184,7 @@ class CachedMaterialsRepository:
         query: str,
         limit: int = 10,
         use_cache: bool = True
-    ) -> List[MaterialResponse]:
+    ) -> List[Material]:
         """SQL search with caching.
         
         Args:
@@ -224,7 +232,7 @@ class CachedMaterialsRepository:
         self,
         material: MaterialCreate,
         generate_embedding: bool = True
-    ) -> MaterialResponse:
+    ) -> Material:
         """Create material with cache invalidation.
         
         Args:
@@ -262,7 +270,7 @@ class CachedMaterialsRepository:
         self,
         material_id: str,
         use_cache: bool = True
-    ) -> Optional[MaterialResponse]:
+    ) -> Optional[Material]:
         """Get material by ID with caching.
         
         Args:
@@ -307,7 +315,7 @@ class CachedMaterialsRepository:
         material_id: str,
         updates: Dict[str, Any],
         regenerate_embedding: bool = True
-    ) -> Optional[MaterialResponse]:
+    ) -> Optional[Material]:
         """Update material with cache invalidation.
         
         Args:
@@ -389,7 +397,7 @@ class CachedMaterialsRepository:
         self,
         materials: List[MaterialCreate],
         generate_embeddings: bool = True
-    ) -> List[MaterialResponse]:
+    ) -> List[Material]:
         """Batch create materials with caching.
         
         Args:
@@ -435,7 +443,7 @@ class CachedMaterialsRepository:
         self,
         material_ids: List[str],
         use_cache: bool = True
-    ) -> List[MaterialResponse]:
+    ) -> List[Material]:
         """Get multiple materials with batch caching.
         
         Args:
@@ -460,7 +468,7 @@ class CachedMaterialsRepository:
             for i, cached_data in enumerate(cached_materials):
                 if cached_data:
                     try:
-                        material = MaterialResponse(**cached_data)
+                        material = Material(**cached_data)
                         results.append(material)
                         self.stats["cache_hits"] += 1
                     except Exception as e:
@@ -757,12 +765,12 @@ class CachedMaterialsRepository:
         except Exception as e:
             logger.warning(f"Failed to cache search result: {e}")
     
-    async def _get_cached_material(self, cache_key: str) -> Optional[MaterialResponse]:
+    async def _get_cached_material(self, cache_key: str) -> Optional[Material]:
         """Get cached material."""
         try:
             cached_data = await self.cache_db.get(cache_key, default=None)
             if cached_data:
-                return MaterialResponse(**cached_data)
+                return Material(**cached_data)
             return None
             
         except Exception as e:
@@ -772,7 +780,7 @@ class CachedMaterialsRepository:
     async def _cache_material(
         self,
         cache_key: str,
-        material: MaterialResponse,
+        material: Material,
         ttl: int
     ) -> None:
         """Cache material."""
@@ -785,12 +793,12 @@ class CachedMaterialsRepository:
         except Exception as e:
             logger.warning(f"Failed to cache material: {e}")
     
-    async def _get_cached_materials_list(self, cache_key: str) -> Optional[List[MaterialResponse]]:
+    async def _get_cached_materials_list(self, cache_key: str) -> Optional[List[Material]]:
         """Get cached materials list."""
         try:
             cached_data = await self.cache_db.get(cache_key, default=None)
             if cached_data and isinstance(cached_data, list):
-                return [MaterialResponse(**item) for item in cached_data]
+                return [Material(**item) for item in cached_data]
             return None
             
         except Exception as e:
@@ -800,7 +808,7 @@ class CachedMaterialsRepository:
     async def _cache_materials_list(
         self,
         cache_key: str,
-        materials: List[MaterialResponse],
+        materials: List[Material],
         ttl: int
     ) -> None:
         """Cache materials list."""

@@ -103,4 +103,26 @@ class ValidationError(DatabaseError):
         default_message = "Data validation failed"
         if field:
             default_message += f" for field: {field}"
+        super().__init__(message or default_message, details)
+
+
+class CacheError(DatabaseError):
+    """Exception raised when cache operations fail."""
+    
+    def __init__(self, operation: str = None, key: str = None, message: str = None, details: str = None):
+        """Initialize cache error.
+        
+        Args:
+            operation: Cache operation that failed (get, set, delete, etc.)
+            key: Cache key that caused the error
+            message: Error message
+            details: Additional error details
+        """
+        self.operation = operation
+        self.key = key
+        default_message = "Cache operation failed"
+        if operation:
+            default_message += f" during {operation}"
+        if key:
+            default_message += f" for key: {key}"
         super().__init__(message or default_message, details) 
