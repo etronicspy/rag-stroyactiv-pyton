@@ -1,4 +1,5 @@
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,6 +9,7 @@ from fastapi.responses import JSONResponse
 from core.config import settings
 from core.database.init_db import initialize_database_on_startup
 from core.middleware import RateLimitMiddleware, LoggingMiddleware, SecurityMiddleware
+from core.monitoring import setup_structured_logging, get_metrics_collector
 from api.routes import reference, health, materials, prices, search
 
 logger = logging.getLogger(__name__)
@@ -18,6 +20,16 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown tasks."""
     # Startup
     logger.info("🚀 Starting Construction Materials API...")
+    
+    # Setup monitoring and logging
+    setup_structured_logging(
+        log_level=settings.LOG_LEVEL,
+        enable_structured=settings.ENABLE_STRUCTURED_LOGGING
+    )
+    
+    # Initialize metrics collector
+    metrics_collector = get_metrics_collector()
+    metrics_collector._start_time = time.time()
     
     try:
         # Initialize database on startup
@@ -36,6 +48,10 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("🛑 Shutting down Construction Materials API...")
+    
+    # Log final metrics
+    final_metrics = metrics_collector.get_metrics_summary()
+    logger.info(f"📊 Final application metrics: {final_metrics}")
 
 
 app = FastAPI(lifespan=lifespan)

@@ -14,6 +14,8 @@ from core.repositories.interfaces import IMaterialsRepository
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase
 from core.database.exceptions import DatabaseError, QueryError
 from core.schemas.materials import Material, MaterialCreate, MaterialUpdate
+from core.monitoring.logger import DatabaseLogger, log_database_operation
+from core.monitoring.metrics import get_metrics_collector
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,11 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
         self.ai_client = ai_client
         self.collection_name = "materials"
         
+        # Initialize monitoring
+        self.db_logger = DatabaseLogger("hybrid")
+        self.metrics_collector = get_metrics_collector()
+        self.performance_tracker = self.metrics_collector.get_performance_tracker()
+        
         logger.info("Hybrid Materials Repository initialized")
     
     async def create_material(self, material: MaterialCreate) -> Material:
@@ -67,57 +74,79 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
         Raises:
             DatabaseError: If creation fails in either database
         """
-        try:
-            # Generate embedding for semantic search
-            text_for_embedding = self._prepare_text_for_embedding(material)
-            embedding = await self.get_embedding(text_for_embedding)
-            
-            # Create material ID and timestamps
-            material_id = str(uuid.uuid4())
-            current_time = datetime.utcnow()
-            
-            # Prepare material data
-            material_data = {
-                "id": material_id,
-                "name": material.name,
-                "use_category": material.use_category,
-                "unit": material.unit,
-                "sku": material.sku,
-                "description": material.description,
-                "embedding": embedding,
-                "created_at": current_time,
-                "updated_at": current_time
-            }
-            
-            # Store in both databases concurrently
-            vector_task = self._create_in_vector_db(material_data)
-            relational_task = self._create_in_relational_db(material_data)
-            
-            # Wait for both operations to complete
-            await asyncio.gather(vector_task, relational_task)
-            
-            logger.info(f"Material created in both databases: {material.name} (ID: {material_id})")
-            
-            return Material(
-                id=material_id,
-                name=material.name,
-                use_category=material.use_category,
-                unit=material.unit,
-                sku=material.sku,
-                description=material.description,
-                embedding=embedding[:10],  # Truncate for response
-                created_at=current_time,
-                updated_at=current_time
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to create material in hybrid repository: {e}")
-            if isinstance(e, DatabaseError):
-                raise
-            raise DatabaseError(
-                message=f"Failed to create material '{material.name}'",
-                details=str(e)
-            )
+        correlation_id = str(uuid.uuid4())
+        
+        with self.performance_tracker.time_operation("hybrid", "create_material", 1):
+            try:
+                # Generate embedding for semantic search
+                text_for_embedding = self._prepare_text_for_embedding(material)
+                embedding = await self.get_embedding(text_for_embedding)
+                
+                # Create material ID and timestamps
+                material_id = str(uuid.uuid4())
+                current_time = datetime.utcnow()
+                
+                # Prepare material data
+                material_data = {
+                    "id": material_id,
+                    "name": material.name,
+                    "use_category": material.use_category,
+                    "unit": material.unit,
+                    "sku": material.sku,
+                    "description": material.description,
+                    "embedding": embedding,
+                    "created_at": current_time,
+                    "updated_at": current_time
+                }
+                
+                # Store in both databases concurrently
+                vector_task = self._create_in_vector_db(material_data)
+                relational_task = self._create_in_relational_db(material_data)
+                
+                # Wait for both operations to complete
+                await asyncio.gather(vector_task, relational_task)
+                
+                logger.info(f"Material created in both databases: {material.name} (ID: {material_id})")
+                
+                # Log successful operation
+                self.db_logger.log_operation(
+                    operation="create_material",
+                    success=True,
+                    record_count=1,
+                    correlation_id=correlation_id,
+                    extra_data={"material_name": material.name, "material_id": material_id}
+                )
+                
+                return Material(
+                    id=material_id,
+                    name=material.name,
+                    use_category=material.use_category,
+                    unit=material.unit,
+                    sku=material.sku,
+                    description=material.description,
+                    embedding=embedding[:10],  # Truncate for response
+                    created_at=current_time,
+                    updated_at=current_time
+                )
+                
+            except Exception as e:
+                logger.error(f"Failed to create material in hybrid repository: {e}")
+                
+                # Log failed operation
+                self.db_logger.log_operation(
+                    operation="create_material",
+                    success=False,
+                    error=e,
+                    correlation_id=correlation_id,
+                    extra_data={"material_name": material.name}
+                )
+                
+                if isinstance(e, DatabaseError):
+                    raise
+                raise DatabaseError(
+                    message=f"Failed to create material '{material.name}'",
+                    details=str(e)
+                )
     
     async def search_materials_hybrid(
         self, 
@@ -146,45 +175,72 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
         Raises:
             DatabaseError: If search fails
         """
-        try:
-            # Run both searches concurrently
-            vector_task = self._search_vector_db(query, limit * 2, min_vector_score)
-            sql_task = self._search_relational_db(query, limit * 2, min_sql_similarity)
-            
-            vector_results, sql_results = await asyncio.gather(
-                vector_task, sql_task, return_exceptions=True
-            )
-            
-            # Handle exceptions
-            if isinstance(vector_results, Exception):
-                logger.warning(f"Vector search failed: {vector_results}")
-                vector_results = []
-            
-            if isinstance(sql_results, Exception):
-                logger.warning(f"SQL search failed: {sql_results}")
-                sql_results = []
-            
-            # Combine and rank results
-            combined_results = self._combine_search_results(
-                vector_results, sql_results, vector_weight, sql_weight
-            )
-            
-            # Deduplicate and limit results
-            final_results = self._deduplicate_results(combined_results)[:limit]
-            
-            logger.info(
-                f"Hybrid search completed: {len(vector_results)} vector + "
-                f"{len(sql_results)} SQL = {len(final_results)} final results"
-            )
-            
-            return final_results
-            
-        except Exception as e:
-            logger.error(f"Hybrid search failed: {e}")
-            raise DatabaseError(
-                message="Hybrid search failed",
-                details=str(e)
-            )
+        correlation_id = str(uuid.uuid4())
+        
+        with self.performance_tracker.time_operation("hybrid", "search_hybrid"):
+            try:
+                # Run both searches concurrently
+                vector_task = self._search_vector_db(query, limit * 2, min_vector_score)
+                sql_task = self._search_relational_db(query, limit * 2, min_sql_similarity)
+                
+                vector_results, sql_results = await asyncio.gather(
+                    vector_task, sql_task, return_exceptions=True
+                )
+                
+                # Handle exceptions
+                if isinstance(vector_results, Exception):
+                    logger.warning(f"Vector search failed: {vector_results}")
+                    vector_results = []
+                
+                if isinstance(sql_results, Exception):
+                    logger.warning(f"SQL search failed: {sql_results}")
+                    sql_results = []
+                
+                # Combine and rank results
+                combined_results = self._combine_search_results(
+                    vector_results, sql_results, vector_weight, sql_weight
+                )
+                
+                # Deduplicate and limit results
+                final_results = self._deduplicate_results(combined_results)[:limit]
+                
+                logger.info(
+                    f"Hybrid search completed: {len(vector_results)} vector + "
+                    f"{len(sql_results)} SQL = {len(final_results)} final results"
+                )
+                
+                # Log successful search
+                self.db_logger.log_operation(
+                    operation="search_hybrid",
+                    success=True,
+                    record_count=len(final_results),
+                    correlation_id=correlation_id,
+                    extra_data={
+                        "query": query[:100],  # Truncate long queries
+                        "vector_results": len(vector_results),
+                        "sql_results": len(sql_results),
+                        "final_results": len(final_results)
+                    }
+                )
+                
+                return final_results
+                
+            except Exception as e:
+                logger.error(f"Hybrid search failed: {e}")
+                
+                # Log failed search
+                self.db_logger.log_operation(
+                    operation="search_hybrid",
+                    success=False,
+                    error=e,
+                    correlation_id=correlation_id,
+                    extra_data={"query": query[:100]}
+                )
+                
+                raise DatabaseError(
+                    message="Hybrid search failed",
+                    details=str(e)
+                )
     
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
         """Search materials with fallback strategy.
