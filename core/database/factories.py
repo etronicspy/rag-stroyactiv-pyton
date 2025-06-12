@@ -175,8 +175,8 @@ class DatabaseFactory:
         Returns:
             Weaviate vector database client
         """
-        # Will be implemented when Weaviate support is added
-        raise NotImplementedError("Weaviate support will be added later")
+        from core.database.adapters.weaviate_adapter import WeaviateVectorDatabase
+        return WeaviateVectorDatabase(config)
     
     @staticmethod
     def _create_pinecone_client(config: Dict[str, Any]) -> IVectorDatabase:
@@ -188,8 +188,8 @@ class DatabaseFactory:
         Returns:
             Pinecone vector database client
         """
-        # Will be implemented when Pinecone support is added
-        raise NotImplementedError("Pinecone support will be added later")
+        from core.database.adapters.pinecone_adapter import PineconeVectorDatabase
+        return PineconeVectorDatabase(config)
     
     @staticmethod
     def clear_cache() -> None:

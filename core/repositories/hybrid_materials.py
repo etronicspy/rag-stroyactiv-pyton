@@ -10,6 +10,7 @@ import asyncio
 import uuid
 
 from core.repositories.base import BaseRepository
+from core.repositories.interfaces import IMaterialsRepository
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase
 from core.database.exceptions import DatabaseError, QueryError
 from core.schemas.materials import Material, MaterialCreate, MaterialUpdate
@@ -18,7 +19,7 @@ from core.schemas.materials import Material, MaterialCreate, MaterialUpdate
 logger = logging.getLogger(__name__)
 
 
-class HybridMaterialsRepository(BaseRepository):
+class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
     """Hybrid repository using both vector and relational databases.
     
     Гибридный репозиторий, использующий векторную БД для семантического поиска
@@ -392,6 +393,168 @@ class HybridMaterialsRepository(BaseRepository):
                 message=f"Failed to delete material {material_id}",
                 details=str(e)
             )
+
+    # === Interface compliance methods ===
+    
+    async def create(self, material: MaterialCreate) -> Material:
+        """Create material (implements IMaterialsRepository interface)."""
+        return await self.create_material(material)
+    
+    async def upsert(self, material: MaterialCreate) -> Material:
+        """Insert or update material (implements IMaterialsRepository interface)."""
+        # For hybrid repository, we'll try to find existing material first
+        # Generate a predictable ID based on material properties for upsert logic
+        material_name_hash = hash(f"{material.name}_{material.sku or material.description}")
+        potential_id = str(abs(material_name_hash))
+        
+        existing_material = await self.get_material_by_id(potential_id)
+        if existing_material:
+            # Update existing
+            update_data = MaterialUpdate(**material.model_dump())
+            updated_material = await self.update_material(potential_id, update_data)
+            return updated_material or existing_material
+        else:
+            # Create new
+            return await self.create_material(material)
+    
+    async def get_by_id(self, material_id: str) -> Optional[Material]:
+        """Get material by ID (implements IMaterialsRepository interface).""" 
+        return await self.get_material_by_id(material_id)
+    
+    async def update(self, material_id: str, material_update: MaterialUpdate) -> Optional[Material]:
+        """Update material (implements IMaterialsRepository interface)."""
+        return await self.update_material(material_id, material_update)
+    
+    async def delete(self, material_id: str) -> bool:
+        """Delete material (implements IMaterialsRepository interface)."""
+        return await self.delete_material(material_id)
+    
+    async def list(self, skip: int = 0, limit: int = 100, 
+                  category: Optional[str] = None) -> List[Material]:
+        """List materials (implements IMaterialsRepository interface)."""
+        return await self.get_materials(skip, limit, category)
+    
+    async def search_semantic(self, query: str, limit: int = 10) -> List[Material]:
+        """Semantic search (implements IMaterialsRepository interface)."""
+        return await self.search_materials(query, limit)
+    
+    async def search_text(self, query: str, limit: int = 10) -> List[Material]:
+        """Text search fallback (implements IMaterialsRepository interface)."""
+        try:
+            # Use only SQL search for text search
+            sql_results = await self._search_relational_db(query, limit)
+            return [self._dict_to_material(result) for result in sql_results]
+        except Exception as e:
+            logger.error(f"Text search failed: {e}")
+            return []
+    
+    async def create_batch(self, materials: List[MaterialCreate], 
+                          batch_size: int = 100) -> Dict[str, Any]:
+        """Create multiple materials in batches (implements IMaterialsRepository interface)."""
+        try:
+            total_materials = len(materials)
+            created_count = 0
+            failed_count = 0
+            failed_materials = []
+            
+            # Process in batches
+            for i in range(0, total_materials, batch_size):
+                batch = materials[i:i + batch_size]
+                
+                # Process batch concurrently
+                tasks = []
+                for material in batch:
+                    tasks.append(self._create_single_material_safe(material))
+                
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Count results
+                for j, result in enumerate(batch_results):
+                    if isinstance(result, Exception):
+                        failed_count += 1
+                        failed_materials.append({
+                            "material": batch[j].model_dump(),
+                            "error": str(result)
+                        })
+                    else:
+                        created_count += 1
+            
+            result = {
+                "total_processed": total_materials,
+                "created": created_count,
+                "failed": failed_count,
+                "success_rate": created_count / total_materials if total_materials > 0 else 0,
+                "failed_materials": failed_materials[:10]  # Limit failed details
+            }
+            
+            logger.info(f"Batch create completed: {created_count}/{total_materials} materials created")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Batch create failed: {e}")
+            raise DatabaseError(f"Batch create failed: {e}")
+    
+    async def batch_upsert(self, materials: List[MaterialCreate], 
+                          batch_size: int = 100) -> Dict[str, Any]:
+        """Upsert multiple materials in batches (implements IMaterialsRepository interface)."""
+        try:
+            total_materials = len(materials)
+            upserted_count = 0
+            failed_count = 0
+            failed_materials = []
+            
+            # Process in batches
+            for i in range(0, total_materials, batch_size):
+                batch = materials[i:i + batch_size]
+                
+                # Process batch concurrently
+                tasks = []
+                for material in batch:
+                    tasks.append(self._upsert_single_material_safe(material))
+                
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Count results
+                for j, result in enumerate(batch_results):
+                    if isinstance(result, Exception):
+                        failed_count += 1
+                        failed_materials.append({
+                            "material": batch[j].model_dump(),
+                            "error": str(result)
+                        })
+                    else:
+                        upserted_count += 1
+            
+            result = {
+                "total_processed": total_materials,
+                "upserted": upserted_count,
+                "failed": failed_count,
+                "success_rate": upserted_count / total_materials if total_materials > 0 else 0,
+                "failed_materials": failed_materials[:10]  # Limit failed details
+            }
+            
+            logger.info(f"Batch upsert completed: {upserted_count}/{total_materials} materials upserted")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Batch upsert failed: {e}")
+            raise DatabaseError(f"Batch upsert failed: {e}")
+    
+    async def _create_single_material_safe(self, material: MaterialCreate) -> Material:
+        """Safely create a single material with error handling."""
+        try:
+            return await self.create_material(material)
+        except Exception as e:
+            logger.error(f"Failed to create material {material.name}: {e}")
+            raise e
+    
+    async def _upsert_single_material_safe(self, material: MaterialCreate) -> Material:
+        """Safely upsert a single material with error handling."""
+        try:
+            return await self.upsert(material)
+        except Exception as e:
+            logger.error(f"Failed to upsert material {material.name}: {e}")
+            raise e
     
     async def health_check(self) -> Dict[str, Any]:
         """Check health of both databases.

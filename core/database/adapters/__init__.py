@@ -6,9 +6,13 @@
 from .qdrant_adapter import QdrantVectorDatabase
 from .postgresql_adapter import PostgreSQLDatabase
 from .redis_adapter import RedisDatabase
+from .weaviate_adapter import WeaviateVectorDatabase
+from .pinecone_adapter import PineconeVectorDatabase
 
 __all__ = [
     "QdrantVectorDatabase",
     "PostgreSQLDatabase", 
-    "RedisDatabase"
+    "RedisDatabase",
+    "WeaviateVectorDatabase",
+    "PineconeVectorDatabase"
 ] 

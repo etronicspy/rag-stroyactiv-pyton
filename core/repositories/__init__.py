@@ -5,10 +5,16 @@
 
 from .interfaces import IMaterialsRepository, ICategoriesRepository, IUnitsRepository
 from .base import BaseRepository
+from .redis_materials import RedisMaterialsRepository
+from .hybrid_materials import HybridMaterialsRepository
+from .cached_materials import CachedMaterialsRepository
 
 __all__ = [
     "IMaterialsRepository",
     "ICategoriesRepository", 
     "IUnitsRepository",
-    "BaseRepository"
+    "BaseRepository",
+    "RedisMaterialsRepository",
+    "HybridMaterialsRepository",
+    "CachedMaterialsRepository"
 ] 

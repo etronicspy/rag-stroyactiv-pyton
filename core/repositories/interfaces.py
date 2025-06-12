@@ -12,7 +12,7 @@ class IMaterialsRepository(ABC):
     """Abstract interface for materials repository.
     
     Репозиторий материалов с обязательными методами: create, upsert, get_by_id, 
-    update, delete, search_semantic, search_text, create_batch
+    update, delete, search_semantic, search_text, create_batch, batch_upsert
     """
     
     @abstractmethod
@@ -128,6 +128,20 @@ class IMaterialsRepository(ABC):
             
         Returns:
             Batch operation results
+        """
+        pass
+
+    @abstractmethod
+    async def batch_upsert(self, materials: List[MaterialCreate], 
+                          batch_size: int = 100) -> Dict[str, Any]:
+        """Upsert multiple materials in batches (insert or update).
+        
+        Args:
+            materials: List of materials to upsert
+            batch_size: Size of processing batches
+            
+        Returns:
+            Batch operation results with created/updated counts
         """
         pass
 
