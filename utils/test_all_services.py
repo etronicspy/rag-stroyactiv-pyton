@@ -9,7 +9,7 @@ import asyncio
 # Добавляем корневую директорию в PYTHONPATH
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from services.materials import MaterialsService, CategoryService, UnitService
+from services.materials_consolidated import MaterialsService, CategoryService, UnitService
 from core.schemas.materials import MaterialCreate
 
 async def test_category_service():

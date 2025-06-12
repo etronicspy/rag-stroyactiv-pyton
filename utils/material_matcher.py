@@ -8,7 +8,7 @@ import json
 
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 from core.config import settings
-from services.materials import MaterialsService  
+from services.materials_consolidated import MaterialsService  
 from services.price_processor import PriceProcessor
 from .common import (
     embedding_service, 
