@@ -8,12 +8,16 @@ This package contains middleware components for:
 - Error handling and monitoring
 """
 
-from .rate_limiting import RateLimitMiddleware
 from .logging import LoggingMiddleware
+from .rate_limiting import RateLimitMiddleware
 from .security import SecurityMiddleware
+from .conditional import ConditionalMiddleware
+from .compression import CompressionMiddleware
 
 __all__ = [
-    "RateLimitMiddleware",
-    "LoggingMiddleware", 
+    "LoggingMiddleware",
+    "RateLimitMiddleware", 
     "SecurityMiddleware",
+    "ConditionalMiddleware",
+    "CompressionMiddleware",
 ] 

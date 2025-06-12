@@ -23,7 +23,7 @@
 | 6 | `material_summary.py` | 🔄 Сопоставление | Быстрый анализ результатов |
 | 7 | `save_matches.py` | 🔄 Сопоставление | Полное сохранение результатов |
 | 8 | `save_simple_matches.py` | 🔄 Сопоставление | Упрощенное сохранение (CSV) |
-| 9 | `show_material.py` | 👁️ Просмотр | Структура конкретного материала |
+| 9 | `show_real_material.py` | 👁️ Просмотр | Структура конкретного материала |
 | 10 | `show_real_material.py` | 👁️ Просмотр | Анализ импортированного материала |
 | 11 | `view_collection.py` | 👁️ Просмотр | Просмотр коллекций |
 | 12 | `check_loaded_materials.py` | 👁️ Просмотр | Проверка загруженных материалов |
@@ -161,7 +161,7 @@ python utils/run_utility.py
 # Запускает интерактивное меню всех утилит
 ```
 
-#### `show_material.py`
+#### `show_real_material.py`
 **Просмотр структуры конкретного материала**
 - Показывает полную структуру материала из API
 - Отображение embedding информации
@@ -169,7 +169,7 @@ python utils/run_utility.py
 - JSON структуру для отладки
 
 ```bash
-python utils/show_material.py
+python utils/show_real_material.py
 # Показывает материал с ID: 042f031f-eac0-4f21-b409-e7cd962e4e0e
 ```
 
@@ -402,7 +402,7 @@ python utils/save_matches.py
 python utils/save_simple_matches.py
 
 # Просмотр данных
-python utils/show_material.py
+python utils/show_real_material.py
 python utils/show_real_material.py
 python utils/view_collection.py
 
@@ -481,7 +481,7 @@ python utils/check_db_connection.py
 python utils/test_russian_search.py
 
 # Посмотреть структуру материала
-python utils/show_material.py
+python utils/show_real_material.py
 
 # Очистить при необходимости
 python utils/cleanup_collections.py

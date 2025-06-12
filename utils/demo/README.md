@@ -4,7 +4,7 @@
 
 ## Файлы
 
-- `demo_advanced_search.py` - Демонстрация расширенного поиска
+- `demo_advanced_search_simple.py` - Демонстрация расширенного поиска (упрощенная версия)
 - `demo_advanced_search_simple.py` - Упрощенная демонстрация поиска
 - `demo_redis_caching.py` - Демонстрация кеширования с Redis
 - `demo_postgresql_hybrid.py` - Демонстрация гибридного поиска
@@ -15,7 +15,7 @@
 Запустите любой скрипт из корневой директории проекта:
 
 ```bash
-python utils/demo/demo_advanced_search.py
+python utils/demo/demo_advanced_search_simple.py
 ```
 
 ## Требования

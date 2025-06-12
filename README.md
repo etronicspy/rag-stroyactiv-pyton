@@ -194,7 +194,7 @@ pytest tests/test_monitoring.py -v
 ### Демонстрационные скрипты
 ```bash
 # Демо продвинутого поиска
-python utils/demo_advanced_search.py
+python utils/demo/demo_advanced_search_simple.py
 
 # Простое демо поиска
 python utils/demo_advanced_search_simple.py
@@ -351,7 +351,7 @@ python utils/demo_price_processing.py
 ## 🔧 Утилиты и инструменты
 
 ### Демонстрационные скрипты
-- `utils/demo_advanced_search.py` - полное демо продвинутого поиска
+- `utils/demo/demo_advanced_search_simple.py` - упрощенное демо продвинутого поиска
 - `utils/demo_advanced_search_simple.py` - упрощенное демо
 - `utils/demo_price_processing.py` - демо обработки прайс-листов
 

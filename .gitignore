@@ -1,7 +1,6 @@
 # Environment variables
 .env
 .env.local
-env.local
 .env.*.local
 
 # Allow example environment file
@@ -35,54 +34,122 @@ wheels/
 env/
 venv/
 ENV/
+env.local
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
 # Logs
 *.log
-
-# Local development
-.env.local
-env(copy).local
-*.DS_Store
-.env.development.local
-.env.test.local
-.env.production.local
+logs/
 
 # Test coverage
 .coverage
 htmlcov/
 .pytest_cache/
+.mypy_cache/
+.tox/
 
-# Temporary files
+# Security - SSH keys and certificates
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+# Но разрешаем конкретные ключи bitbucket (по просьбе пользователя)
+!id_bitbucket
+!id_bitbucket.pub
+
+# Backup and temporary files
+*.bak
+*.backup
+*.tmp
+*.swp
+*.swo
+*~
 temp/
 tmp/
+.DS_Store
 
-# Utils temporary files and outputs (но не сами утилиты)
+# Documentation temporary files
+*.md~
+*.md.bak
+optimization_plan.md
+OPTIMIZATION_SUMMARY.md
+CLEANUP.md
+
+# Archive folders
+docs/archive/
+archive/
+
+# Cache directories
+.cache/
+.npm/
+node_modules/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Utils temporary files and outputs
 utils/temp/
 utils/output/
 utils/*.log
 utils/*.csv
+utils/*.json
+utils/*.xlsx
+utils/*.xls
+
+# Demo outputs
+utils/demo/output/
+utils/demo/*.log
+utils/demo/*.csv
+
+# Tools outputs
+utils/tools/output/
+utils/tools/*.log
+
+# Allow specific utility files
 !utils/load_materials.py
 !utils/material_matcher.py
 !utils/common.py
+!utils/common_utils.py
 !utils/create_test_data.py
-!utils/test_russian_search.py
-!utils/test_all_services.py
-!utils/check_db_connection.py
-!utils/cleanup_collections.py
-!utils/view_collection.py
-!utils/show_material.py
-!utils/show_real_material.py
 !utils/material_summary.py
 !utils/save_matches.py
 !utils/save_simple_matches.py
+!utils/show_real_material.py
 !utils/README.md
 !utils/__init__.py
 
-# Тесты утилит теперь включены
-!tests/utils/ 
+# Allow demo files
+!utils/demo/README.md
+!utils/demo/__init__.py
+!utils/demo/*.py
+
+# Allow tools files
+!utils/tools/README.md
+!utils/tools/__init__.py
+!utils/tools/*.py
+
+# Allow data files
+!utils/data/README.md
+!utils/data/__init__.py
+!utils/data/*.py
+
+# Allow admin files
+!utils/admin/README.md
+!utils/admin/__init__.py
+!utils/admin/*.py
+
+# Allow tests
+!tests/
+!tests/**/*.py 
