@@ -194,14 +194,14 @@ class Settings(BaseSettings):
         # Здесь можно добавить другие типы БД
         raise ValueError(f"Unsupported database type: {self.DATABASE_TYPE}")
     
-    def get_postgresql_config(self) -> Dict[str, Any]:
-        """Get PostgreSQL database configuration"""
+    def get_relational_db_config(self) -> Dict[str, Any]:
+        """Get relational database configuration (PostgreSQL)"""
         if self.POSTGRESQL_URL:
             connection_string = self.POSTGRESQL_URL
         else:
             # Build connection string from components
             connection_string = (
-                f"postgresql://{self.POSTGRESQL_USER}:{self.POSTGRESQL_PASSWORD}"
+                f"postgresql+asyncpg://{self.POSTGRESQL_USER}:{self.POSTGRESQL_PASSWORD}"
                 f"@{self.POSTGRESQL_HOST}:{self.POSTGRESQL_PORT}/{self.POSTGRESQL_DATABASE}"
             )
         
