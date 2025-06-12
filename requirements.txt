@@ -28,4 +28,5 @@ pytest-mock==3.12.0
 pytest-cov==4.1.0
 
 # Performance optimization dependencies
-msgpack==1.0.7 
+msgpack==1.0.7
+psutil==5.9.8 
