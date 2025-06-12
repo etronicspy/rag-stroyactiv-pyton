@@ -70,7 +70,10 @@ class DatabaseConfig:
             "retry_on_timeout": retry_on_timeout,
             "socket_timeout": 30,
             "socket_connect_timeout": 30,
-            "decode_responses": True
+            "decode_responses": True,
+            "health_check_interval": 30,
+            "default_ttl": 3600,  # 1 hour
+            "key_prefix": "rag_materials:"
         }
 
 class AIConfig:
