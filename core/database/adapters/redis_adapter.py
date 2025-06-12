@@ -6,6 +6,7 @@
 import json
 import pickle
 import logging
+import zlib
 from typing import Any, Dict, List, Optional, Union, Set
 from datetime import datetime, timedelta
 import asyncio
@@ -14,6 +15,14 @@ from contextlib import asynccontextmanager
 import redis.asyncio as redis
 from redis.asyncio import ConnectionPool
 from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
+
+# Try to import msgpack for optimized serialization
+try:
+    import msgpack
+    MSGPACK_AVAILABLE = True
+except ImportError:
+    MSGPACK_AVAILABLE = False
+    logging.getLogger(__name__).warning("msgpack not available, falling back to JSON+pickle serialization")
 
 from core.database.interfaces import ICacheDatabase
 from core.database.exceptions import ConnectionError, DatabaseError, QueryError
@@ -749,27 +758,130 @@ class RedisDatabase(ICacheDatabase):
         """Build full cache key with prefix."""
         return f"{self.key_prefix}{key}"
     
-    def _serialize_value(self, value: Any) -> str:
-        """Serialize value for storage."""
-        try:
-            # Try JSON first (faster and more readable)
-            return json.dumps(value, default=str, ensure_ascii=False)
-        except (TypeError, ValueError):
-            # Fallback to pickle for complex objects
-            return pickle.dumps(value).hex()
-    
-    def _deserialize_value(self, value: str) -> Any:
-        """Deserialize value from storage."""
-        try:
-            # Try JSON first
-            return json.loads(value)
-        except (json.JSONDecodeError, TypeError):
+    def _serialize_value(self, value: Any) -> bytes:
+        """Serialize value for storage with optimal performance.
+        
+        Uses msgpack if available (fastest), otherwise falls back to JSON+pickle.
+        Automatically compresses large objects.
+        """
+        if MSGPACK_AVAILABLE:
             try:
-                # Try pickle
-                return pickle.loads(bytes.fromhex(value))
-            except (ValueError, pickle.PickleError):
-                # Return as string if all else fails
-                return value
+                # Use msgpack for fastest serialization
+                serialized = msgpack.packb(value, use_bin_type=True, strict_types=False)
+                
+                # Compress if larger than 1KB
+                if len(serialized) > 1024:
+                    compressed = zlib.compress(serialized, level=1)  # Fast compression
+                    # Only use compression if it actually reduces size
+                    if len(compressed) < len(serialized):
+                        return b'ZLIB:' + compressed
+                
+                return b'MSGPACK:' + serialized
+                
+            except (TypeError, ValueError, msgpack.exceptions.PackException) as e:
+                logger.debug(f"msgpack serialization failed, falling back to pickle: {e}")
+                # Fallback to pickle for complex objects
+                pickled = pickle.dumps(value)
+                if len(pickled) > 1024:
+                    compressed = zlib.compress(pickled, level=1)
+                    if len(compressed) < len(pickled):
+                        return b'ZLIB_PICKLE:' + compressed
+                return b'PICKLE:' + pickled
+        else:
+            # Legacy JSON+pickle fallback
+            try:
+                json_str = json.dumps(value, default=str, ensure_ascii=False)
+                json_bytes = json_str.encode('utf-8')
+                
+                if len(json_bytes) > 1024:
+                    compressed = zlib.compress(json_bytes, level=1)
+                    if len(compressed) < len(json_bytes):
+                        return b'ZLIB_JSON:' + compressed
+                
+                return b'JSON:' + json_bytes
+                
+            except (TypeError, ValueError):
+                # Fallback to pickle for complex objects
+                pickled = pickle.dumps(value)
+                if len(pickled) > 1024:
+                    compressed = zlib.compress(pickled, level=1)
+                    if len(compressed) < len(pickled):
+                        return b'ZLIB_PICKLE:' + compressed
+                return b'PICKLE:' + pickled
+    
+    def _deserialize_value(self, value: Union[str, bytes]) -> Any:
+        """Deserialize value from storage with automatic format detection."""
+        if isinstance(value, str):
+            # Legacy string format (JSON or hex-encoded pickle)
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                try:
+                    return pickle.loads(bytes.fromhex(value))
+                except (ValueError, pickle.PickleError):
+                    return value
+        
+        if not isinstance(value, bytes):
+            return value
+            
+        # New binary format with prefixes
+        if value.startswith(b'ZLIB:'):
+            # Compressed msgpack
+            try:
+                decompressed = zlib.decompress(value[5:])
+                return msgpack.unpackb(decompressed, raw=False, strict_map_key=False)
+            except Exception as e:
+                logger.error(f"Failed to decompress/deserialize ZLIB msgpack: {e}")
+                return None
+                
+        elif value.startswith(b'MSGPACK:'):
+            # Uncompressed msgpack
+            try:
+                return msgpack.unpackb(value[8:], raw=False, strict_map_key=False)
+            except Exception as e:
+                logger.error(f"Failed to deserialize msgpack: {e}")
+                return None
+                
+        elif value.startswith(b'ZLIB_PICKLE:'):
+            # Compressed pickle
+            try:
+                decompressed = zlib.decompress(value[12:])
+                return pickle.loads(decompressed)
+            except Exception as e:
+                logger.error(f"Failed to decompress/deserialize ZLIB pickle: {e}")
+                return None
+                
+        elif value.startswith(b'PICKLE:'):
+            # Uncompressed pickle
+            try:
+                return pickle.loads(value[7:])
+            except Exception as e:
+                logger.error(f"Failed to deserialize pickle: {e}")
+                return None
+                
+        elif value.startswith(b'ZLIB_JSON:'):
+            # Compressed JSON
+            try:
+                decompressed = zlib.decompress(value[10:])
+                return json.loads(decompressed.decode('utf-8'))
+            except Exception as e:
+                logger.error(f"Failed to decompress/deserialize ZLIB JSON: {e}")
+                return None
+                
+        elif value.startswith(b'JSON:'):
+            # Uncompressed JSON
+            try:
+                return json.loads(value[5:].decode('utf-8'))
+            except Exception as e:
+                logger.error(f"Failed to deserialize JSON: {e}")
+                return None
+        
+        # Unknown format, try to decode as string
+        try:
+            return value.decode('utf-8')
+        except UnicodeDecodeError:
+            logger.warning("Unknown serialization format, returning raw bytes")
+            return value
     
     async def _get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
