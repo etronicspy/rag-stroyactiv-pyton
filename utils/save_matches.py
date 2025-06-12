@@ -8,7 +8,8 @@ import json
 from datetime import datetime
 
 from .material_matcher import MaterialMatcher
-from .common import qdrant_service, embedding_service, generate_unique_id, format_price, truncate_text
+from .common import qdrant_service, embedding_service
+from .common_utils import generate_unique_id, format_price, truncate_text
 from qdrant_client.models import PointStruct
 
 async def save_and_view_matches(supplier_id: str):

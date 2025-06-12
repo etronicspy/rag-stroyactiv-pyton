@@ -31,25 +31,75 @@ try:
         embedding_service,
         qdrant_service,
         vector_cache,
-        calculate_cosine_similarity,
-        calculate_cosine_similarity_batch,
-        format_confidence,
-        format_price,
-        truncate_text,
-        generate_unique_id,
         parallel_processing
     )
     __all__.extend([
         'embedding_service',
         'qdrant_service', 
         'vector_cache',
+        'parallel_processing'
+    ])
+except ImportError:
+    pass
+
+try:
+    from .common_utils import (
+        calculate_cosine_similarity,
+        calculate_cosine_similarity_batch,
+        format_confidence,
+        format_price,
+        truncate_text,
+        generate_unique_id,
+        clean_text,
+        normalize_unit,
+        parse_price,
+        calculate_text_similarity,
+        calculate_combined_score,
+        validate_email,
+        validate_phone,
+        validate_sku,
+        format_datetime,
+        parse_datetime,
+        flatten_dict,
+        chunk_list,
+        remove_duplicates,
+        safe_divide,
+        safe_get,
+        measure_time,
+        measure_time_async,
+        DEFAULT_CATEGORIES,
+        DEFAULT_UNITS,
+        SIMILARITY_THRESHOLDS,
+        SEARCH_WEIGHTS
+    )
+    __all__.extend([
         'calculate_cosine_similarity',
         'calculate_cosine_similarity_batch',
         'format_confidence',
         'format_price',
         'truncate_text',
         'generate_unique_id',
-        'parallel_processing'
+        'clean_text',
+        'normalize_unit',
+        'parse_price',
+        'calculate_text_similarity',
+        'calculate_combined_score',
+        'validate_email',
+        'validate_phone',
+        'validate_sku',
+        'format_datetime',
+        'parse_datetime',
+        'flatten_dict',
+        'chunk_list',
+        'remove_duplicates',
+        'safe_divide',
+        'safe_get',
+        'measure_time',
+        'measure_time_async',
+        'DEFAULT_CATEGORIES',
+        'DEFAULT_UNITS',
+        'SIMILARITY_THRESHOLDS',
+        'SEARCH_WEIGHTS'
     ])
 except ImportError:
     pass

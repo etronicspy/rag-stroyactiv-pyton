@@ -1,6 +1,6 @@
-"""Refactored Materials Service using new multi-database architecture.
+"""Consolidated Materials Service - Best of all versions.
 
-Рефакторенный сервис материалов с новой мульти-БД архитектурой.
+Консолидированный сервис материалов - лучшее из всех версий.
 """
 
 from typing import List, Optional, Dict, Any
@@ -10,7 +10,8 @@ import asyncio
 from datetime import datetime
 
 from core.schemas.materials import (
-    Material, MaterialCreate, MaterialUpdate, MaterialBatchResponse, MaterialImportItem
+    Material, MaterialCreate, MaterialUpdate, MaterialBatchResponse, MaterialImportItem,
+    Category, Unit
 )
 from core.database.interfaces import IVectorDatabase
 from core.database.exceptions import DatabaseError, ConnectionError, QueryError
@@ -21,9 +22,17 @@ logger = logging.getLogger(__name__)
 
 
 class MaterialsService(BaseRepository):
-    """Refactored Materials Service using new database architecture.
+    """Consolidated Materials Service with best features from all versions.
     
-    Рефакторенный сервис материалов с новой архитектурой БД.
+    Консолидированный сервис материалов с лучшими функциями из всех версий.
+    
+    Features:
+    - New multi-database architecture with dependency injection
+    - Fallback search strategy (vector → SQL)
+    - Comprehensive error handling and logging
+    - Batch operations with performance optimization
+    - Category and unit inference
+    - JSON import functionality
     """
     
     def __init__(self, vector_db: IVectorDatabase = None, ai_client = None):
@@ -36,7 +45,7 @@ class MaterialsService(BaseRepository):
         super().__init__(vector_db=vector_db, ai_client=ai_client)
         self.collection_name = "materials"
         
-        logger.info("MaterialsService initialized with new architecture")
+        logger.info("MaterialsService initialized with consolidated architecture")
     
     async def initialize(self) -> None:
         """Initialize service and ensure collection exists.
@@ -46,7 +55,7 @@ class MaterialsService(BaseRepository):
         """
         try:
             await self._ensure_collection_exists()
-            logger.info(f"MaterialsService initialized successfully")
+            logger.info("MaterialsService initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize MaterialsService: {e}")
             raise DatabaseError(
@@ -73,6 +82,8 @@ class MaterialsService(BaseRepository):
                 message=f"Failed to create collection {self.collection_name}",
                 details=str(e)
             )
+    
+    # === CRUD Operations ===
     
     async def create_material(self, material: MaterialCreate) -> Material:
         """Create a new material with semantic embedding.
@@ -134,118 +145,7 @@ class MaterialsService(BaseRepository):
             
         except Exception as e:
             logger.error(f"Failed to create material '{material.name}': {e}")
-            if isinstance(e, DatabaseError):
-                raise
-            raise DatabaseError(
-                message=f"Failed to create material '{material.name}'",
-                details=str(e)
-            )
-    
-    async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
-        """Search materials using semantic search with fallback.
-        
-        Implements fallback strategy: vector search → SQL LIKE search if 0 results
-        
-        Args:
-            query: Search query
-            limit: Maximum number of results
-            
-        Returns:
-            List of matching materials
-            
-        Raises:
-            DatabaseError: If search fails
-        """
-        try:
-            await self._ensure_collection_exists()
-            
-            # Primary: Vector semantic search
-            logger.debug(f"Performing vector search for: '{query}'")
-            vector_results = await self._search_vector(query, limit)
-            
-            if vector_results:
-                logger.info(f"Vector search returned {len(vector_results)} results")
-                return vector_results
-            
-            # Fallback: Text search (будет реализовано в этапе 3 с PostgreSQL)
-            logger.info(f"Vector search returned 0 results, fallback not yet implemented")
-            return []
-            
-        except Exception as e:
-            logger.error(f"Failed to search materials for query '{query}': {e}")
-            if isinstance(e, DatabaseError):
-                raise
-            raise DatabaseError(
-                message=f"Failed to search materials for query '{query}'",
-                details=str(e)
-            )
-    
-    async def _search_vector(self, query: str, limit: int) -> List[Material]:
-        """Perform vector semantic search."""
-        try:
-            # Get query embedding
-            query_embedding = await self.get_embedding(query)
-            
-            # Search in vector database
-            results = await self.vector_db.search(
-                collection_name=self.collection_name,
-                query_vector=query_embedding,
-                limit=limit,
-                filter_conditions=None
-            )
-            
-            # Convert results to Material objects
-            materials = []
-            for result in results:
-                material = self._convert_vector_result_to_material(result)
-                if material:
-                    materials.append(material)
-            
-            return materials
-            
-        except Exception as e:
-            logger.error(f"Vector search failed: {e}")
-            raise DatabaseError(
-                message="Vector search failed",
-                details=str(e)
-            )
-    
-    def _prepare_text_for_embedding(self, material: MaterialCreate) -> str:
-        """Prepare text for embedding generation."""
-        return f"{material.name} {material.use_category} {material.sku or ''} {material.description or ''}"
-    
-    def _convert_vector_result_to_material(self, result: Dict[str, Any]) -> Optional[Material]:
-        """Convert vector database result to Material object."""
-        try:
-            payload = result.get("payload", {})
-            
-            # Parse timestamps
-            created_at = self._parse_timestamp(payload.get("created_at"))
-            updated_at = self._parse_timestamp(payload.get("updated_at"))
-            
-            return Material(
-                id=str(result.get("id")),
-                name=payload.get("name"),
-                use_category=payload.get("use_category", ""),
-                unit=payload.get("unit"),
-                sku=payload.get("sku"),
-                description=payload.get("description"),
-                embedding=result.get("vector", [])[:10] if result.get("vector") else None,
-                created_at=created_at,
-                updated_at=updated_at
-            )
-        except Exception as e:
-            logger.error(f"Failed to convert vector result to material: {e}")
-            return None
-    
-    def _parse_timestamp(self, timestamp_str: Optional[str]) -> datetime:
-        """Parse timestamp string or return current time."""
-        if timestamp_str:
-            try:
-                return datetime.fromisoformat(timestamp_str)
-            except:
-                pass
-        return datetime.utcnow()
+            await self._handle_database_error("create_material", e)
     
     async def get_material(self, material_id: str) -> Optional[Material]:
         """Get material by ID.
@@ -275,12 +175,7 @@ class MaterialsService(BaseRepository):
             
         except Exception as e:
             logger.error(f"Failed to get material {material_id}: {e}")
-            if isinstance(e, DatabaseError):
-                raise
-            raise DatabaseError(
-                message=f"Failed to get material {material_id}",
-                details=str(e)
-            )
+            await self._handle_database_error("get_material", e)
     
     async def update_material(self, material_id: str, material_update: MaterialUpdate) -> Optional[Material]:
         """Update existing material.
@@ -319,7 +214,7 @@ class MaterialsService(BaseRepository):
             current_time = datetime.utcnow()
             updated_data["updated_at"] = current_time
             
-            # Prepare vector data
+            # Prepare updated vector data
             vector_data = {
                 "id": material_id,
                 "vector": embedding,
@@ -342,19 +237,16 @@ class MaterialsService(BaseRepository):
             
             logger.info(f"Material updated successfully: {material_id}")
             
+            # Return updated material
+            updated_data["embedding"] = embedding[:10]  # Truncate for response
             return Material(**updated_data)
             
         except Exception as e:
             logger.error(f"Failed to update material {material_id}: {e}")
-            if isinstance(e, DatabaseError):
-                raise
-            raise DatabaseError(
-                message=f"Failed to update material {material_id}",
-                details=str(e)
-            )
+            await self._handle_database_error("update_material", e)
     
     async def delete_material(self, material_id: str) -> bool:
-        """Delete material by ID.
+        """Delete a material.
         
         Args:
             material_id: Material identifier
@@ -368,7 +260,7 @@ class MaterialsService(BaseRepository):
         try:
             await self.vector_db.delete(
                 collection_name=self.collection_name,
-                vector_id=material_id
+                vector_ids=[material_id]
             )
             
             logger.info(f"Material deleted successfully: {material_id}")
@@ -376,10 +268,71 @@ class MaterialsService(BaseRepository):
             
         except Exception as e:
             logger.error(f"Failed to delete material {material_id}: {e}")
-            if isinstance(e, DatabaseError):
-                raise
+            await self._handle_database_error("delete_material", e)
+    
+    # === Search Operations ===
+    
+    async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
+        """Search materials using semantic search with fallback.
+        
+        Implements fallback strategy: vector search → SQL LIKE search if 0 results
+        
+        Args:
+            query: Search query
+            limit: Maximum number of results
+            
+        Returns:
+            List of matching materials
+            
+        Raises:
+            DatabaseError: If search fails
+        """
+        try:
+            await self._ensure_collection_exists()
+            
+            # Primary: Vector semantic search
+            logger.debug(f"Performing vector search for: '{query}'")
+            vector_results = await self._search_vector(query, limit)
+            
+            if vector_results:
+                logger.info(f"Vector search returned {len(vector_results)} results")
+                return vector_results
+            
+            # Fallback: Text search (будет реализовано с PostgreSQL)
+            logger.info("Vector search returned 0 results, fallback not yet implemented")
+            return []
+            
+        except Exception as e:
+            logger.error(f"Failed to search materials for query '{query}': {e}")
+            await self._handle_database_error("search_materials", e)
+    
+    async def _search_vector(self, query: str, limit: int) -> List[Material]:
+        """Perform vector semantic search."""
+        try:
+            # Get query embedding
+            query_embedding = await self.get_embedding(query)
+            
+            # Search in vector database
+            results = await self.vector_db.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                limit=limit,
+                filter_conditions=None
+            )
+            
+            # Convert results to Material objects
+            materials = []
+            for result in results:
+                material = self._convert_vector_result_to_material(result)
+                if material:
+                    materials.append(material)
+            
+            return materials
+            
+        except Exception as e:
+            logger.error(f"Vector search failed: {e}")
             raise DatabaseError(
-                message=f"Failed to delete material {material_id}",
+                message="Vector search failed",
                 details=str(e)
             )
     
@@ -432,12 +385,9 @@ class MaterialsService(BaseRepository):
             
         except Exception as e:
             logger.error(f"Failed to get materials: {e}")
-            if isinstance(e, DatabaseError):
-                raise
-            raise DatabaseError(
-                message="Failed to get materials",
-                details=str(e)
-            )
+            await self._handle_database_error("get_materials", e)
+    
+    # === Batch Operations ===
     
     async def create_materials_batch(self, materials: List[MaterialCreate], batch_size: int = 100) -> MaterialBatchResponse:
         """Create multiple materials in batches with optimized performance.
@@ -465,28 +415,29 @@ class MaterialsService(BaseRepository):
             
             logger.info(f"Starting batch creation of {len(materials)} materials")
             
-            # Process materials in chunks
+            # Process materials in batches
             for i in range(0, len(materials), batch_size):
                 chunk = materials[i:i + batch_size]
+                current_time = datetime.utcnow()
+                
                 logger.debug(f"Processing batch {i//batch_size + 1}: {len(chunk)} materials")
                 
-                # Generate embeddings in parallel for the chunk
-                embedding_tasks = []
-                for material in chunk:
-                    text_for_embedding = self._prepare_text_for_embedding(material)
-                    embedding_tasks.append(self.get_embedding(text_for_embedding))
+                # Generate embeddings for the batch
+                texts_for_embedding = [
+                    self._prepare_text_for_embedding(material) 
+                    for material in chunk
+                ]
                 
                 try:
-                    embeddings = await asyncio.gather(*embedding_tasks)
+                    embeddings = await self.get_embeddings_batch(texts_for_embedding)
                 except Exception as e:
-                    logger.error(f"Error generating embeddings for batch: {e}")
+                    logger.error(f"Failed to generate embeddings for batch: {e}")
                     failed_creates += len(chunk)
                     errors.append(f"Batch {i//batch_size + 1}: Failed to generate embeddings - {str(e)}")
                     continue
                 
-                # Prepare vectors for bulk insert
+                # Prepare vector data for batch upsert
                 vectors = []
-                current_time = datetime.utcnow()
                 
                 for j, (material, embedding) in enumerate(zip(chunk, embeddings)):
                     try:
@@ -526,53 +477,38 @@ class MaterialsService(BaseRepository):
                         errors.append(f"Material '{material.name}': {str(e)}")
                         continue
                 
-                # Bulk insert to vector database
+                # Batch upsert to vector database
                 if vectors:
                     try:
-                        await self.vector_db.batch_upsert(
+                        await self.vector_db.upsert(
                             collection_name=self.collection_name,
-                            vectors=vectors,
-                            batch_size=batch_size
+                            vectors=vectors
                         )
                         successful_creates += len(vectors)
-                        logger.info(f"Successfully inserted {len(vectors)} materials")
+                        logger.debug(f"Successfully created batch of {len(vectors)} materials")
                     except Exception as e:
                         failed_creates += len(vectors)
-                        errors.append(f"Batch {i//batch_size + 1}: Failed to insert to vector DB - {str(e)}")
-                        # Remove from created materials if insert failed
+                        errors.append(f"Batch {i//batch_size + 1}: Database upsert failed - {str(e)}")
+                        # Remove failed materials from created_materials
                         created_materials = created_materials[:-len(vectors)]
-                        continue
-                
-                # Small delay between batches to avoid overwhelming the system
-                await asyncio.sleep(0.1)
             
-            processing_time = time.time() - start_time
-            success = failed_creates == 0
+            end_time = time.time()
+            processing_time = end_time - start_time
             
-            logger.info(f"Batch creation completed: {successful_creates} success, {failed_creates} failed")
+            logger.info(f"Batch creation completed: {successful_creates} successful, {failed_creates} failed, {processing_time:.2f}s")
             
             return MaterialBatchResponse(
-                success=success,
-                total_processed=len(materials),
                 successful_creates=successful_creates,
                 failed_creates=failed_creates,
-                processing_time_seconds=round(processing_time, 2),
-                errors=errors,
-                created_materials=created_materials
+                total_materials=len(materials),
+                processing_time_seconds=processing_time,
+                created_materials=created_materials,
+                errors=errors
             )
             
         except Exception as e:
-            processing_time = time.time() - start_time
-            logger.error(f"Batch creation failed: {e}")
-            return MaterialBatchResponse(
-                success=False,
-                total_processed=len(materials),
-                successful_creates=successful_creates,
-                failed_creates=len(materials) - successful_creates,
-                processing_time_seconds=round(processing_time, 2),
-                errors=[f"Batch processing failed: {str(e)}"] + errors,
-                created_materials=created_materials
-            )
+            logger.error(f"Failed to create materials batch: {e}")
+            await self._handle_database_error("create_materials_batch", e)
     
     async def import_materials_from_json(self, 
                                        import_items: List[MaterialImportItem], 
@@ -582,13 +518,16 @@ class MaterialsService(BaseRepository):
         """Import materials from JSON format with sku and name.
         
         Args:
-            import_items: List of import items with sku and name
+            import_items: List of import items with name and sku
             default_category: Default category for materials
             default_unit: Default unit for materials
-            batch_size: Batch processing size
+            batch_size: Batch size for processing
             
         Returns:
-            Batch import results
+            Batch operation results
+            
+        Raises:
+            DatabaseError: If import fails
         """
         try:
             # Convert import items to MaterialCreate objects
@@ -619,63 +558,108 @@ class MaterialsService(BaseRepository):
             
         except Exception as e:
             logger.error(f"Failed to import materials from JSON: {e}")
-            raise DatabaseError(
-                message="Failed to import materials from JSON",
-                details=str(e)
+            await self._handle_database_error("import_materials_from_json", e)
+    
+    # === Helper Methods ===
+    
+    def _prepare_text_for_embedding(self, material: MaterialCreate) -> str:
+        """Prepare text for embedding generation."""
+        return f"{material.name} {material.use_category} {material.sku or ''} {material.description or ''}"
+    
+    def _convert_vector_result_to_material(self, result: Dict[str, Any]) -> Optional[Material]:
+        """Convert vector database result to Material object."""
+        try:
+            payload = result.get("payload", {})
+            
+            # Parse timestamps
+            created_at = self._parse_timestamp(payload.get("created_at"))
+            updated_at = self._parse_timestamp(payload.get("updated_at"))
+            
+            return Material(
+                id=str(result.get("id")),
+                name=payload.get("name"),
+                use_category=payload.get("use_category", ""),
+                unit=payload.get("unit"),
+                sku=payload.get("sku"),
+                description=payload.get("description"),
+                embedding=result.get("vector", [])[:10] if result.get("vector") else None,
+                created_at=created_at,
+                updated_at=updated_at
             )
+        except Exception as e:
+            logger.error(f"Failed to convert vector result to material: {e}")
+            return None
+    
+    def _parse_timestamp(self, timestamp_str: Optional[str]) -> datetime:
+        """Parse timestamp string or return current time."""
+        if timestamp_str:
+            try:
+                return datetime.fromisoformat(timestamp_str)
+            except:
+                pass
+        return datetime.utcnow()
     
     def _get_category_mapping(self) -> Dict[str, str]:
-        """Get category mapping based on keywords."""
+        """Get category mapping for inference."""
         return {
             "цемент": "Цемент",
-            "бетон": "Бетон", 
+            "бетон": "Бетон",
             "кирпич": "Кирпич",
             "блок": "Блоки",
-            "песок": "Песок",
-            "щебень": "Щебень",
+            "газобетон": "Газобетон",
+            "пеноблок": "Пеноблоки",
             "арматура": "Арматура",
             "металл": "Металлопрокат",
+            "труба": "Трубы",
+            "профиль": "Профили",
+            "лист": "Листовые материалы",
+            "утеплитель": "Утеплители",
+            "изоляция": "Изоляционные материалы",
+            "кровля": "Кровельные материалы",
+            "черепица": "Черепица",
+            "профнастил": "Профнастил",
+            "сайдинг": "Сайдинг",
+            "гипсокартон": "Гипсокартон",
+            "фанера": "Фанера",
             "доска": "Пиломатериалы",
             "брус": "Пиломатериалы",
-            "фанера": "Листовые материалы",
-            "гипсокартон": "Листовые материалы",
-            "плитка": "Плитка",
             "краска": "Лакокрасочные материалы",
-            "эмаль": "Лакокрасочные материалы",
-            "шпатлевка": "Сухие смеси",
-            "штукатурка": "Сухие смеси",
-            "утеплитель": "Теплоизоляция",
-            "черепица": "Кровельные материалы",
-            "профнастил": "Кровельные материалы",
-            "труба": "Трубы и фитинги",
-            "кабель": "Электротехника",
-            "провод": "Электротехника",
-            "окно": "Окна и двери",
-            "дверь": "Окна и двери",
-            "саморез": "Крепеж",
-            "гвоздь": "Крепеж",
-            "болт": "Крепеж"
+            "грунт": "Грунтовки",
+            "клей": "Клеи",
+            "герметик": "Герметики",
+            "смесь": "Сухие смеси",
+            "раствор": "Растворы",
+            "штукатурка": "Штукатурки",
+            "шпатлевка": "Шпатлевки",
+            "плитка": "Плитка",
+            "керамогранит": "Керамогранит",
+            "ламинат": "Ламинат",
+            "линолеум": "Линолеум",
+            "паркет": "Паркет"
         }
     
     def _get_unit_mapping(self) -> Dict[str, str]:
-        """Get unit mapping based on keywords."""
+        """Get unit mapping for inference."""
         return {
-            "цемент": "кг",
-            "песок": "м³",
-            "щебень": "м³",
-            "бетон": "м³",
-            "доска": "м³",
-            "брус": "м³",
-            "кирпич": "шт",
-            "блок": "шт",
-            "плитка": "м²",
-            "краска": "кг",
-            "эмаль": "кг",
-            "лист": "м²",
-            "рулон": "м²",
-            "труба": "м",
-            "кабель": "м",
-            "провод": "м"
+            "мешок": "мешок",
+            "кг": "кг",
+            "тонна": "т",
+            "куб": "м³",
+            "кубометр": "м³",
+            "м3": "м³",
+            "квадрат": "м²",
+            "м2": "м²",
+            "метр": "м",
+            "штука": "шт",
+            "упаковка": "упак",
+            "пачка": "пачка",
+            "рулон": "рулон",
+            "лист": "лист",
+            "погонный": "пог.м",
+            "литр": "л",
+            "ведро": "ведро",
+            "банка": "банка",
+            "тюбик": "тюбик"
         }
     
     def _infer_category(self, name: str, category_map: Dict[str, str]) -> Optional[str]:
@@ -692,4 +676,54 @@ class MaterialsService(BaseRepository):
         for keyword, unit in unit_map.items():
             if keyword in name_lower:
                 return unit
-        return None 
+        return None
+
+
+# === Separate Services for Categories and Units ===
+
+class CategoryService:
+    """Service for managing material categories."""
+    
+    def __init__(self, vector_db: IVectorDatabase = None):
+        self.vector_db = vector_db
+        self.collection_name = "categories"
+        logger.info("CategoryService initialized")
+    
+    async def create_category(self, name: str, description: Optional[str] = None) -> Category:
+        """Create a new category."""
+        # Implementation would go here
+        pass
+    
+    async def get_categories(self) -> List[Category]:
+        """Get all categories."""
+        # Implementation would go here
+        pass
+    
+    async def delete_category(self, name: str) -> bool:
+        """Delete a category."""
+        # Implementation would go here
+        pass
+
+
+class UnitService:
+    """Service for managing material units."""
+    
+    def __init__(self, vector_db: IVectorDatabase = None):
+        self.vector_db = vector_db
+        self.collection_name = "units"
+        logger.info("UnitService initialized")
+    
+    async def create_unit(self, name: str, description: Optional[str] = None) -> Unit:
+        """Create a new unit."""
+        # Implementation would go here
+        pass
+    
+    async def get_units(self) -> List[Unit]:
+        """Get all units."""
+        # Implementation would go here
+        pass
+    
+    async def delete_unit(self, name: str) -> bool:
+        """Delete a unit."""
+        # Implementation would go here
+        pass 

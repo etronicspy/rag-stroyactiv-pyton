@@ -8,7 +8,8 @@ import asyncio
 from datetime import datetime
 
 from .material_matcher import MaterialMatcher
-from .common import qdrant_service, generate_unique_id, truncate_text
+from .common import qdrant_service
+from .common_utils import generate_unique_id, truncate_text
 from qdrant_client.models import PointStruct, Distance, VectorParams
 
 async def save_simple_matches(supplier_id: str):

@@ -1,7 +1,17 @@
+"""Legacy Materials Service - DEPRECATED.
+
+This file is kept for backward compatibility only.
+Use services/materials_consolidated.py for new development.
+"""
+
 from typing import List, Optional, Dict, Any
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from core.schemas.materials import Material, MaterialCreate, MaterialUpdate, Category, Unit
 from core.config import get_vector_db_client, get_ai_client, settings
+from utils.common_utils import (
+    truncate_text, format_price, calculate_cosine_similarity,
+    generate_unique_id, format_confidence
+)
 import uuid
 
 class MaterialsService:

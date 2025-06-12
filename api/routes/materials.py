@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from core.schemas.materials import MaterialCreate, MaterialUpdate, Material, MaterialSearchQuery, MaterialBatchCreate, MaterialBatchResponse, MaterialImportRequest
-from services.materials import MaterialsService
+from services.materials_consolidated import MaterialsService
 
 router = APIRouter()
 materials_service = MaterialsService()

@@ -13,10 +13,12 @@ from services.price_processor import PriceProcessor
 from .common import (
     embedding_service, 
     qdrant_service, 
+    parallel_processing
+)
+from .common_utils import (
     calculate_cosine_similarity,
     calculate_cosine_similarity_batch,
     format_confidence,
-    parallel_processing,
     generate_unique_id
 )
 

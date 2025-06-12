@@ -8,7 +8,7 @@
 import asyncio
 
 from .material_matcher import MaterialMatcher
-from .common import truncate_text, format_price
+from .common_utils import truncate_text, format_price
 
 async def show_material_matches(supplier_id: str):
     """Показать результаты сопоставления материалов (оптимизированная версия)"""
