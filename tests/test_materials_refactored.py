@@ -9,7 +9,7 @@ from datetime import datetime
 
 from core.schemas.materials import MaterialCreate, MaterialUpdate, MaterialImportItem
 from core.database.exceptions import DatabaseError, ConnectionError
-from services.materials_new import MaterialsService
+from services.materials import MaterialsService
 
 
 class TestMaterialsServiceRefactored:

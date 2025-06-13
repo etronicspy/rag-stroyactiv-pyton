@@ -47,15 +47,19 @@ def qdrant_client():
 @pytest.fixture(autouse=True)
 def cleanup_test_collections(qdrant_client):
     """Clean up test collections before and after each test"""
-    # Cleanup before test
-    _cleanup_test_collections(qdrant_client)
-    
-    yield
-    
-    # Cleanup after test (опционально для реальной БД)
-    # Для реальной БД можно оставить данные для анализа
-    if not _is_production_db():
+    try:
+        # Cleanup before test
         _cleanup_test_collections(qdrant_client)
+        
+        yield
+        
+        # Cleanup after test (опционально для реальной БД)
+        # Для реальной БД можно оставить данные для анализа
+        if not _is_production_db():
+            _cleanup_test_collections(qdrant_client)
+    except Exception as e:
+        print(f"⚠️ Error in cleanup: {e}")
+        yield  # Continue with tests even if cleanup fails
 
 def _is_production_db() -> bool:
     """Check if we're using production database"""

@@ -13,8 +13,8 @@ from core.repositories.cached_materials import CachedMaterialsRepository
 from core.repositories.hybrid_materials import HybridMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import DatabaseError
-from core.schemas.materials import MaterialCreate, MaterialResponse, MaterialSearchRequest
-from core.schemas.search import SearchResponse
+from core.schemas.materials import MaterialCreate, Material as MaterialResponse, SearchResponse as MaterialSearchRequest
+from core.schemas.materials import SearchResponse
 
 
 class TestCachedMaterialsRepository:

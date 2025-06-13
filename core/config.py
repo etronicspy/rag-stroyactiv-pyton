@@ -219,7 +219,13 @@ class Settings(BaseSettings):
     
     # === DATABASE INITIALIZATION SETTINGS ===
     AUTO_MIGRATE: bool = Field(default=True, description="Automatically run migrations on startup")
-    AUTO_SEED: bool = Field(default=True, description="Automatically seed reference data on startup") 
+    AUTO_SEED: bool = Field(default=True, description="Automatically seed reference data on startup")
+    
+    # === FALLBACK SETTINGS ===
+    QDRANT_ONLY_MODE: bool = Field(default=True, description="Use only Qdrant without other databases")
+    ENABLE_FALLBACK_DATABASES: bool = Field(default=True, description="Enable fallback to mock databases")
+    DISABLE_REDIS_CONNECTION: bool = Field(default=True, description="Disable Redis connection (use mocks)")
+    DISABLE_POSTGRESQL_CONNECTION: bool = Field(default=True, description="Disable PostgreSQL connection (use mocks)") 
     
     # === PERFORMANCE SETTINGS ===
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB

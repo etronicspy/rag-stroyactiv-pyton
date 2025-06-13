@@ -3,7 +3,7 @@ from typing import List
 import logging
 
 from core.schemas.materials import Material
-from services.materials_consolidated import MaterialsService
+from services.materials import MaterialsService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -14,10 +14,10 @@ from fastapi.responses import JSONResponse
 import httpx
 import logging
 
-from core.config import get_settings, DatabaseType, AIProvider
+from core.config import get_settings, DatabaseType, AIProvider, get_vector_db_client
 from core.monitoring import get_metrics_collector
 from core.monitoring.logger import get_logger
-from core.database.factories import get_vector_db_client, get_postgresql_client, get_redis_client
+from core.database.factories import DatabaseFactory
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -209,7 +209,28 @@ class HealthChecker:
             from sqlalchemy import text
             
             # Get database connection
-            db_client = get_postgresql_client()
+            db_client = DatabaseFactory.create_relational_database()
+            
+            # Check if it's a mock adapter
+            if hasattr(db_client, 'mock_db'):
+                health_info.update({
+                    "status": "mock",
+                    "response_time_ms": round((time.time() - start_time) * 1000, 2),
+                    "details": {
+                        "type": "mock_postgresql",
+                        "message": "Using mock PostgreSQL adapter (fallback mode)",
+                        "connectivity": True,
+                        "version": "Mock PostgreSQL v1.0",
+                        "tables_count": 0,
+                        "materials_count": 0,
+                        "required_tables": {
+                            "materials": True,
+                            "categories": True,
+                            "units": True
+                        }
+                    }
+                })
+                return health_info
             
             async with db_client() as session:
                 # Test basic connectivity
@@ -280,7 +301,26 @@ class HealthChecker:
         start_time = time.time()
         
         try:
-            redis_client = get_redis_client()
+            redis_client = DatabaseFactory.create_cache_database()
+            
+            # Check if it's a mock adapter
+            if hasattr(redis_client, 'mock_redis'):
+                health_info.update({
+                    "status": "mock",
+                    "response_time_ms": round((time.time() - start_time) * 1000, 2),
+                    "details": {
+                        "type": "mock_redis",
+                        "message": "Using mock Redis adapter (fallback mode)",
+                        "ping": True,
+                        "version": "Mock Redis v1.0",
+                        "memory_usage": "1KB",
+                        "connected_clients": 1,
+                        "operations_per_sec": 0,
+                        "keyspace": {},
+                        "test_operation": True
+                    }
+                })
+                return health_info
             
             # Test basic connectivity
             ping_result = await redis_client.ping()

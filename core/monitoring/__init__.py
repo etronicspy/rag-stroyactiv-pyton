@@ -6,7 +6,7 @@ for database operations and application performance.
 """
 
 from .logger import get_logger, DatabaseLogger, setup_structured_logging
-from .metrics import MetricsCollector, DatabaseMetrics, PerformanceTracker
+from .metrics import MetricsCollector, DatabaseMetrics, PerformanceTracker, get_metrics_collector
 
 __all__ = [
     "get_logger",
@@ -14,5 +14,6 @@ __all__ = [
     "setup_structured_logging",
     "MetricsCollector",
     "DatabaseMetrics",
-    "PerformanceTracker"
+    "PerformanceTracker",
+    "get_metrics_collector"
 ] 

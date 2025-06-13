@@ -687,22 +687,42 @@ class CategoryService:
     def __init__(self, vector_db: IVectorDatabase = None):
         self.vector_db = vector_db
         self.collection_name = "categories"
+        # Mock storage for testing
+        self.categories = {}
         logger.info("CategoryService initialized")
     
     async def create_category(self, name: str, description: Optional[str] = None) -> Category:
         """Create a new category."""
-        # Implementation would go here
-        pass
+        try:
+            logger.info(f"Creating category: {name}")
+            category = Category(name=name, description=description)
+            self.categories[name] = category
+            return category
+        except Exception as e:
+            logger.error(f"Failed to create category {name}: {e}")
+            raise e
     
     async def get_categories(self) -> List[Category]:
         """Get all categories."""
-        # Implementation would go here
-        pass
+        try:
+            logger.info(f"Getting {len(self.categories)} categories")
+            return list(self.categories.values())
+        except Exception as e:
+            logger.error(f"Failed to get categories: {e}")
+            raise e
     
     async def delete_category(self, name: str) -> bool:
         """Delete a category."""
-        # Implementation would go here
-        pass
+        try:
+            if name in self.categories:
+                del self.categories[name]
+                logger.info(f"Category {name} deleted")
+                return True
+            logger.warning(f"Category {name} not found")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to delete category {name}: {e}")
+            raise e
 
 
 class UnitService:
@@ -711,19 +731,39 @@ class UnitService:
     def __init__(self, vector_db: IVectorDatabase = None):
         self.vector_db = vector_db
         self.collection_name = "units"
+        # Mock storage for testing
+        self.units = {}
         logger.info("UnitService initialized")
     
     async def create_unit(self, name: str, description: Optional[str] = None) -> Unit:
         """Create a new unit."""
-        # Implementation would go here
-        pass
+        try:
+            logger.info(f"Creating unit: {name}")
+            unit = Unit(name=name, description=description)
+            self.units[name] = unit
+            return unit
+        except Exception as e:
+            logger.error(f"Failed to create unit {name}: {e}")
+            raise e
     
     async def get_units(self) -> List[Unit]:
         """Get all units."""
-        # Implementation would go here
-        pass
+        try:
+            logger.info(f"Getting {len(self.units)} units")
+            return list(self.units.values())
+        except Exception as e:
+            logger.error(f"Failed to get units: {e}")
+            raise e
     
     async def delete_unit(self, name: str) -> bool:
         """Delete a unit."""
-        # Implementation would go here
-        pass 
+        try:
+            if name in self.units:
+                del self.units[name]
+                logger.info(f"Unit {name} deleted")
+                return True
+            logger.warning(f"Unit {name} not found")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to delete unit {name}: {e}")
+            raise e 

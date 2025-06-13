@@ -11,6 +11,16 @@ from enum import Enum
 from core.config import settings, DatabaseType, AIProvider
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
 from core.database.exceptions import ConfigurationError, ConnectionError
+from core.database.mocks import (
+    create_mock_redis_client, 
+    create_mock_postgresql_database,
+    MockRedisClient,
+    MockPostgreSQLDatabase
+)
+from core.database.adapters.mock_adapters import (
+    create_mock_relational_adapter,
+    create_mock_cache_adapter
+)
 
 
 logger = logging.getLogger(__name__)
@@ -78,19 +88,29 @@ class DatabaseFactory:
         connection_string: str = None,
         config_override: Optional[Dict[str, Any]] = None
     ) -> IRelationalDatabase:
-        """Create relational database client with caching.
+        """Create relational database client with caching and fallback support.
         
         Args:
             connection_string: Database connection string override
             config_override: Optional configuration override
             
         Returns:
-            Relational database client instance
+            Relational database client instance (real or mock)
             
         Raises:
             ConfigurationError: If configuration is invalid
-            ConnectionError: If connection fails
+            ConnectionError: If connection fails and fallback is disabled
         """
+        # Check if PostgreSQL connection is disabled
+        if getattr(settings, 'DISABLE_POSTGRESQL_CONNECTION', True):
+            logger.info("PostgreSQL connection disabled, using mock database")
+            return create_mock_relational_adapter()
+        
+        # Check if we're in Qdrant-only mode
+        if getattr(settings, 'QDRANT_ONLY_MODE', True):
+            logger.info("Qdrant-only mode enabled, using mock PostgreSQL database")
+            return create_mock_relational_adapter()
+        
         try:
             config = config_override or {
                 "connection_string": connection_string or "postgresql://localhost/materials"
@@ -104,6 +124,12 @@ class DatabaseFactory:
             
         except Exception as e:
             logger.error(f"Failed to create relational database client: {e}")
+            
+            # Use fallback if enabled
+            if getattr(settings, 'ENABLE_FALLBACK_DATABASES', True):
+                logger.warning("Using mock PostgreSQL database as fallback")
+                return create_mock_relational_adapter()
+                
             if isinstance(e, NotImplementedError):
                 raise e  # Pass through NotImplementedError
             raise ConnectionError(
@@ -118,19 +144,29 @@ class DatabaseFactory:
         redis_url: str = None,
         config_override: Optional[Dict[str, Any]] = None
     ) -> ICacheDatabase:
-        """Create cache database client with caching.
+        """Create cache database client with caching and fallback support.
         
         Args:
             redis_url: Redis connection URL override
             config_override: Optional configuration override
             
         Returns:
-            Cache database client instance
+            Cache database client instance (real or mock)
             
         Raises:
             ConfigurationError: If configuration is invalid
-            ConnectionError: If connection fails
+            ConnectionError: If connection fails and fallback is disabled
         """
+        # Check if Redis connection is disabled
+        if getattr(settings, 'DISABLE_REDIS_CONNECTION', True):
+            logger.info("Redis connection disabled, using mock cache")
+            return create_mock_cache_adapter()
+        
+        # Check if we're in Qdrant-only mode
+        if getattr(settings, 'QDRANT_ONLY_MODE', True):
+            logger.info("Qdrant-only mode enabled, using mock Redis cache")
+            return create_mock_cache_adapter()
+        
         try:
             config = config_override or {
                 "redis_url": redis_url or "redis://localhost:6379"
@@ -144,6 +180,12 @@ class DatabaseFactory:
             
         except Exception as e:
             logger.error(f"Failed to create cache database client: {e}")
+            
+            # Use fallback if enabled
+            if getattr(settings, 'ENABLE_FALLBACK_DATABASES', True):
+                logger.warning("Using mock Redis cache as fallback")
+                return create_mock_cache_adapter()
+                
             if isinstance(e, NotImplementedError):
                 raise e  # Pass through NotImplementedError
             raise ConnectionError(

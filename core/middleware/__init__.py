@@ -11,7 +11,7 @@ This package contains middleware components for:
 from .logging import LoggingMiddleware
 from .rate_limiting import RateLimitMiddleware
 from .security import SecurityMiddleware
-from .conditional import ConditionalMiddleware
+from .conditional import ConditionalMiddleware, MiddlewareOptimizer
 from .compression import CompressionMiddleware
 
 __all__ = [
@@ -20,4 +20,5 @@ __all__ = [
     "SecurityMiddleware",
     "ConditionalMiddleware",
     "CompressionMiddleware",
+    "MiddlewareOptimizer",
 ] 

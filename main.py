@@ -106,12 +106,11 @@ app.add_middleware(CompressionMiddleware,
     enable_brotli=True,
     enable_streaming=True,
     exclude_paths=["/health", "/ping", "/metrics"],
-    enable_performance_logging=settings.DEBUG,
+    enable_performance_logging=settings.ENVIRONMENT == "development",
 )
 
-# 2. Conditional Security middleware (only for API routes)
-security_middleware = MiddlewareOptimizer.exclude_static_and_health(
-    SecurityMiddleware,
+# 2. Security middleware 
+app.add_middleware(SecurityMiddleware,
     max_request_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,
     enable_security_headers=True,
     enable_input_validation=True,
@@ -119,51 +118,27 @@ security_middleware = MiddlewareOptimizer.exclude_static_and_health(
     enable_sql_injection_protection=True,
     enable_path_traversal_protection=True,
 )
-app.add_middleware(ConditionalMiddleware, 
-    middleware_class=SecurityMiddleware,
-    middleware_kwargs={
-        "max_request_size": settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,
-        "enable_security_headers": True,
-        "enable_input_validation": True,
-        "enable_xss_protection": True,
-        "enable_sql_injection_protection": True,
-        "enable_path_traversal_protection": True,
-    },
-    exclude_paths=[r"/health.*", r"/ping", r"/metrics", r"/docs.*", r"/redoc.*"],
-    enable_performance_logging=settings.DEBUG,
-)
 
-# 3. Optimized Rate limiting middleware (only for API routes)
+# 3. Rate limiting middleware
 if settings.ENABLE_RATE_LIMITING:
-    app.add_middleware(ConditionalMiddleware,
-        middleware_class=OptimizedRateLimitMiddleware,
-        middleware_kwargs={
-            "redis_url": settings.REDIS_URL,
-            "default_requests_per_minute": settings.RATE_LIMIT_RPM,
-            "default_requests_per_hour": settings.RATE_LIMIT_RPH,
-            "default_burst_size": settings.RATE_LIMIT_BURST,
-            "enable_burst_protection": True,
-            "rate_limit_headers": True,
-            "enable_performance_logging": settings.DEBUG,
-        },
-        include_paths=[r"/api/.*"],
-        exclude_paths=[r"/api/v1/health/.*"],
-        enable_performance_logging=settings.DEBUG,
+    app.add_middleware(OptimizedRateLimitMiddleware,
+        redis_url=settings.REDIS_URL,
+        default_requests_per_minute=settings.RATE_LIMIT_RPM,
+        default_requests_per_hour=settings.RATE_LIMIT_RPH,
+        default_burst_size=settings.RATE_LIMIT_BURST,
+        enable_burst_protection=True,
+        rate_limit_headers=True,
+        enable_performance_logging=settings.ENVIRONMENT == "development",
     )
 
-# 4. Conditional Logging middleware (exclude health checks for performance)
-app.add_middleware(ConditionalMiddleware,
-    middleware_class=LoggingMiddleware,
-    middleware_kwargs={
-        "log_level": settings.LOG_LEVEL,
-        "log_request_body": settings.LOG_REQUEST_BODY,
-        "log_response_body": settings.LOG_RESPONSE_BODY,
-        "max_body_size": 64 * 1024,  # 64KB
-        "include_headers": True,
-        "mask_sensitive_headers": True,
-    },
-    exclude_paths=[r"/health", r"/ping", r"/metrics"],
-    enable_performance_logging=settings.DEBUG,
+# 4. Logging middleware
+app.add_middleware(LoggingMiddleware,
+    log_level=settings.LOG_LEVEL,
+    log_request_body=settings.LOG_REQUEST_BODY,
+    log_response_body=settings.LOG_RESPONSE_BODY,
+    max_body_size=64 * 1024,  # 64KB
+    include_headers=True,
+    mask_sensitive_headers=True,
 )
 
 # 5. CORS middleware (last, closest to app)

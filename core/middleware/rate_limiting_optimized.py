@@ -173,6 +173,17 @@ class OptimizedRateLimitMiddleware(BaseHTTPMiddleware):
         """Get Redis connection with enhanced connection pooling."""
         if self._redis is None:
             try:
+                # Check if we should use mock Redis
+                if getattr(settings, 'DISABLE_REDIS_CONNECTION', False) or getattr(settings, 'QDRANT_ONLY_MODE', False):
+                    # Use mock Redis adapter
+                    from core.database.factories import DatabaseFactory
+                    cache_db = DatabaseFactory.create_cache_database()
+                    if hasattr(cache_db, 'mock_redis'):
+                        logger.info("🔧 Using mock Redis for rate limiting (Qdrant-only mode)")
+                        self._redis = cache_db.mock_redis
+                        return self._redis
+                
+                # Use real Redis
                 self._redis_pool = aioredis.ConnectionPool.from_url(
                     self.redis_url,
                     max_connections=50,  # Increased pool size
@@ -188,11 +199,25 @@ class OptimizedRateLimitMiddleware(BaseHTTPMiddleware):
                 
                 # Test connection and load Lua scripts
                 await self._redis.ping()
-                await self._load_lua_scripts()
+                if not hasattr(self._redis, 'mock_redis'):  # Skip Lua scripts for mock Redis
+                    await self._load_lua_scripts()
                 
                 logger.info("✅ Optimized rate limiting Redis connection established")
             except Exception as e:
                 logger.error(f"❌ Failed to connect to Redis for rate limiting: {e}")
+                
+                # Try fallback to mock if enabled
+                try:
+                    if getattr(settings, 'ENABLE_FALLBACK_DATABASES', True):
+                        from core.database.factories import DatabaseFactory
+                        cache_db = DatabaseFactory.create_cache_database()
+                        if hasattr(cache_db, 'mock_redis'):
+                            logger.warning("🔧 Using mock Redis as fallback for rate limiting")
+                            self._redis = cache_db.mock_redis
+                            return self._redis
+                except Exception as fallback_error:
+                    logger.error(f"Fallback to mock Redis failed: {fallback_error}")
+                
                 self._redis = None
         return self._redis
 
