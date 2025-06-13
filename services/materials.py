@@ -42,6 +42,23 @@ class MaterialsService(BaseRepository):
             vector_db: Vector database client (injected)
             ai_client: AI client for embeddings (injected)
         """
+        # Use factory defaults if not provided
+        if vector_db is None:
+            try:
+                from core.config import get_vector_db_client
+                vector_db = get_vector_db_client()
+            except Exception as e:
+                logger.warning(f"Failed to get vector DB client: {e}")
+                vector_db = None
+        
+        if ai_client is None:
+            try:
+                from core.config import get_ai_client
+                ai_client = get_ai_client()
+            except Exception as e:
+                logger.warning(f"Failed to get AI client: {e}")
+                ai_client = None
+        
         super().__init__(vector_db=vector_db, ai_client=ai_client)
         self.collection_name = "materials"
         
@@ -66,11 +83,18 @@ class MaterialsService(BaseRepository):
     async def _ensure_collection_exists(self) -> None:
         """Ensure materials collection exists with proper configuration."""
         try:
+            # Check if vector_db is available
+            if self.vector_db is None:
+                logger.warning("Vector DB not available, skipping collection creation")
+                return
+                
+            # Check if collection exists (using adapter method)
             if not await self.vector_db.collection_exists(self.collection_name):
                 logger.info(f"Creating collection: {self.collection_name}")
+                # Create collection using adapter
                 await self.vector_db.create_collection(
-                    collection_name=self.collection_name,
-                    vector_size=1536,  # OpenAI text-embedding-3-small
+                    name=self.collection_name,
+                    vector_size=1536,
                     distance_metric="cosine"
                 )
                 logger.info(f"Collection {self.collection_name} created successfully")
@@ -123,7 +147,21 @@ class MaterialsService(BaseRepository):
                 }
             }
             
-            # Store in vector database
+            # Store in vector database (using adapter)
+            vector_data = {
+                "id": material_id,
+                "vector": embedding,
+                "payload": {
+                    "name": material.name,
+                    "use_category": material.use_category,
+                    "unit": material.unit,
+                    "sku": material.sku,
+                    "description": material.description,
+                    "created_at": current_time.isoformat(),
+                    "updated_at": current_time.isoformat()
+                }
+            }
+            
             await self.vector_db.upsert(
                 collection_name=self.collection_name,
                 vectors=[vector_data]
@@ -290,6 +328,11 @@ class MaterialsService(BaseRepository):
         try:
             await self._ensure_collection_exists()
             
+            # Check if vector_db is available
+            if self.vector_db is None:
+                logger.warning("Vector DB not available, returning empty results")
+                return []
+            
             # Primary: Vector semantic search
             logger.debug(f"Performing vector search for: '{query}'")
             vector_results = await self._search_vector(query, limit)
@@ -312,15 +355,14 @@ class MaterialsService(BaseRepository):
             # Get query embedding
             query_embedding = await self.get_embedding(query)
             
-            # Search in vector database
+            # Search in vector database (using adapter)
             results = await self.vector_db.search(
                 collection_name=self.collection_name,
                 query_vector=query_embedding,
-                limit=limit,
-                filter_conditions=None
+                limit=limit
             )
             
-            # Convert results to Material objects
+            # Convert results to Material objects (adapter already returns proper format)
             materials = []
             for result in results:
                 material = self._convert_vector_result_to_material(result)

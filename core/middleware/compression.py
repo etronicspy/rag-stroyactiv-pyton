@@ -262,11 +262,13 @@ class CompressionMiddleware(BaseHTTPMiddleware):
                 
             else:
                 # Handle regular response
-                if hasattr(response, 'body'):
+                if hasattr(response, 'body') and response.body is not None:
                     original_content = response.body
+                    if isinstance(original_content, str):
+                        original_content = original_content.encode('utf-8')
                 else:
-                    # Convert response to bytes if needed
-                    original_content = str(response).encode('utf-8')
+                    # Skip compression for responses without content
+                    return response
                 
                 compressed_content = self._compress_content(original_content, algorithm)
                 

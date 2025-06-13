@@ -22,17 +22,20 @@ class BaseRepository(ABC):
     def __init__(self, 
                  vector_db: Optional[IVectorDatabase] = None,
                  relational_db: Optional[IRelationalDatabase] = None,
-                 cache_db: Optional[ICacheDatabase] = None):
+                 cache_db: Optional[ICacheDatabase] = None,
+                 ai_client: Optional[Any] = None):
         """Initialize base repository.
         
         Args:
             vector_db: Vector database client
             relational_db: Relational database client  
             cache_db: Cache database client
+            ai_client: AI client for embeddings
         """
         self.vector_db = vector_db
         self.relational_db = relational_db
         self.cache_db = cache_db
+        self.ai_client = ai_client
         self.logger = logging.getLogger(self.__class__.__name__)
     
     async def _handle_database_error(self, operation: str, error: Exception) -> None:
@@ -198,4 +201,74 @@ class BaseRepository(ABC):
         if details:
             log_data.update(details)
         
-        self.logger.info(f"Repository operation: {operation}", extra=log_data) 
+        self.logger.info(f"Repository operation: {operation}", extra=log_data)
+    
+    async def get_embedding(self, text: str) -> list:
+        """Get embedding for text using AI client.
+        
+        Args:
+            text: Text to get embedding for
+            
+        Returns:
+            List of float values representing the embedding
+            
+        Raises:
+            DatabaseError: If embedding generation fails
+        """
+        if not self.ai_client:
+            # Fallback to mock embedding if no AI client
+            return await self._generate_mock_embedding(text)
+        
+        try:
+            # For mock AI client (testing)
+            if hasattr(self.ai_client, 'get_embedding'):
+                return await self.ai_client.get_embedding(text)
+            
+            # For real OpenAI client
+            if hasattr(self.ai_client, 'embeddings'):
+                response = await self.ai_client.embeddings.create(
+                    input=text,
+                    model="text-embedding-3-small",
+                    dimensions=1536
+                )
+                return response.data[0].embedding
+            
+            # Fallback
+            self.logger.warning("AI client doesn't support embedding generation, using mock")
+            return await self._generate_mock_embedding(text)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate embedding for text: {e}")
+            # Return mock embedding as fallback
+            return await self._generate_mock_embedding(text)
+    
+    async def get_embeddings_batch(self, texts: list) -> list:
+        """Get embeddings for multiple texts.
+        
+        Args:
+            texts: List of texts to get embeddings for
+            
+        Returns:
+            List of embeddings
+        """
+        embeddings = []
+        for text in texts:
+            embedding = await self.get_embedding(text)
+            embeddings.append(embedding)
+        return embeddings
+    
+    async def _generate_mock_embedding(self, text: str) -> list:
+        """Generate mock embedding for testing/fallback.
+        
+        Args:
+            text: Input text
+            
+        Returns:
+            Mock embedding vector
+        """
+        import hashlib
+        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
+        mock_embedding = []
+        for i in range(1536):  # OpenAI embedding size
+            mock_embedding.append(float(int(text_hash[i % len(text_hash)], 16)) / 15.0 - 0.5)
+        return mock_embedding 

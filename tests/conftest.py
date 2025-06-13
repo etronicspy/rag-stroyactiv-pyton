@@ -1,27 +1,143 @@
+"""
+Единая конфигурация для всех тестов RAG Construction Materials API
+Поддерживает автоматическое переключение между mock и real DB
+"""
 import pytest
 import asyncio
+import os
+import time
+import logging
+from typing import Dict, Any, List
+from datetime import datetime
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 from qdrant_client import QdrantClient
-from core.config import settings
-import tempfile
-from datetime import datetime
-import time
-from typing import Dict, List, Any
-import logging
 
 # Настраиваем логирование для тестов
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-@pytest.fixture
-def client():
-    """Test client fixture"""
-    from main import app
-    return TestClient(app)
+# Константы для тестирования
+TEST_SETTINGS = {
+    "ENVIRONMENT": "test",
+    "BACKEND_CORS_ORIGINS": '["http://localhost:3000", "http://127.0.0.1:3000"]',
+    "QDRANT_URL": "https://test-cluster.qdrant.tech:6333",
+    "QDRANT_API_KEY": "test-api-key",
+    "QDRANT_COLLECTION_NAME": "materials_test",
+    "QDRANT_VECTOR_SIZE": "1536",
+    "OPENAI_API_KEY": "sk-test-key",
+    "OPENAI_MODEL": "text-embedding-3-small",
+    "AI_PROVIDER": "openai",
+    "DATABASE_TYPE": "qdrant_cloud",
+    "QDRANT_ONLY_MODE": "true",
+    "ENABLE_FALLBACK_DATABASES": "true",
+    "DISABLE_REDIS_CONNECTION": "true",
+    "DISABLE_POSTGRESQL_CONNECTION": "true",
+    "POSTGRESQL_URL": "postgresql://test:test@localhost:5432/test_materials",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "MAX_UPLOAD_SIZE": "52428800",
+    "BATCH_SIZE": "50",
+    "AUTO_MIGRATE": "false",
+    "AUTO_SEED": "false",
+    "LOG_LEVEL": "INFO",
+    "ENABLE_RATE_LIMITING": "true",
+    "RATE_LIMIT_RPM": "60",
+    "PROJECT_NAME": "RAG Construction Materials API",
+    "VERSION": "1.0.0",
+    "API_V1_STR": "/api/v1"
+}
+
+# Маркеры для разных типов тестов
+def pytest_configure(config):
+    """Конфигурация pytest с маркерами"""
+    config.addinivalue_line("markers", "unit: Quick unit tests with mocks")
+    config.addinivalue_line("markers", "integration: Integration tests with real databases")
+    config.addinivalue_line("markers", "functional: End-to-end functional tests")
+    config.addinivalue_line("markers", "performance: Performance and load tests")
+    config.addinivalue_line("markers", "slow: Tests that take more than 5 seconds")
+
+# ============================================================================
+# БАЗОВЫЕ ФИКСТУРЫ ДЛЯ УПРАВЛЕНИЯ РЕЖИМОМ ТЕСТИРОВАНИЯ
+# ============================================================================
 
 @pytest.fixture(scope="session")
-def qdrant_client():
-    """Real Qdrant client for testing"""
-    # Добавляем проверку подключения и ретрай логику
+def test_mode():
+    """Определяет режим тестирования: mock или real"""
+    return os.environ.get("TEST_MODE", "mock")
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_environment():
+    """Устанавливаем переменные окружения для тестов"""
+    original_env = {}
+    for key, value in TEST_SETTINGS.items():
+        original_env[key] = os.environ.get(key)
+        os.environ[key] = value
+    
+    yield
+    
+    # Восстанавливаем оригинальные значения
+    for key, original_value in original_env.items():
+        if original_value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = original_value
+
+# ============================================================================
+# CLIENT ФИКСТУРЫ
+# ============================================================================
+
+@pytest.fixture
+def client_mock():
+    """Test client с моками для unit тестов"""
+    with patch('core.config.get_settings') as mock_settings:
+        from core.config import Settings
+        settings = Settings(
+            PROJECT_NAME="Test API",
+            QDRANT_URL="https://test.qdrant.com",
+            QDRANT_API_KEY="test-key",
+            OPENAI_API_KEY="test-openai-key",
+            QDRANT_ONLY_MODE=True,
+            ENABLE_FALLBACK_DATABASES=True,
+            DISABLE_REDIS_CONNECTION=True,
+            DISABLE_POSTGRESQL_CONNECTION=True
+        )
+        mock_settings.return_value = settings
+        
+        with patch('core.config.get_vector_db_client') as mock_vector_client, \
+             patch('core.config.get_ai_client') as mock_ai, \
+             patch('qdrant_client.QdrantClient') as mock_qdrant:
+            
+            mock_vector_client.return_value = Mock()
+            mock_ai.return_value = Mock()
+            mock_qdrant.return_value.get_collections.return_value = Mock()
+            
+            from main import app
+            return TestClient(app)
+
+@pytest.fixture
+def client_real():
+    """Test client с реальными БД для интеграционных тестов"""
+    with patch.dict(os.environ, TEST_SETTINGS):
+        from main import app
+        return TestClient(app)
+
+@pytest.fixture
+def client(test_mode):
+    """Автоматический выбор клиента в зависимости от режима"""
+    if test_mode == "real":
+        return client_real()
+    else:
+        return client_mock()
+
+# ============================================================================
+# QDRANT ФИКСТУРЫ
+# ============================================================================
+
+@pytest.fixture(scope="session")
+def qdrant_client_real():
+    """Real Qdrant client для интеграционных тестов"""
+    from core.config import settings
+    
     max_retries = 3
     retry_delay = 2
     
@@ -30,44 +146,77 @@ def qdrant_client():
             client = QdrantClient(
                 url=settings.QDRANT_URL,
                 api_key=settings.QDRANT_API_KEY,
-                timeout=30  # Увеличиваем таймаут
+                timeout=30
             )
-            # Проверяем подключение
             client.get_collections()
-            print(f"✅ Successfully connected to Qdrant at {settings.QDRANT_URL}")
+            logger.info(f"✅ Successfully connected to Qdrant at {settings.QDRANT_URL}")
             return client
         except Exception as e:
-            print(f"❌ Attempt {attempt + 1} failed to connect to Qdrant: {e}")
+            logger.warning(f"❌ Attempt {attempt + 1} failed to connect to Qdrant: {e}")
             if attempt < max_retries - 1:
-                print(f"Retrying in {retry_delay} seconds...")
+                logger.info(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
             else:
                 raise Exception(f"Failed to connect to Qdrant after {max_retries} attempts: {e}")
 
+@pytest.fixture
+def mock_qdrant_client():
+    """Mock Qdrant client для unit тестов"""
+    client = MagicMock()
+    client.get_collections.return_value = MagicMock(collections=[])
+    client.create_collection.return_value = True
+    client.delete_collection.return_value = True
+    client.search.return_value = []
+    client.upsert.return_value = True
+    return client
+
+@pytest.fixture
+def qdrant_client(test_mode):
+    """Автоматический выбор Qdrant клиента"""
+    if test_mode == "real":
+        return qdrant_client_real()
+    else:
+        return mock_qdrant_client()
+
+# ============================================================================
+# CLEANUP ФИКСТУРЫ
+# ============================================================================
+
 @pytest.fixture(autouse=True)
-def cleanup_test_collections(qdrant_client):
-    """Clean up test collections before and after each test"""
+def cleanup_test_collections(test_mode, request):
+    """Очистка тестовых коллекций (только для реальных БД)"""
+    if test_mode != "real":
+        yield
+        return
+        
     try:
+        # Получаем реальный клиент для очистки
+        from core.config import settings
+        client = QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            timeout=30
+        )
+        
         # Cleanup before test
-        _cleanup_test_collections(qdrant_client)
+        _cleanup_test_collections(client)
         
         yield
         
-        # Cleanup after test (опционально для реальной БД)
-        # Для реальной БД можно оставить данные для анализа
+        # Cleanup after test (только если не production)
         if not _is_production_db():
-            _cleanup_test_collections(qdrant_client)
+            _cleanup_test_collections(client)
     except Exception as e:
-        print(f"⚠️ Error in cleanup: {e}")
-        yield  # Continue with tests even if cleanup fails
+        logger.warning(f"⚠️ Error in cleanup: {e}")
+        yield
 
 def _is_production_db() -> bool:
-    """Check if we're using production database"""
-    # Можно добавить логику для определения prod окружения
+    """Проверка на production БД"""
+    from core.config import settings
     return "prod" in settings.QDRANT_URL.lower() or "production" in settings.QDRANT_URL.lower()
 
 def _cleanup_test_collections(client: QdrantClient):
-    """Helper function to clean up test collections"""
+    """Очистка тестовых коллекций"""
     try:
         collections = client.get_collections()
         test_collections = [
@@ -80,17 +229,127 @@ def _cleanup_test_collections(client: QdrantClient):
         for collection_name in test_collections:
             try:
                 client.delete_collection(collection_name)
-                print(f"🧹 Deleted test collection: {collection_name}")
+                logger.info(f"🧹 Deleted test collection: {collection_name}")
             except Exception as e:
-                print(f"⚠️ Error deleting collection {collection_name}: {e}")
+                logger.warning(f"⚠️ Error deleting collection {collection_name}: {e}")
                 
     except Exception as e:
-        print(f"⚠️ Error getting collections: {e}")
+        logger.warning(f"⚠️ Error getting collections: {e}")
 
-# Additional fixtures for common test data
+# ============================================================================
+# MOCK SERVICES ФИКСТУРЫ
+# ============================================================================
+
+@pytest.fixture
+def mock_vector_db():
+    """Mock vector database"""
+    mock_db = Mock()
+    mock_db.upsert = AsyncMock(return_value=True)
+    mock_db.search = AsyncMock(return_value=[])
+    mock_db.get_by_id = AsyncMock(return_value=None)
+    mock_db.delete = AsyncMock(return_value=True)
+    mock_db.create_collection = AsyncMock(return_value=True)
+    mock_db.collection_exists = AsyncMock(return_value=True)
+    return mock_db
+
+@pytest.fixture
+def mock_materials_service():
+    """Mock MaterialsService"""
+    service = Mock()
+    service.create_material = AsyncMock()
+    service.get_material = AsyncMock()
+    service.get_materials = AsyncMock(return_value=[])
+    service.update_material = AsyncMock()
+    service.delete_material = AsyncMock(return_value=True)
+    service.search_materials = AsyncMock(return_value=[])
+    service.create_materials_batch = AsyncMock()
+    return service
+
+@pytest.fixture
+def mock_category_service():
+    """Mock CategoryService"""
+    service = Mock()
+    service.create_category = AsyncMock()
+    service.get_categories = AsyncMock(return_value=[])
+    service.delete_category = AsyncMock(return_value=True)
+    return service
+
+@pytest.fixture
+def mock_unit_service():
+    """Mock UnitService"""
+    service = Mock()
+    service.create_unit = AsyncMock()
+    service.get_units = AsyncMock(return_value=[])
+    service.delete_unit = AsyncMock(return_value=True)
+    return service
+
+@pytest.fixture
+def mock_openai_client():
+    """Mock OpenAI client"""
+    client = AsyncMock()
+    client.embeddings = AsyncMock()
+    client.embeddings.create = AsyncMock()
+    client.embeddings.create.return_value = MagicMock(
+        data=[MagicMock(embedding=[0.1] * 1536)]
+    )
+    return client
+
+@pytest.fixture
+def mock_database_services():
+    """Mock all database services"""
+    return {
+        "vector_db": Mock(),
+        "postgresql": Mock(),
+        "redis": Mock()
+    }
+
+# ============================================================================
+# SAMPLE DATA ФИКСТУРЫ
+# ============================================================================
+
+@pytest.fixture
+def sample_material():
+    """Sample material для тестов"""
+    from core.schemas.materials import Material
+    return Material(
+        id="test-id",
+        name="Тестовый материал",
+        use_category="Тестовая категория",
+        unit="кг",
+        sku="TEST001",
+        description="Тестовое описание",
+        embedding=[0.1, 0.2, 0.3],
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+@pytest.fixture
+def sample_category():
+    """Sample category для тестов"""
+    from core.schemas.materials import Category
+    return Category(name="Тестовая категория", description="Описание")
+
+@pytest.fixture
+def sample_unit():
+    """Sample unit для тестов"""
+    from core.schemas.materials import Unit
+    return Unit(name="кг", description="Килограмм")
+
+@pytest.fixture
+def sample_material_data():
+    """Sample material data dictionary"""
+    return {
+        "name": "Test Cement",
+        "use_category": "Building Materials",
+        "unit": "kg",
+        "price": 45.50,
+        "description": "Test cement for unit testing",
+        "sku": "TEST_001"
+    }
+
 @pytest.fixture
 def sample_price_data():
-    """Sample price data for testing with correct column names"""
+    """Sample price data для тестов с корректными названиями колонок"""
     return [
         {
             "name": "Cement Portland Test",
@@ -111,4 +370,21 @@ def sample_price_data():
 @pytest.fixture
 def test_supplier_id():
     """Generate unique test supplier ID"""
-    return f"TEST_{int(time.time())}" 
+    return f"TEST_{int(time.time())}"
+
+# ============================================================================
+# AUTO-MOCK ФИКСТУРА ДЛЯ UNIT ТЕСТОВ
+# ============================================================================
+
+@pytest.fixture(autouse=True)
+def auto_mock_for_unit_tests(request, mock_materials_service, mock_category_service, mock_unit_service):
+    """Автоматическое мокирование для unit тестов"""
+    # Проверяем если тест помечен как unit
+    if request.node.get_closest_marker("unit"):
+        with patch('services.materials.MaterialsService', return_value=mock_materials_service), \
+             patch('services.materials.CategoryService', return_value=mock_category_service), \
+             patch('services.materials.UnitService', return_value=mock_unit_service), \
+             patch('api.routes.materials.get_materials_service', return_value=mock_materials_service):
+            yield
+    else:
+        yield 

@@ -154,7 +154,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # CORS Configuration
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
+    BACKEND_CORS_ORIGINS: List[str] = []
     
     # Environment
     ENVIRONMENT: str = Field(default="development", description="Environment: development, staging, production")
@@ -246,6 +246,7 @@ class Settings(BaseSettings):
     
     # Logging settings
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
+    LOG_FILE: Optional[str] = Field(default=None, description="Log file path")
     LOG_REQUEST_BODY: bool = Field(default=True, description="Log request bodies")
     LOG_RESPONSE_BODY: bool = Field(default=False, description="Log response bodies")
     ENABLE_STRUCTURED_LOGGING: bool = Field(default=False, description="Enable JSON structured logging")

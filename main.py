@@ -84,7 +84,11 @@ async def lifespan(app: FastAPI):
     logger.info(f"📊 Final application metrics: {final_metrics}")
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    lifespan=lifespan
+)
 
 # Custom JSON response class to ensure UTF-8 encoding
 class UTF8JSONResponse(JSONResponse):
@@ -155,7 +159,7 @@ app.include_router(search.router, prefix="/api/v1/search", tags=["search"])
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to Construction Materials API",
+        "message": f"Welcome to {settings.PROJECT_NAME}",
         "version": settings.VERSION,
         "docs_url": "/docs"
     } 
