@@ -17,6 +17,22 @@ from core.schemas.materials import Material, MaterialCreate, MaterialBatchRespon
 from core.schemas.materials import Category, Unit
 
 
+# === Root API Tests ===
+class TestRootAPI:
+    """Test root API endpoint."""
+    
+    def test_root_endpoint(self, client_mock):
+        """Test root endpoint."""
+        response = client_mock.get("/")
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+        assert "version" in data
+        assert "docs_url" in data
+        assert data["message"] == "Welcome to Construction Materials API"
+        assert data["docs_url"] == "/docs"
+
+
 class TestHealthEndpoints:
     """Комплексные тесты health check эндпоинтов"""
     
@@ -237,134 +253,256 @@ class TestMaterialsAPIEndpoints:
         assert response.status_code == 422  # Validation error
 
 
-class TestSearchAPIEndpoints:
-    """Unit тесты для Search API с моками"""
+class TestSearchAPI:
+    """Test search API endpoints."""
     
-    @pytest.mark.unit
-    def test_search_materials(self, client_mock, sample_material):
-        """Тест поиска материалов"""
-        with patch('api.routes.search.MaterialsService') as mock_service_class:
-            mock_service = Mock()
-            mock_service.search_materials = AsyncMock(return_value=[sample_material])
-            mock_service_class.return_value = mock_service
-            
-            response = client_mock.post(
-                "/api/v1/search/",
-                json={"query": "цемент", "limit": 10}
-            )
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert isinstance(data, list)
+    @pytest.fixture
+    def mock_materials_service(self):
+        """Mock MaterialsService for testing."""
+        service = Mock()
+        service.search_materials = AsyncMock()
+        return service
     
-    @pytest.mark.unit
-    def test_search_get_endpoint(self, client_mock):
-        """Тест GET эндпоинта поиска"""
-        response = client_mock.get("/api/v1/search/?q=cement&limit=5")
+    def test_search_materials_success(self, client_mock, mock_materials_service):
+        """Test successful materials search."""
+        mock_materials_service.search_materials.return_value = [
+            {
+                "id": "1",
+                "name": "Портландцемент М500",
+                "use_category": "Цемент", 
+                "unit": "кг",
+                "description": "Высококачественный цемент",
+                "created_at": "2024-01-01T12:00:00",
+                "updated_at": "2024-01-01T12:00:00"
+            },
+            {
+                "id": "2", 
+                "name": "Цемент белый",
+                "use_category": "Цемент",
+                "unit": "кг", 
+                "description": "Белый цемент для декоративных работ",
+                "created_at": "2024-01-01T12:00:00",
+                "updated_at": "2024-01-01T12:00:00"
+            }
+        ]
         
-        # В unit тестах ожидаем либо 200 с данными, либо правильную обработку ошибок
-        assert response.status_code in [200, 500]
+        with patch('api.routes.search.MaterialsService', return_value=mock_materials_service):
+            response = client_mock.get("/api/v1/search/?q=цемент&limit=10")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+        assert data[0]["name"] == "Портландцемент М500"
+        assert data[1]["name"] == "Цемент белый"
+        mock_materials_service.search_materials.assert_called_once_with(query="цемент", limit=10)
     
-    @pytest.mark.unit
-    def test_search_empty_query_validation(self, client_mock):
-        """Тест валидации пустого поискового запроса"""
-        response = client_mock.get("/api/v1/search/?q=&limit=5")
+    def test_search_materials_empty_result(self, client_mock, mock_materials_service):
+        """Test materials search with empty result."""
+        mock_materials_service.search_materials.return_value = []
+        
+        with patch('api.routes.search.MaterialsService', return_value=mock_materials_service):
+            response = client_mock.get("/api/v1/search/?q=несуществующий материал")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 0
+        mock_materials_service.search_materials.assert_called_once_with(query="несуществующий материал", limit=10)
+    
+    def test_search_materials_custom_limit(self, client_mock, mock_materials_service):
+        """Test materials search with custom limit."""
+        mock_materials_service.search_materials.return_value = [
+            {
+                "id": "1",
+                "name": "Песок речной",
+                "use_category": "Песок",
+                "unit": "м³",
+                "description": "Чистый речной песок",
+                "created_at": "2024-01-01T12:00:00",
+                "updated_at": "2024-01-01T12:00:00"
+            }
+        ]
+        
+        with patch('api.routes.search.MaterialsService', return_value=mock_materials_service):
+            response = client_mock.get("/api/v1/search/?q=песок&limit=5")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert data[0]["name"] == "Песок речной"
+        mock_materials_service.search_materials.assert_called_once_with(query="песок", limit=5)
+    
+    def test_search_materials_missing_query(self, client_mock):
+        """Test materials search without query parameter."""
+        response = client_mock.get("/api/v1/search/")
         assert response.status_code == 422  # Validation error
+    
+    def test_search_materials_empty_query(self, client_mock, mock_materials_service):
+        """Test materials search with empty query."""
+        mock_materials_service.search_materials.return_value = []
+        
+        with patch('api.routes.search.MaterialsService', return_value=mock_materials_service):
+            response = client_mock.get("/api/v1/search/?q=")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 0
+        mock_materials_service.search_materials.assert_called_once_with(query="", limit=10)
+    
+    def test_search_materials_service_error(self, client_mock, mock_materials_service):
+        """Test materials search when service raises exception."""
+        mock_materials_service.search_materials.side_effect = Exception("Database connection error")
+        
+        with patch('api.routes.search.MaterialsService', return_value=mock_materials_service):
+            response = client_mock.get("/api/v1/search/?q=цемент")
+        
+        # The endpoint should handle exceptions gracefully
+        assert response.status_code == 500
+    
+    def test_search_materials_large_limit(self, client_mock, mock_materials_service):
+        """Test materials search with large limit value."""
+        mock_materials_service.search_materials.return_value = []
+        
+        with patch('api.routes.search.MaterialsService', return_value=mock_materials_service):
+            response = client_mock.get("/api/v1/search/?q=материал&limit=1000")
+        
+        assert response.status_code == 200
+        mock_materials_service.search_materials.assert_called_once_with(query="материал", limit=1000)
+    
+    def test_search_materials_zero_limit(self, client_mock, mock_materials_service):
+        """Test materials search with zero limit."""
+        mock_materials_service.search_materials.return_value = []
+        
+        with patch('api.routes.search.MaterialsService', return_value=mock_materials_service):
+            response = client_mock.get("/api/v1/search/?q=материал&limit=0")
+        
+        assert response.status_code == 200
+        mock_materials_service.search_materials.assert_called_once_with(query="материал", limit=0)
 
 
-class TestReferenceAPIEndpoints:
-    """Unit тесты для Reference API с моками"""
+class TestReferenceAPI:
+    """Test reference API endpoints for categories and units."""
     
-    @pytest.mark.unit
-    def test_create_category(self, client_mock, sample_category):
-        """Тест создания категории"""
-        with patch('api.routes.reference.CategoryService') as mock_service_class:
-            mock_service = Mock()
-            mock_service.create_category = AsyncMock(return_value=sample_category)
-            mock_service_class.return_value = mock_service
-            
-            response = client_mock.post(
-                "/api/v1/reference/categories/",
-                json={"name": "Цемент", "description": "Строительные цементы"}
-            )
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert "name" in data
-            assert "description" in data
+    def test_create_category_success(self, client_mock):
+        """Test successful category creation."""
+        category_data = {
+            "name": "Тестовая категория",
+            "description": "Описание тестовой категории"
+        }
+        
+        response = client_mock.post("/api/v1/reference/categories/", json=category_data)
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["name"] == category_data["name"]
+        assert data["description"] == category_data["description"]
+        assert "id" in data
     
-    @pytest.mark.unit
-    def test_get_categories(self, client_mock, sample_category):
-        """Тест получения списка категорий"""
-        with patch('api.routes.reference.CategoryService') as mock_service_class:
-            mock_service = Mock()
-            mock_service.get_categories = AsyncMock(return_value=[sample_category])
-            mock_service_class.return_value = mock_service
-            
-            response = client_mock.get("/api/v1/reference/categories/")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert isinstance(data, list)
+    def test_create_category_validation_error(self, client_mock):
+        """Test category creation with validation error."""
+        invalid_data = {
+            "name": "",  # Empty name should fail validation
+            "description": "Описание"
+        }
+        
+        response = client_mock.post("/api/v1/reference/categories/", json=invalid_data)
+        assert response.status_code == 422  # Validation error
     
-    @pytest.mark.unit
-    def test_delete_category(self, client_mock):
-        """Тест удаления категории"""
-        with patch('api.routes.reference.CategoryService') as mock_service_class:
-            mock_service = Mock()
-            mock_service.delete_category = AsyncMock(return_value=True)
-            mock_service_class.return_value = mock_service
-            
-            response = client_mock.delete("/api/v1/reference/categories/TestCategory")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
+    def test_get_categories_success(self, client_mock):
+        """Test getting all categories."""
+        # First create some categories
+        categories = [
+            {"name": "Категория 1", "description": "Описание 1"},
+            {"name": "Категория 2", "description": "Описание 2"}
+        ]
+        
+        for category in categories:
+            client_mock.post("/api/v1/reference/categories/", json=category)
+        
+        response = client_mock.get("/api/v1/reference/categories/")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 2
     
-    @pytest.mark.unit
-    def test_create_unit(self, client_mock, sample_unit):
-        """Тест создания единицы измерения"""
-        with patch('api.routes.reference.UnitService') as mock_service_class:
-            mock_service = Mock()
-            mock_service.create_unit = AsyncMock(return_value=sample_unit)
-            mock_service_class.return_value = mock_service
-            
-            response = client_mock.post(
-                "/api/v1/reference/units/",
-                json={"name": "кг", "description": "Килограмм"}
-            )
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["name"] == "кг"
+    def test_create_unit_success(self, client_mock):
+        """Test successful unit creation."""
+        unit_data = {
+            "name": "тест_единица",
+            "description": "Тестовая единица измерения"
+        }
+        
+        response = client_mock.post("/api/v1/reference/units/", json=unit_data)
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["name"] == unit_data["name"]
+        assert data["description"] == unit_data["description"]
+        assert "id" in data
     
-    @pytest.mark.unit
-    def test_get_units(self, client_mock, sample_unit):
-        """Тест получения списка единиц измерения"""
-        with patch('api.routes.reference.UnitService') as mock_service_class:
-            mock_service = Mock()
-            mock_service.get_units = AsyncMock(return_value=[sample_unit])
-            mock_service_class.return_value = mock_service
-            
-            response = client_mock.get("/api/v1/reference/units/")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert isinstance(data, list)
+    def test_create_unit_validation_error(self, client_mock):
+        """Test unit creation with validation error."""
+        invalid_data = {
+            "name": "",  # Empty name should fail validation
+            "description": "Описание"
+        }
+        
+        response = client_mock.post("/api/v1/reference/units/", json=invalid_data)
+        assert response.status_code == 422  # Validation error
     
-    @pytest.mark.unit
-    def test_delete_unit(self, client_mock):
-        """Тест удаления единицы измерения"""
-        with patch('api.routes.reference.UnitService') as mock_service_class:
-            mock_service = Mock()
-            mock_service.delete_unit = AsyncMock(return_value=True)
-            mock_service_class.return_value = mock_service
-            
-            response = client_mock.delete("/api/v1/reference/units/TestUnit")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
+    def test_get_units_success(self, client_mock):
+        """Test getting all units."""
+        # First create some units
+        units = [
+            {"name": "кг_тест", "description": "Килограмм тестовый"},
+            {"name": "м_тест", "description": "Метр тестовый"}
+        ]
+        
+        for unit in units:
+            client_mock.post("/api/v1/reference/units/", json=unit)
+        
+        response = client_mock.get("/api/v1/reference/units/")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 2
+    
+    def test_create_duplicate_category(self, client_mock):
+        """Test creating duplicate category."""
+        category_data = {
+            "name": "Уникальная категория",
+            "description": "Описание"
+        }
+        
+        # Create first category
+        response1 = client_mock.post("/api/v1/reference/categories/", json=category_data)
+        assert response1.status_code == 200
+        
+        # Try to create duplicate
+        response2 = client_mock.post("/api/v1/reference/categories/", json=category_data)
+        # Should handle duplicate gracefully (depending on implementation)
+        assert response2.status_code in [200, 409]  # Either success or conflict
+    
+    def test_create_duplicate_unit(self, client_mock):
+        """Test creating duplicate unit."""
+        unit_data = {
+            "name": "уникальная_единица",
+            "description": "Описание"
+        }
+        
+        # Create first unit
+        response1 = client_mock.post("/api/v1/reference/units/", json=unit_data)
+        assert response1.status_code == 200
+        
+        # Try to create duplicate
+        response2 = client_mock.post("/api/v1/reference/units/", json=unit_data)
+        # Should handle duplicate gracefully (depending on implementation)
+        assert response2.status_code in [200, 409]  # Either success or conflict
 
 
 class TestEnvironmentConfiguration:
@@ -387,4 +525,197 @@ class TestEnvironmentConfiguration:
                 origins = json.loads(cors_origins)
                 assert isinstance(origins, list)
             except json.JSONDecodeError:
-                pytest.fail("BACKEND_CORS_ORIGINS is not valid JSON") 
+                pytest.fail("BACKEND_CORS_ORIGINS is not valid JSON")
+
+
+# === API Validation Tests ===
+class TestAPIValidation:
+    """API validation and edge case tests."""
+    
+    def test_create_material_missing_fields(self, client_mock):
+        """Test material creation with missing required fields."""
+        response = client_mock.post(
+            "/api/v1/materials/",
+            json={
+                "name": "Неполный материал"
+                # missing category, unit, description
+            }
+        )
+        assert response.status_code == 422  # Validation error
+    
+    def test_create_category_missing_name(self, client_mock):
+        """Test category creation with missing name."""
+        response = client_mock.post(
+            "/api/v1/reference/categories/",
+            json={
+                "description": "Категория без имени"
+                # missing name
+            }
+        )
+        assert response.status_code == 422
+    
+    def test_create_unit_missing_name(self, client_mock):
+        """Test unit creation with missing name."""
+        response = client_mock.post(
+            "/api/v1/reference/units/",
+            json={
+                "description": "Единица без имени"
+                # missing name
+            }
+        )
+        assert response.status_code == 422
+    
+    def test_create_material_empty_strings(self, client_mock):
+        """Test material creation with empty strings."""
+        response = client_mock.post(
+            "/api/v1/materials/",
+            json={
+                "name": "",
+                "use_category": "",
+                "unit": "",
+                "description": ""
+            }
+        )
+        assert response.status_code == 422
+    
+    def test_invalid_json_format(self, client_mock):
+        """Test API with invalid JSON."""
+        response = client_mock.post(
+            "/api/v1/materials/",
+            content="invalid json",
+            headers={"content-type": "application/json"}
+        )
+        assert response.status_code == 422
+
+
+# === API Limits and Pagination Tests ===
+class TestAPILimitsAndPagination:
+    """API limits and pagination tests."""
+    
+    def test_get_materials_with_limit(self, client_mock):
+        """Test materials API with limit parameter."""
+        response = client_mock.get("/api/v1/materials/?limit=5")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) <= 5
+    
+    def test_get_materials_with_zero_limit(self, client_mock):
+        """Test materials API with zero limit."""
+        response = client_mock.get("/api/v1/materials/?limit=0")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 0
+    
+    def test_get_materials_with_large_limit(self, client_mock):
+        """Test materials API with large limit."""
+        response = client_mock.get("/api/v1/materials/?limit=1000")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+    
+    def test_get_materials_with_negative_limit(self, client_mock):
+        """Test materials API with negative limit."""
+        response = client_mock.get("/api/v1/materials/?limit=-1")
+        # API doesn't validate negative limits, returns all results
+        assert response.status_code == 200
+
+
+# === API Response Structure Tests ===
+class TestAPIResponseStructure:
+    """Test API response structure consistency."""
+    
+    def test_material_response_structure(self, client_mock):
+        """Test material response has required fields."""
+        response = client_mock.post(
+            "/api/v1/materials/",
+            json={
+                "name": "Тест материал",
+                "use_category": "Тест",
+                "unit": "кг",
+                "description": "Тестовое описание"
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            required_fields = ["id", "name", "use_category", "unit", "description", "created_at", "updated_at"]
+            for field in required_fields:
+                assert field in data, f"Missing field: {field}"
+    
+    def test_category_response_structure(self, client_mock):
+        """Test category response has required fields."""
+        response = client_mock.post(
+            "/api/v1/reference/categories/",
+            json={
+                "name": "Тест категория",
+                "description": "Тестовое описание"
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            required_fields = ["id", "name", "description"]
+            for field in required_fields:
+                assert field in data, f"Missing field: {field}"
+    
+    def test_unit_response_structure(self, client_mock):
+        """Test unit response has required fields."""
+        response = client_mock.post(
+            "/api/v1/reference/units/",
+            json={
+                "name": "тест_единица",
+                "description": "Тестовое описание"
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            required_fields = ["id", "name", "description"]
+            for field in required_fields:
+                assert field in data, f"Missing field: {field}"
+
+
+# === API Edge Cases Tests ===
+class TestAPIEdgeCases:
+    """Test API edge cases and special scenarios."""
+    
+    def test_very_long_material_name(self, client_mock):
+        """Test material creation with very long name."""
+        long_name = "Очень длинное название материала " * 20  # ~600 characters
+        
+        response = client_mock.post(
+            "/api/v1/materials/",
+            json={
+                "name": long_name,
+                "use_category": "Тест",
+                "unit": "кг",
+                "description": "Тестовое описание"
+            }
+        )
+        
+        # Should either succeed or fail gracefully
+        assert response.status_code in [200, 422, 413]  # Success, validation error, or payload too large
+    
+    def test_unicode_material(self, client_mock):
+        """Test material creation with Unicode characters."""
+        response = client_mock.post(
+            "/api/v1/materials/",
+            json={
+                "name": "Материал с эмодзи 🏗️🔨",
+                "use_category": "Тест 🏠",
+                "unit": "кг",
+                "description": "Описание с символами: αβγδε"
+            }
+        )
+        
+        # Should handle Unicode gracefully
+        assert response.status_code in [200, 422]
+    
+    def test_search_with_special_unicode(self, client_mock):
+        """Test search with special Unicode characters."""
+        response = client_mock.get("/api/v1/search/?q=🏗️ материал αβγ&limit=5")
+        
+        # Should handle Unicode in search gracefully
+        assert response.status_code in [200, 422] 

@@ -430,3 +430,432 @@ class TestDatabaseArchitectureIntegration:
                 await cache_db.close()
             except Exception:
                 pass 
+
+
+# === Cached Repository Tests ===
+class TestCachedMaterialsRepository:
+    """Test cached materials repository with Redis caching."""
+    
+    @pytest.fixture
+    def mock_hybrid_repo(self):
+        """Mock hybrid materials repository."""
+        return AsyncMock(spec=HybridMaterialsRepository)
+    
+    @pytest.fixture
+    def mock_cache_db(self):
+        """Mock Redis cache database."""
+        return AsyncMock(spec=RedisDatabase)
+    
+    @pytest.fixture
+    def cache_config(self) -> Dict[str, Any]:
+        """Cache configuration for testing."""
+        return {
+            "search_ttl": 300,
+            "material_ttl": 3600,
+            "health_ttl": 60,
+            "batch_size": 100,
+            "enable_write_through": False,
+            "cache_miss_threshold": 0.3
+        }
+    
+    @pytest.fixture
+    def cached_repo(self, mock_hybrid_repo, mock_cache_db, cache_config):
+        """Cached materials repository instance."""
+        return CachedMaterialsRepository(
+            hybrid_repository=mock_hybrid_repo,
+            cache_db=mock_cache_db,
+            cache_config=cache_config
+        )
+    
+    def test_cached_repo_initialization(self, cached_repo, cache_config):
+        """Test cached repository initialization."""
+        assert cached_repo.search_ttl == cache_config["search_ttl"]
+        assert cached_repo.material_ttl == cache_config["material_ttl"]
+        assert cached_repo.batch_size == cache_config["batch_size"]
+    
+    @pytest.mark.asyncio
+    async def test_search_materials_cache_hit(self, cached_repo, mock_cache_db):
+        """Test search materials with cache hit."""
+        # Mock cache hit
+        cached_result = {
+            "materials": [{"id": "1", "name": "Test Material"}],
+            "total": 1,
+            "query": "test",
+            "search_type": "hybrid"
+        }
+        mock_cache_db.get.return_value = cached_result
+        
+        # Mock search request
+        search_request = SearchRequest(query="test", limit=10)
+        result = await cached_repo.search_materials(search_request)
+        
+        # Verify cache hit
+        assert len(result.materials) == 1
+        assert result.materials[0]["name"] == "Test Material"
+        assert cached_repo.stats["cache_hits"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_search_materials_cache_miss(self, cached_repo, mock_cache_db, mock_hybrid_repo):
+        """Test search materials with cache miss."""
+        # Mock cache miss
+        mock_cache_db.get.return_value = None
+        
+        # Mock hybrid repo response
+        search_result = SearchResponse(
+            materials=[{"id": "1", "name": "Test Material"}],
+            total=1,
+            query="test",
+            search_type="hybrid"
+        )
+        mock_hybrid_repo.search_materials.return_value = search_result
+        
+        # Execute search
+        search_request = SearchRequest(query="test", limit=10)
+        result = await cached_repo.search_materials(search_request)
+        
+        # Verify cache miss and database call
+        assert len(result.materials) == 1
+        assert cached_repo.stats["cache_misses"] == 1
+        mock_hybrid_repo.search_materials.assert_called_once()
+        mock_cache_db.set.assert_called_once()
+
+
+# === Hybrid Repository Tests ===
+class TestHybridMaterialsRepository:
+    """Test hybrid materials repository combining vector and relational databases."""
+    
+    @pytest.fixture
+    def mock_vector_db(self):
+        """Mock vector database."""
+        return AsyncMock(spec=IVectorDatabase)
+    
+    @pytest.fixture
+    def mock_relational_db(self):
+        """Mock relational database."""
+        return AsyncMock(spec=IRelationalDatabase)
+    
+    @pytest.fixture
+    def mock_ai_client(self):
+        """Mock AI client."""
+        return AsyncMock()
+    
+    @pytest.fixture
+    def hybrid_repo(self, mock_vector_db, mock_relational_db, mock_ai_client):
+        """Hybrid repository instance."""
+        with patch.object(HybridMaterialsRepository, 'get_embedding', new_callable=AsyncMock) as mock_embedding:
+            mock_embedding.return_value = [0.1, 0.2, 0.3, 0.4, 0.5]
+            return HybridMaterialsRepository(
+                vector_db=mock_vector_db,
+                relational_db=mock_relational_db,
+                ai_client=mock_ai_client
+            )
+    
+    def test_hybrid_repo_initialization(self, hybrid_repo, mock_vector_db, mock_relational_db, mock_ai_client):
+        """Test hybrid repository initialization."""
+        assert hybrid_repo.vector_db == mock_vector_db
+        assert hybrid_repo.relational_db == mock_relational_db
+        assert hybrid_repo.ai_client == mock_ai_client
+        assert hybrid_repo.collection_name == "materials"
+    
+    @pytest.mark.asyncio
+    async def test_create_material_success(self, hybrid_repo, mock_vector_db, mock_relational_db):
+        """Test successful material creation in both databases."""
+        # Mock successful operations
+        mock_vector_db.upsert.return_value = None
+        mock_relational_db.create_material.return_value = {"id": "test-id"}
+        
+        sample_material = MaterialCreate(
+            name="Test Material",
+            use_category="Test Category",
+            unit="kg",
+            description="Test description"
+        )
+        
+        with patch('uuid.uuid4', return_value=MagicMock(hex="test-id")):
+            result = await hybrid_repo.create_material(sample_material)
+        
+        assert isinstance(result, Material)
+        assert result.name == sample_material.name
+        assert result.use_category == sample_material.use_category
+        
+        # Verify both databases were called
+        mock_vector_db.upsert.assert_called_once()
+        mock_relational_db.create_material.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_search_materials_hybrid_success(self, hybrid_repo, mock_vector_db, mock_relational_db):
+        """Test successful hybrid search combining vector and SQL results."""
+        query = "test material"
+        
+        # Mock vector search results
+        vector_result = MagicMock()
+        vector_result.id = "test-id-1"
+        vector_result.score = 0.85
+        vector_result.payload = {
+            "name": "Vector Material",
+            "use_category": "Vector Category",
+            "unit": "kg",
+            "description": "Vector description"
+        }
+        
+        # Mock SQL search results
+        sql_result = {
+            "id": "test-id-2",
+            "name": "SQL Material",
+            "use_category": "SQL Category",
+            "unit": "kg",
+            "description": "SQL description",
+            "similarity_score": 0.75
+        }
+        
+        # Setup mocks
+        mock_vector_db.search.return_value = [vector_result]
+        mock_relational_db.search_materials_hybrid.return_value = [sql_result]
+        
+        results = await hybrid_repo.search_materials_hybrid(query, limit=10)
+        
+        assert len(results) == 2  # One from each source
+        assert results[0]["search_type"] == "vector"  # Higher score should be first
+        assert results[1]["search_type"] == "sql"
+        
+        # Verify both searches were called
+        mock_vector_db.search.assert_called_once()
+        mock_relational_db.search_materials_hybrid.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_search_materials_fallback_strategy(self, hybrid_repo, mock_vector_db, mock_relational_db):
+        """Test fallback strategy: vector → SQL if 0 results."""
+        query = "test material"
+        
+        # Mock vector search returning empty results
+        mock_vector_db.search.return_value = []
+        
+        # Mock SQL search returning results
+        sql_result = {
+            "id": "test-id",
+            "name": "SQL Material",
+            "similarity_score": 0.75,
+            "search_type": "sql"
+        }
+        mock_relational_db.search_materials_hybrid.return_value = [sql_result]
+        
+        results = await hybrid_repo.search_materials_hybrid(query, limit=10)
+        
+        assert len(results) == 1
+        assert results[0]["search_type"] == "sql"
+        
+        # Verify fallback to SQL search
+        mock_vector_db.search.assert_called_once()
+        mock_relational_db.search_materials_hybrid.assert_called_once()
+
+
+# === Database Migrations Tests ===
+class TestDatabaseMigrations:
+    """Test database migrations and initialization."""
+    
+    @pytest.fixture
+    def mock_db_config(self):
+        """Mock database configuration."""
+        return {
+            "connection_string": "postgresql+asyncpg://test:test@localhost/test_db",
+            "pool_size": 5,
+            "max_overflow": 10
+        }
+    
+    @pytest.fixture
+    def db_initializer(self, mock_db_config):
+        """Create database initializer with mock config."""
+        return DatabaseInitializer(mock_db_config)
+    
+    @patch('core.database.init_db.PostgreSQLDatabase')
+    async def test_connect_database(self, mock_postgres, db_initializer):
+        """Test database connection."""
+        mock_db_instance = Mock()
+        mock_postgres.return_value = mock_db_instance
+        
+        await db_initializer.connect_database()
+        
+        mock_postgres.assert_called_once_with(db_initializer.db_config)
+        assert db_initializer.db_adapter == mock_db_instance
+    
+    @patch('core.database.init_db.Config')
+    @patch('core.database.init_db.command')
+    def test_run_migrations(self, mock_command, mock_config, db_initializer):
+        """Test running Alembic migrations."""
+        mock_alembic_cfg = Mock()
+        mock_config.return_value = mock_alembic_cfg
+        
+        db_initializer.run_migrations()
+        
+        mock_config.assert_called_once()
+        mock_command.upgrade.assert_called_once_with(mock_alembic_cfg, "head")
+    
+    @patch('core.database.init_db.PostgreSQLDatabase')
+    async def test_seed_reference_data(self, mock_postgres, db_initializer):
+        """Test seeding reference data."""
+        mock_db_instance = Mock()
+        mock_session = AsyncMock()
+        mock_db_instance.get_session.return_value.__aenter__.return_value = mock_session
+        mock_postgres.return_value = mock_db_instance
+        
+        await db_initializer.connect_database()
+        
+        with patch('core.database.init_db.seed_database') as mock_seed:
+            mock_seed.return_value = {"categories": 5, "units": 18}
+            
+            result = await db_initializer.seed_reference_data()
+            
+            mock_seed.assert_called_once_with(mock_session)
+            assert result == {"categories": 5, "units": 18}
+    
+    @patch('core.database.init_db.PostgreSQLDatabase')
+    async def test_initialize_database_success(self, mock_postgres, db_initializer):
+        """Test successful database initialization."""
+        mock_db_instance = Mock()
+        mock_session = AsyncMock()
+        mock_db_instance.get_session.return_value.__aenter__.return_value = mock_session
+        mock_db_instance.health_check.return_value = {"status": "healthy"}
+        mock_db_instance.close = AsyncMock()
+        mock_postgres.return_value = mock_db_instance
+        
+        with patch.object(db_initializer, 'run_migrations') as mock_migrate, \
+             patch('core.database.init_db.seed_database') as mock_seed:
+            
+            mock_seed.return_value = {"categories": 5, "units": 18}
+            
+            result = await db_initializer.initialize_database()
+            
+            assert result["success"] is True
+            assert result["migrations"]["status"] == "success"
+            assert result["seeding"]["status"] == "success"
+            assert result["health_check"]["status"] == "success"
+            mock_migrate.assert_called_once()
+
+
+# === Real Database Connection Tests ===
+@pytest.mark.integration
+class TestRealDBConnection:
+    """Integration tests for real database connections."""
+    
+    def test_qdrant_connection(self, qdrant_client):
+        """Test connection to Qdrant."""
+        try:
+            collections = qdrant_client.get_collections()
+            logger.info(f"✅ Connected to Qdrant. Collections count: {len(collections.collections)}")
+            
+            # Log information about existing collections
+            for collection in collections.collections:
+                logger.info(f"📚 Collection: {collection.name}")
+            
+            assert True, "Connection successful"
+        except Exception as e:
+            pytest.fail(f"Failed to connect to Qdrant: {e}")
+    
+    def test_create_test_collection(self, qdrant_client):
+        """Test creating a test collection."""
+        import time
+        from qdrant_client.models import Distance, VectorParams
+        
+        test_collection_name = f"test_connection_{int(time.time())}"
+        
+        try:
+            # Create test collection
+            qdrant_client.create_collection(
+                collection_name=test_collection_name,
+                vectors_config=VectorParams(size=384, distance=Distance.COSINE),
+            )
+            
+            # Verify collection was created
+            collections = qdrant_client.get_collections()
+            collection_names = [c.name for c in collections.collections]
+            
+            assert test_collection_name in collection_names
+            logger.info(f"✅ Test collection '{test_collection_name}' created successfully")
+            
+        except Exception as e:
+            pytest.fail(f"Failed to create test collection: {e}")
+        
+        finally:
+            # Cleanup test collection
+            try:
+                qdrant_client.delete_collection(test_collection_name)
+                logger.info(f"🧹 Cleaned up test collection '{test_collection_name}'")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup test collection: {e}")
+    
+    def test_insert_and_retrieve_data(self, qdrant_client):
+        """Test inserting and retrieving data."""
+        import time
+        from qdrant_client.models import Distance, VectorParams, PointStruct
+        
+        test_collection_name = f"test_data_{int(time.time())}"
+        
+        try:
+            # Create collection
+            qdrant_client.create_collection(
+                collection_name=test_collection_name,
+                vectors_config=VectorParams(size=384, distance=Distance.COSINE),
+            )
+            
+            # Prepare test data
+            test_vector = [0.1] * 384  # Simple test vector
+            test_payload = {
+                "name": "Test Material",
+                "use_category": "Test Category",
+                "price": 100.0,
+                "supplier": "TEST_SUPPLIER"
+            }
+            
+            # Insert data
+            qdrant_client.upsert(
+                collection_name=test_collection_name,
+                points=[
+                    PointStruct(
+                        id=1,
+                        vector=test_vector,
+                        payload=test_payload
+                    )
+                ]
+            )
+            
+            # Retrieve data
+            retrieved = qdrant_client.retrieve(
+                collection_name=test_collection_name,
+                ids=[1]
+            )
+            
+            assert len(retrieved) == 1
+            assert retrieved[0].payload["name"] == "Test Material"
+            assert retrieved[0].payload["supplier"] == "TEST_SUPPLIER"
+            
+            logger.info("✅ Data insert and retrieve test passed")
+            
+        except Exception as e:
+            pytest.fail(f"Failed to insert/retrieve data: {e}")
+        
+        finally:
+            # Cleanup
+            try:
+                qdrant_client.delete_collection(test_collection_name)
+                logger.info(f"🧹 Cleaned up test collection '{test_collection_name}'")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup: {e}")
+    
+    def test_list_existing_collections(self, qdrant_client):
+        """Test listing existing collections."""
+        try:
+            collections = qdrant_client.get_collections()
+            
+            logger.info(f"📊 Database contains {len(collections.collections)} collections:")
+            for collection in collections.collections:
+                # Get collection information
+                try:
+                    info = qdrant_client.get_collection(collection.name)
+                    logger.info(f"  📚 {collection.name}: {info.points_count} points, vector size: {info.config.params.vectors.size}")
+                except Exception as e:
+                    logger.info(f"  📚 {collection.name}: (error getting details: {e})")
+            
+            assert True, "Collection listing successful"
+            
+        except Exception as e:
+            pytest.fail(f"Failed to list collections: {e}") 

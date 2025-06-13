@@ -12,12 +12,15 @@ import asyncio
 import time
 from unittest.mock import Mock, AsyncMock, patch
 from typing import List, Dict, Any
+import random
+from datetime import datetime
 
 from core.middleware.conditional import ConditionalMiddleware, MiddlewareOptimizer
 from core.middleware.compression import CompressionMiddleware
 from core.middleware.rate_limiting_optimized import OptimizedRateLimitMiddleware
 from services.dynamic_batch_processor import DynamicBatchProcessor, BatchConfig
 from core.caching.multi_level_cache import MultiLevelCache, L1MemoryCache, L2RedisCache
+from services.dynamic_pool_manager import DynamicPoolManager, PoolConfig, MockPoolAdapter
 
 
 class TestCompressionPerformance:
@@ -321,4 +324,270 @@ class TestIntegrationPerformance:
             
         except ImportError:
             # psutil not available, skip test
-            pytest.skip("psutil not available for memory testing") 
+            pytest.skip("psutil not available for memory testing")
+
+
+# === Dynamic Pool Manager Tests ===
+class TestDynamicPoolManagerPerformance:
+    """Performance tests for dynamic pool manager."""
+    
+    @pytest.fixture
+    def pool_config(self):
+        """Create test pool configuration."""
+        return PoolConfig(
+            min_size=2,
+            max_size=20,
+            target_utilization=0.75,
+            scale_up_threshold=0.85,
+            scale_down_threshold=0.4,
+            scale_factor=1.5,
+            monitoring_interval=1.0,
+            auto_scaling_enabled=True
+        )
+    
+    @pytest.fixture
+    def pool_manager(self, pool_config):
+        """Create test pool manager."""
+        return DynamicPoolManager(pool_config)
+    
+    @pytest.fixture
+    def mock_pool(self):
+        """Create mock pool adapter."""
+        return MockPoolAdapter("test_pool", initial_size=5)
+    
+    def test_pool_manager_initialization_performance(self, pool_manager):
+        """Test pool manager initialization performance."""
+        start_time = time.time()
+        
+        # Test initialization time
+        assert pool_manager.config is not None
+        assert pool_manager.pools == {}
+        assert pool_manager.metrics == {}
+        
+        init_time = time.time() - start_time
+        assert init_time < 0.01, f"Initialization took too long: {init_time}s"
+    
+    def test_pool_registration_performance(self, pool_manager, mock_pool):
+        """Test pool registration performance."""
+        start_time = time.time()
+        
+        # Register multiple pools
+        for i in range(100):
+            pool_name = f"test_pool_{i}"
+            pool_manager.register_pool(pool_name, mock_pool, initial_size=5, max_size=20)
+        
+        registration_time = time.time() - start_time
+        assert registration_time < 1.0, f"Pool registration took too long: {registration_time}s"
+        assert len(pool_manager.pools) == 100
+    
+    @pytest.mark.asyncio
+    async def test_metrics_collection_performance(self, pool_manager, mock_pool):
+        """Test metrics collection performance."""
+        # Register multiple pools
+        for i in range(50):
+            pool_name = f"test_pool_{i}"
+            pool_manager.register_pool(pool_name, mock_pool)
+        
+        start_time = time.time()
+        
+        # Collect metrics
+        await pool_manager._collect_metrics()
+        
+        collection_time = time.time() - start_time
+        assert collection_time < 0.5, f"Metrics collection took too long: {collection_time}s"
+    
+    @pytest.mark.asyncio
+    async def test_pool_scaling_performance(self, pool_manager, mock_pool):
+        """Test pool scaling performance under load."""
+        pool_manager.register_pool("test_pool", mock_pool, initial_size=5)
+        
+        start_time = time.time()
+        
+        # Simulate high utilization (90%)
+        mock_pool.simulate_load(0.9)
+        await pool_manager._collect_metrics()
+        
+        # Trigger scaling
+        await pool_manager.force_pool_resize("test_pool", 8, "Performance test")
+        
+        scaling_time = time.time() - start_time
+        assert scaling_time < 0.1, f"Pool scaling took too long: {scaling_time}s"
+        assert mock_pool.current_size == 8
+    
+    def test_metrics_retrieval_performance(self, pool_manager, mock_pool):
+        """Test metrics retrieval performance."""
+        # Register multiple pools
+        for i in range(100):
+            pool_name = f"test_pool_{i}"
+            pool_manager.register_pool(pool_name, mock_pool)
+        
+        start_time = time.time()
+        
+        # Get all metrics
+        all_metrics = pool_manager.get_pool_metrics()
+        
+        retrieval_time = time.time() - start_time
+        assert retrieval_time < 0.1, f"Metrics retrieval took too long: {retrieval_time}s"
+        assert len(all_metrics) == 100
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_pool_operations(self, pool_manager, mock_pool):
+        """Test concurrent pool operations performance."""
+        import asyncio
+        
+        # Register pools
+        for i in range(10):
+            pool_name = f"concurrent_pool_{i}"
+            pool_manager.register_pool(pool_name, mock_pool)
+        
+        async def concurrent_operation(pool_name):
+            """Simulate concurrent operations on a pool."""
+            await pool_manager._collect_metrics()
+            return pool_manager.get_pool_metrics(pool_name)
+        
+        start_time = time.time()
+        
+        # Run concurrent operations
+        tasks = [concurrent_operation(f"concurrent_pool_{i}") for i in range(10)]
+        results = await asyncio.gather(*tasks)
+        
+        concurrent_time = time.time() - start_time
+        assert concurrent_time < 1.0, f"Concurrent operations took too long: {concurrent_time}s"
+        assert len(results) == 10
+
+
+# === Redis Serialization Optimization Tests ===
+class TestRedisSerializationPerformance:
+    """Performance tests for Redis serialization optimization."""
+    
+    @pytest.fixture
+    def large_material_data(self):
+        """Generate large material data for performance testing."""
+        return {
+            "id": "performance-test-material",
+            "name": "Test Material " * 100,  # Long name
+            "description": "Long description " * 200,  # Very long description
+            "use_category": "Performance Test Category",
+            "unit": "kg",
+            "embedding": [random.random() for _ in range(1536)],  # Large embedding vector
+            "metadata": {
+                "supplier": "Test Supplier",
+                "tags": ["tag" + str(i) for i in range(100)],  # Many tags
+                "properties": {f"prop_{i}": f"value_{i}" for i in range(50)}  # Many properties
+            },
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }
+    
+    def test_json_serialization_performance(self, large_material_data):
+        """Test JSON serialization performance."""
+        import json
+        
+        start_time = time.time()
+        
+        # Serialize 1000 times
+        for _ in range(1000):
+            serialized = json.dumps(large_material_data)
+            deserialized = json.loads(serialized)
+        
+        json_time = time.time() - start_time
+        assert json_time < 2.0, f"JSON serialization took too long: {json_time}s"
+    
+    def test_pickle_serialization_performance(self, large_material_data):
+        """Test pickle serialization performance."""
+        import pickle
+        
+        start_time = time.time()
+        
+        # Serialize 1000 times
+        for _ in range(1000):
+            serialized = pickle.dumps(large_material_data)
+            deserialized = pickle.loads(serialized)
+        
+        pickle_time = time.time() - start_time
+        assert pickle_time < 1.0, f"Pickle serialization took too long: {pickle_time}s"
+    
+    def test_msgpack_serialization_performance(self, large_material_data):
+        """Test msgpack serialization performance."""
+        try:
+            import msgpack
+        except ImportError:
+            pytest.skip("msgpack not available")
+        
+        start_time = time.time()
+        
+        # Serialize 1000 times
+        for _ in range(1000):
+            serialized = msgpack.packb(large_material_data)
+            deserialized = msgpack.unpackb(serialized, raw=False)
+        
+        msgpack_time = time.time() - start_time
+        assert msgpack_time < 0.5, f"Msgpack serialization took too long: {msgpack_time}s"
+    
+    def test_compression_performance(self, large_material_data):
+        """Test compression performance for large data."""
+        import json
+        import gzip
+        import zlib
+        
+        json_data = json.dumps(large_material_data).encode('utf-8')
+        
+        # Test gzip compression
+        start_time = time.time()
+        for _ in range(100):
+            compressed = gzip.compress(json_data)
+            decompressed = gzip.decompress(compressed)
+        gzip_time = time.time() - start_time
+        
+        # Test zlib compression
+        start_time = time.time()
+        for _ in range(100):
+            compressed = zlib.compress(json_data)
+            decompressed = zlib.decompress(compressed)
+        zlib_time = time.time() - start_time
+        
+        assert gzip_time < 1.0, f"Gzip compression took too long: {gzip_time}s"
+        assert zlib_time < 0.5, f"Zlib compression took too long: {zlib_time}s"
+        assert zlib_time < gzip_time, "Zlib should be faster than gzip for this data size"
+    
+    @pytest.mark.asyncio
+    async def test_redis_batch_operations_performance(self):
+        """Test Redis batch operations performance."""
+        try:
+            import redis.asyncio as redis
+        except ImportError:
+            pytest.skip("redis not available")
+        
+        # Mock Redis client
+        mock_redis = AsyncMock()
+        mock_redis.pipeline.return_value.__aenter__.return_value = mock_redis
+        mock_redis.execute.return_value = [True] * 1000
+        
+        start_time = time.time()
+        
+        # Simulate batch operations
+        async with mock_redis.pipeline() as pipe:
+            for i in range(1000):
+                pipe.set(f"key_{i}", f"value_{i}")
+            await pipe.execute()
+        
+        batch_time = time.time() - start_time
+        assert batch_time < 0.1, f"Redis batch operations took too long: {batch_time}s"
+    
+    def test_embedding_vector_serialization_performance(self):
+        """Test performance of embedding vector serialization."""
+        import json
+        import numpy as np
+        
+        # Generate large embedding vectors
+        embeddings = [np.random.rand(1536).tolist() for _ in range(100)]
+        
+        start_time = time.time()
+        
+        # Serialize embeddings
+        for embedding in embeddings:
+            serialized = json.dumps(embedding)
+            deserialized = json.loads(serialized)
+        
+        embedding_time = time.time() - start_time
+        assert embedding_time < 1.0, f"Embedding serialization took too long: {embedding_time}s" 
