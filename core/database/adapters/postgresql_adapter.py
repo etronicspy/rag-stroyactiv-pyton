@@ -138,6 +138,7 @@ class PostgreSQLDatabase(IRelationalDatabase):
         
         if not self.connection_string:
             raise ConnectionError(
+                database_type="PostgreSQL",
                 message="PostgreSQL connection string is required",
                 details="Missing 'connection_string' in config"
             )
@@ -170,6 +171,7 @@ class PostgreSQLDatabase(IRelationalDatabase):
         except Exception as e:
             logger.error(f"Failed to initialize PostgreSQL adapter: {e}")
             raise ConnectionError(
+                database_type="PostgreSQL",
                 message="Failed to initialize PostgreSQL connection",
                 details=str(e)
             )
@@ -239,6 +241,7 @@ class PostgreSQLDatabase(IRelationalDatabase):
         except SQLAlchemyError as e:
             logger.error(f"Database session error: {e}")
             raise ConnectionError(
+                database_type="PostgreSQL",
                 message="Database session error",
                 details=str(e)
             )
@@ -302,69 +305,36 @@ class PostgreSQLDatabase(IRelationalDatabase):
                 query=command
             )
     
-    async def begin_transaction(self) -> AsyncSession:
-        """Begin database transaction.
+    @asynccontextmanager
+    async def begin_transaction(self):
+        """Begin database transaction as async context manager.
         
-        Returns:
+        Yields:
             AsyncSession: Transaction session
             
         Raises:
             TransactionError: If transaction start fails
         """
+        session = None
         try:
             session = self.async_session()
-            await session.begin()
-            return session
+            # Транзакция начинается автоматически при создании сессии
+            yield session
+            await session.commit()
             
         except SQLAlchemyError as e:
-            logger.error(f"Failed to begin transaction: {e}")
+            logger.error(f"Transaction failed: {e}")
+            if session:
+                await session.rollback()
             raise TransactionError(
-                message="Failed to begin transaction",
+                message="Transaction failed",
                 details=str(e)
             )
+        finally:
+            if session:
+                await session.close()
     
-    async def commit_transaction(self, transaction: AsyncSession) -> None:
-        """Commit transaction.
-        
-        Args:
-            transaction: Transaction session
-            
-        Raises:
-            TransactionError: If commit fails
-        """
-        try:
-            await transaction.commit()
-            await transaction.close()
-            
-        except SQLAlchemyError as e:
-            logger.error(f"Failed to commit transaction: {e}")
-            await transaction.rollback()
-            await transaction.close()
-            raise TransactionError(
-                message="Failed to commit transaction",
-                details=str(e)
-            )
-    
-    async def rollback_transaction(self, transaction: AsyncSession) -> None:
-        """Rollback transaction.
-        
-        Args:
-            transaction: Transaction session
-            
-        Raises:
-            TransactionError: If rollback fails
-        """
-        try:
-            await transaction.rollback()
-            await transaction.close()
-            
-        except SQLAlchemyError as e:
-            logger.error(f"Failed to rollback transaction: {e}")
-            await transaction.close()
-            raise TransactionError(
-                message="Failed to rollback transaction",
-                details=str(e)
-            )
+
     
     # === Material-specific methods ===
     
@@ -620,4 +590,12 @@ class PostgreSQLDatabase(IRelationalDatabase):
             logger.info("PostgreSQL connections closed")
             
         except Exception as e:
-            logger.error(f"Error closing PostgreSQL connections: {e}") 
+            logger.error(f"Error closing PostgreSQL connections: {e}")
+    
+    async def __aenter__(self):
+        """Async context manager entry"""
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        await self.close() 

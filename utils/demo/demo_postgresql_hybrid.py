@@ -157,13 +157,12 @@ class PostgreSQLHybridDemo:
             # 6. Test transactions
             logger.info("\n6️⃣ Testing transactions...")
             
-            transaction = await self.postgresql_db.begin_transaction()
             try:
-                # This would be a real transaction in production
-                await self.postgresql_db.commit_transaction(transaction)
-                logger.info("   ✅ Transaction committed successfully")
+                async with self.postgresql_db.begin_transaction() as transaction:
+                    # This would be a real transaction in production
+                    # Transaction will be automatically committed on successful exit
+                    logger.info("   ✅ Transaction completed successfully")
             except Exception as e:
-                await self.postgresql_db.rollback_transaction(transaction)
                 logger.error(f"   ❌ Transaction rolled back: {e}")
             
             return created_materials

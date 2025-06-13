@@ -333,7 +333,7 @@ class TestDatabaseInterfaces:
         """Test that IRelationalDatabase has all required methods."""
         required_methods = [
             "execute_query", "execute_command", "begin_transaction", 
-            "commit_transaction", "rollback_transaction", "health_check"
+            "health_check"
         ]
         
         for method_name in required_methods:

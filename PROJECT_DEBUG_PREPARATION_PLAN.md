@@ -47,14 +47,25 @@ LOG_LEVEL=DEBUG
 ENABLE_FALLBACK_DATABASES=true
 AUTO_MIGRATE=true
 AUTO_SEED=true
+
+# Отладочные настройки
+LOG_LEVEL=DEBUG
+ENABLE_FALLBACK_DATABASES=true
+DISABLE_REDIS_CONNECTION=true  
+DISABLE_POSTGRESQL_CONNECTION=true
+QDRANT_TIMEOUT=60
+OPENAI_TIMEOUT=60
+OPENAI_MAX_RETRIES=5
+ENABLE_RATE_LIMITING=false
+ENABLE_REQUEST_LOGGING=true
 ```
 
 ### Этап 2: Исправление PostgreSQL адаптера (Критический - 10 минут)
 
 #### 2.1 Исправление async context manager
-- [ ] Исправить метод создания engine в `postgresql_adapter.py`
-- [ ] Убедиться что `create_async_engine` возвращает правильный объект
-- [ ] Добавить proper async context manager support
+- [x] Исправить метод создания engine в `postgresql_adapter.py`
+- [x] Убедиться что `create_async_engine` возвращает правильный объект
+- [x] Добавить proper async context manager support
 
 ### Этап 3: Исправление тестов (20 минут)
 

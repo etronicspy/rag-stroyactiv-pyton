@@ -82,17 +82,18 @@ class MockRelationalAdapter(IRelationalDatabase):
         """Execute SQL command and return mock affected rows"""
         return 1
     
-    async def begin_transaction(self) -> Any:
-        """Begin mock transaction"""
-        return "mock_transaction"
-    
-    async def commit_transaction(self, transaction: Any) -> None:
-        """Commit mock transaction"""
-        pass
-    
-    async def rollback_transaction(self, transaction: Any) -> None:
-        """Rollback mock transaction"""
-        pass
+    async def begin_transaction(self):
+        """Begin mock transaction as async context manager"""
+        from contextlib import asynccontextmanager
+        
+        @asynccontextmanager
+        async def mock_transaction():
+            try:
+                yield "mock_transaction"
+            finally:
+                pass
+        
+        return mock_transaction()
 
 class MockCacheAdapter(ICacheDatabase):
     """Mock adapter implementing ICacheDatabase interface"""

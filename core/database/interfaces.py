@@ -168,29 +168,11 @@ class IRelationalDatabase(ABC):
         pass
     
     @abstractmethod
-    async def begin_transaction(self) -> Any:
-        """Begin database transaction.
+    async def begin_transaction(self):
+        """Begin database transaction as async context manager.
         
-        Returns:
-            Transaction object
-        """
-        pass
-    
-    @abstractmethod
-    async def commit_transaction(self, transaction: Any) -> None:
-        """Commit transaction.
-        
-        Args:
-            transaction: Transaction object
-        """
-        pass
-    
-    @abstractmethod
-    async def rollback_transaction(self, transaction: Any) -> None:
-        """Rollback transaction.
-        
-        Args:
-            transaction: Transaction object
+        Yields:
+            Transaction session
         """
         pass
     
