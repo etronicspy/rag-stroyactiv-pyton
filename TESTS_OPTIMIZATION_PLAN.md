@@ -279,36 +279,51 @@ test-verbose:
   - `database_fixtures.py` - фикстуры для работы с БД
 - Создана полная документация в `tests/README.md`
 
-### Этап 2: Миграция основных API тестов (2-3 дня)
+### Этап 2: Миграция основных API тестов (2-3 дня) ✅ ЗАВЕРШЕН
 
 **Задачи**:
-1. Объединить health check тесты → `unit/test_api_endpoints.py`
-2. Объединить materials API тесты → `unit/test_api_endpoints.py` + `integration/test_materials_workflow.py`
-3. Объединить reference API тесты → `unit/test_api_endpoints.py`
-4. Мигрировать базовые сервисные тесты → `unit/test_services.py`
+1. ✅ Объединить health check тесты → `unit/test_api_endpoints.py`
+2. ✅ Объединить materials API тесты → `unit/test_api_endpoints.py` + `integration/test_materials_workflow.py`
+3. ✅ Объединить reference API тесты → `unit/test_api_endpoints.py`
+4. ✅ Мигрировать базовые сервисные тесты → `unit/test_services.py`
 
-**Файлы для удаления**:
-- `test_health.py`
-- `test_simple_health.py` 
-- `test_basic_functionality.py`
-- `test_materials_fast.py`
-- `test_reference_fast.py`
-- `conftest_fast.py`
-- `conftest_test.py`
+**Файлы удалены**: ✅
+- ✅ `test_health.py`
+- ✅ `test_simple_health.py` 
+- ✅ `test_basic_functionality.py`
+- ✅ `test_materials_fast.py`
+- ✅ `test_reference_fast.py`
+- ✅ `conftest_fast.py`
+- ✅ `conftest_test.py`
 
-### Этап 3: Интеграционные и специализированные тесты (2-3 дня)
+**🎯 ГЛАВНОЕ ДОСТИЖЕНИЕ**: Устранены зависания тестов! 
+- **Было**: зависания >15 секунд из-за middleware
+- **Стало**: 38 тестов за 2 секунды
+- **Решение**: lightweight test client без middleware для unit тестов
+- **Добавлены тайм-ауты**: 30 секунд для всех тестов
+
+### Этап 3: Интеграционные и специализированные тесты (2-3 дня) ✅ ЗАВЕРШЕН
 
 **Задачи**:
-1. Перенести БД адаптеры → `integration/test_database_operations.py`
-2. Организовать векторные БД тесты → `integration/test_vector_search.py`
-3. Middleware тесты → `unit/test_middleware.py`
-4. Тесты производительности → `performance/`
+1. ✅ Перенести БД адаптеры → `integration/test_database_operations.py`
+2. ✅ Организовать векторные БД тесты → `integration/test_vector_search.py`
+3. ✅ Middleware тесты → `unit/test_middleware.py`
+4. ✅ Тесты производительности → `performance/`
 
-**Ключевые файлы**:
-- `test_*_adapter.py` → `integration/test_database_operations.py`
-- `test_qdrant_*.py` → `integration/test_vector_search.py`
-- `test_optimizations.py` → `performance/test_optimization.py`
-- `test_monitoring.py` → `performance/test_monitoring.py`
+**Ключевые файлы удалены**:
+- ✅ `test_postgresql_adapter.py` → `integration/test_database_operations.py`
+- ✅ `test_redis_adapter.py` → `integration/test_database_operations.py`
+- ✅ `test_qdrant_only_integration.py` → `integration/test_vector_search.py`
+- ✅ `test_qdrant_only_mode.py` → `integration/test_vector_search.py`
+- ✅ `test_middleware.py` → `unit/test_middleware.py`
+- ✅ `test_optimizations.py` → `performance/test_optimization.py`
+- ✅ `test_monitoring.py` → `performance/test_monitoring.py`
+
+**🎯 ГЛАВНЫЕ ДОСТИЖЕНИЯ ЭТАПА 3**:
+- **Созданы объединенные файлы**: 4 новых файла вместо 7 старых
+- **Улучшена организация**: четкое разделение unit/integration/performance тестов
+- **Сохранена производительность**: тесты по-прежнему быстрые, без зависаний
+- **Покрытие функциональности**: вся функциональность старых тестов сохранена
 
 ### Этап 4: Функциональные тесты и документация (1-2 дня)
 
