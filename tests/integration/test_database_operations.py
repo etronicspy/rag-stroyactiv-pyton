@@ -20,6 +20,7 @@ from core.database.adapters.postgresql_adapter import PostgreSQLDatabase, Materi
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import ConnectionError, DatabaseError, QueryError
 from core.database.factories import DatabaseFactory
+from core.database.init_db import DatabaseInitializer
 
 
 class TestPostgreSQLIntegration:
