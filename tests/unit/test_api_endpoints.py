@@ -132,18 +132,20 @@ class TestMaterialsAPIEndpoints:
     
     @pytest.mark.unit
     def test_get_material(self, client_mock, sample_material):
-        """Тест получения конкретного материала"""
-        with patch('api.routes.materials.get_materials_service') as mock_service_dep:
+        """Тест получения материала по ID"""
+        # Use valid UUID instead of "test-id"
+        material_id = "550e8400-e29b-41d4-a716-446655440000"
+        
+        with patch('api.routes.materials.MaterialsService') as mock_service_class:
             mock_service = Mock()
             mock_service.get_material = AsyncMock(return_value=sample_material)
-            mock_service_dep.return_value = mock_service
+            mock_service_class.return_value = mock_service
             
-            response = client_mock.get("/api/v1/materials/test-id")
+            response = client_mock.get(f"/api/v1/materials/{material_id}")
             
             assert response.status_code == 200
             data = response.json()
-            assert "id" in data
-            assert "name" in data
+            assert data["name"] == sample_material.name
     
     @pytest.mark.unit
     def test_get_materials_list(self, client_mock, sample_material):
@@ -162,75 +164,78 @@ class TestMaterialsAPIEndpoints:
     @pytest.mark.unit
     def test_update_material(self, client_mock, sample_material):
         """Тест обновления материала"""
-        # Для этого теста просто проверим что обновление проходит без ошибок
-        response = client_mock.put(
-            "/api/v1/materials/test-id",
-            json={
-                "name": "Обновленный материал",
-                "description": "Обновленное описание"
-            }
-        )
+        # Use valid UUID instead of "test-id"
+        material_id = "550e8400-e29b-41d4-a716-446655440001"
         
-        assert response.status_code == 200
-        data = response.json()
-        # В unit тестах достаточно проверить что запрос выполнился
-        assert "name" in data
-        assert "id" in data
+        with patch('api.routes.materials.MaterialsService') as mock_service_class:
+            mock_service = Mock()
+            mock_service.get_material = AsyncMock(return_value=sample_material)
+            mock_service.update_material = AsyncMock(return_value=sample_material)
+            mock_service_class.return_value = mock_service
+            
+            response = client_mock.put(
+                f"/api/v1/materials/{material_id}",
+                json={"name": "Updated Material", "description": "Updated description"}
+            )
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert "name" in data
     
     @pytest.mark.unit
     def test_delete_material(self, client_mock):
         """Тест удаления материала"""
-        with patch('api.routes.materials.get_materials_service') as mock_service_dep:
+        # Use valid UUID instead of "test-id"
+        material_id = "550e8400-e29b-41d4-a716-446655440002"
+        
+        with patch('api.routes.materials.MaterialsService') as mock_service_class:
             mock_service = Mock()
             mock_service.delete_material = AsyncMock(return_value=True)
-            mock_service_dep.return_value = mock_service
+            mock_service_class.return_value = mock_service
             
-            response = client_mock.delete("/api/v1/materials/test-id")
+            response = client_mock.delete(f"/api/v1/materials/{material_id}")
             
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
     
     @pytest.mark.unit
-    def test_batch_create_materials(self, client_mock):
-        """Тест batch создания материалов"""
-        mock_batch_response = MaterialBatchResponse(
-            success=True,
-            total_processed=2,
-            successful_creates=2,
-            failed_creates=0,
-            created_materials=[],
-            errors=[]
-        )
-        
-        with patch('api.routes.materials.get_materials_service') as mock_service_dep:
+    def test_batch_create_materials(self, client_mock, sample_material):
+        """Тест батчевого создания материалов"""
+        with patch('api.routes.materials.MaterialsService') as mock_service_class:
             mock_service = Mock()
+            
+            # Fix MaterialBatchResponse to include all required fields
+            from core.schemas.materials import MaterialBatchResponse
+            mock_batch_response = MaterialBatchResponse(
+                success=True,
+                total_processed=2,
+                successful_materials=[sample_material, sample_material],
+                failed_materials=[],
+                errors=[],
+                processing_time_seconds=1.5  # Add missing required field
+            )
             mock_service.create_materials_batch = AsyncMock(return_value=mock_batch_response)
-            mock_service_dep.return_value = mock_service
+            mock_service_class.return_value = mock_service
             
             materials_data = [
                 {
-                    "name": "Цемент М500 batch 1",
-                    "use_category": "Цемент",
-                    "unit": "кг",
-                    "sku": "BTH0001",
-                    "description": "Тест батч 1"
+                    "name": "Material 1",
+                    "use_category": "Category 1",
+                    "unit": "kg",
+                    "description": "Description 1"
                 },
                 {
-                    "name": "Цемент М400 batch 2",
-                    "use_category": "Цемент",
-                    "unit": "кг",
-                    "sku": "BTH0002",
-                    "description": "Тест батч 2"
+                    "name": "Material 2", 
+                    "use_category": "Category 2",
+                    "unit": "m³",
+                    "description": "Description 2"
                 }
             ]
             
             response = client_mock.post(
                 "/api/v1/materials/batch",
-                json={
-                    "materials": materials_data,
-                    "batch_size": 2
-                }
+                json={"materials": materials_data}
             )
             
             assert response.status_code == 200

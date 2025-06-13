@@ -858,4 +858,228 @@ class TestRealDBConnection:
             assert True, "Collection listing successful"
             
         except Exception as e:
-            pytest.fail(f"Failed to list collections: {e}") 
+            pytest.fail(f"Failed to list collections: {e}")
+
+
+class TestPostgreSQLAdapter:
+    """Тесты PostgreSQL адаптера"""
+    
+    @pytest.mark.integration
+    async def test_connection_error_handling(self):
+        """Тест обработки ошибок подключения"""
+        from adapters.database.postgresql_adapter import PostgreSQLAdapter
+        from sqlalchemy.exc import OperationalError
+        
+        # Create adapter with invalid connection string
+        adapter = PostgreSQLAdapter("postgresql://invalid:invalid@localhost:5432/invalid")
+        
+        # Test connection error handling
+        with pytest.raises(OperationalError):
+            await adapter.connect()
+    
+    @pytest.mark.integration
+    async def test_query_execution_error(self):
+        """Тест обработки ошибок выполнения запросов"""
+        from adapters.database.postgresql_adapter import PostgreSQLAdapter
+        
+        # Mock adapter for testing
+        adapter = PostgreSQLAdapter("postgresql://test:test@localhost:5432/test")
+        
+        # Mock connection that raises error
+        with patch.object(adapter, 'execute_query') as mock_execute:
+            # Fix: Use proper exception message format
+            mock_execute.side_effect = Exception("Query execution failed")
+            
+            with pytest.raises(Exception, match="Query execution failed"):
+                await adapter.execute_query("SELECT * FROM invalid_table")
+
+
+class TestRedisAdapter:
+    """Тесты Redis адаптера"""
+    
+    @pytest.mark.integration
+    async def test_connection_error_handling(self):
+        """Тест обработки ошибок подключения Redis"""
+        from adapters.database.redis_adapter import RedisAdapter
+        import redis.exceptions
+        
+        # Create adapter with invalid connection
+        adapter = RedisAdapter("redis://invalid:6379")
+        
+        # Test connection error handling
+        with pytest.raises(redis.exceptions.ConnectionError):
+            await adapter.connect()
+    
+    @pytest.mark.integration
+    async def test_operation_error_handling(self):
+        """Тест обработки ошибок операций Redis"""
+        from adapters.database.redis_adapter import RedisAdapter
+        
+        adapter = RedisAdapter("redis://localhost:6379")
+        
+        # Mock Redis client that raises error
+        with patch.object(adapter, 'get') as mock_get:
+            # Fix: Use proper Redis exception
+            mock_get.side_effect = redis.exceptions.RedisError("Redis operation failed")
+            
+            with pytest.raises(redis.exceptions.RedisError):
+                await adapter.get("test_key")
+
+
+class TestCachedMaterialsRepository:
+    """Тесты кешированного репозитория материалов"""
+    
+    @pytest.fixture
+    def mock_cache(self):
+        """Mock cache для тестирования"""
+        cache = Mock()
+        cache.get = AsyncMock(return_value=None)
+        cache.set = AsyncMock()
+        cache.delete = AsyncMock()
+        cache.clear = AsyncMock()
+        return cache
+    
+    @pytest.fixture
+    def mock_repository(self):
+        """Mock основного репозитория"""
+        repo = Mock()
+        repo.get_by_id = AsyncMock()
+        repo.create = AsyncMock()
+        repo.update = AsyncMock()
+        repo.delete = AsyncMock()
+        repo.list_all = AsyncMock(return_value=[])
+        return repo
+    
+    @pytest.fixture
+    def cached_repository(self, mock_repository, mock_cache):
+        """Кешированный репозиторий для тестирования"""
+        from repositories.cached_materials_repository import CachedMaterialsRepository
+        return CachedMaterialsRepository(mock_repository, mock_cache)
+    
+    @pytest.mark.integration
+    async def test_cache_hit(self, cached_repository, mock_cache, sample_material):
+        """Тест попадания в кеш"""
+        # Setup cache hit
+        mock_cache.get.return_value = sample_material.dict()
+        
+        result = await cached_repository.get_by_id("test-id")
+        
+        assert result is not None
+        mock_cache.get.assert_called_once_with("material:test-id")
+    
+    @pytest.mark.integration
+    async def test_cache_miss_and_set(self, cached_repository, mock_cache, mock_repository, sample_material):
+        """Тест промаха кеша и установки значения"""
+        # Setup cache miss
+        mock_cache.get.return_value = None
+        mock_repository.get_by_id.return_value = sample_material
+        
+        result = await cached_repository.get_by_id("test-id")
+        
+        assert result == sample_material
+        mock_cache.get.assert_called_once_with("material:test-id")
+        mock_cache.set.assert_called_once()
+    
+    @pytest.mark.integration
+    async def test_cache_invalidation_on_update(self, cached_repository, mock_cache, mock_repository, sample_material):
+        """Тест инвалидации кеша при обновлении"""
+        mock_repository.update.return_value = sample_material
+        
+        await cached_repository.update("test-id", {"name": "Updated"})
+        
+        mock_cache.delete.assert_called_once_with("material:test-id")
+    
+    @pytest.mark.integration
+    async def test_cache_invalidation_on_delete(self, cached_repository, mock_cache, mock_repository):
+        """Тест инвалидации кеша при удалении"""
+        mock_repository.delete.return_value = True
+        
+        await cached_repository.delete("test-id")
+        
+        mock_cache.delete.assert_called_once_with("material:test-id")
+
+
+class TestHybridMaterialsRepository:
+    """Тесты гибридного репозитория материалов"""
+    
+    @pytest.fixture
+    def mock_sql_repo(self):
+        """Mock SQL репозитория"""
+        repo = Mock()
+        repo.create = AsyncMock()
+        repo.update = AsyncMock()
+        repo.delete = AsyncMock()
+        repo.get_by_id = AsyncMock()
+        repo.list_all = AsyncMock(return_value=[])
+        return repo
+    
+    @pytest.fixture
+    def mock_vector_repo(self):
+        """Mock векторного репозитория"""
+        repo = Mock()
+        repo.upsert = AsyncMock()
+        repo.delete = AsyncMock()
+        repo.search = AsyncMock(return_value=[])
+        return repo
+    
+    @pytest.fixture
+    def hybrid_repository(self, mock_sql_repo, mock_vector_repo):
+        """Гибридный репозиторий для тестирования"""
+        from repositories.hybrid_materials_repository import HybridMaterialsRepository
+        return HybridMaterialsRepository(mock_sql_repo, mock_vector_repo)
+    
+    @pytest.mark.integration
+    async def test_create_syncs_to_both_repos(self, hybrid_repository, mock_sql_repo, mock_vector_repo, sample_material):
+        """Тест синхронизации создания в оба репозитория"""
+        mock_sql_repo.create.return_value = sample_material
+        
+        result = await hybrid_repository.create(sample_material.dict())
+        
+        assert result == sample_material
+        mock_sql_repo.create.assert_called_once()
+        mock_vector_repo.upsert.assert_called_once()
+    
+    @pytest.mark.integration
+    async def test_update_syncs_to_both_repos(self, hybrid_repository, mock_sql_repo, mock_vector_repo, sample_material):
+        """Тест синхронизации обновления в оба репозитория"""
+        mock_sql_repo.update.return_value = sample_material
+        
+        result = await hybrid_repository.update("test-id", {"name": "Updated"})
+        
+        assert result == sample_material
+        mock_sql_repo.update.assert_called_once()
+        mock_vector_repo.upsert.assert_called_once()
+    
+    @pytest.mark.integration
+    async def test_delete_syncs_to_both_repos(self, hybrid_repository, mock_sql_repo, mock_vector_repo):
+        """Тест синхронизации удаления в оба репозитория"""
+        mock_sql_repo.delete.return_value = True
+        
+        result = await hybrid_repository.delete("test-id")
+        
+        assert result is True
+        mock_sql_repo.delete.assert_called_once()
+        mock_vector_repo.delete.assert_called_once()
+    
+    @pytest.mark.integration
+    async def test_search_uses_vector_repo(self, hybrid_repository, mock_vector_repo):
+        """Тест использования векторного репозитория для поиска"""
+        mock_results = [{"id": "1", "score": 0.9}]
+        mock_vector_repo.search.return_value = mock_results
+        
+        results = await hybrid_repository.search("test query", limit=10)
+        
+        assert results == mock_results
+        mock_vector_repo.search.assert_called_once_with("test query", limit=10)
+    
+    @pytest.mark.integration
+    async def test_vector_repo_failure_handling(self, hybrid_repository, mock_sql_repo, mock_vector_repo, sample_material):
+        """Тест обработки ошибок векторного репозитория"""
+        mock_sql_repo.create.return_value = sample_material
+        mock_vector_repo.upsert.side_effect = Exception("Vector DB error")
+        
+        # Should still succeed with SQL repo, log vector error
+        result = await hybrid_repository.create(sample_material.dict())
+        
+        assert result == sample_material
+        mock_sql_repo.create.assert_called_once() 

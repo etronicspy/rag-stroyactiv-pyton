@@ -444,11 +444,25 @@ class MaterialBatchCreate(BaseModel):
 class MaterialBatchResponse(BaseModel):
     success: bool
     total_processed: int
-    successful_creates: int
-    failed_creates: int
+    successful_materials: List[Material] = []
+    failed_materials: List[Dict[str, Any]] = []
     processing_time_seconds: float
     errors: List[str] = []
-    created_materials: List[Material] = []
+    
+    @property
+    def successful_creates(self) -> int:
+        """Backward compatibility property"""
+        return len(self.successful_materials)
+    
+    @property
+    def failed_creates(self) -> int:
+        """Backward compatibility property"""
+        return len(self.failed_materials)
+    
+    @property
+    def created_materials(self) -> List[Material]:
+        """Backward compatibility property"""
+        return self.successful_materials
 
 # Schema for importing from JSON file format
 class MaterialImportItem(BaseModel):
