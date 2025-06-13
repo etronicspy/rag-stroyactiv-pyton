@@ -8,24 +8,26 @@ import time
 class TestPriceListWorkflows:
     """Functional tests for price list processing workflows."""
     
-    @pytest.fixture
-    def setup_references(self, client):
+    def _setup_references(self, client_mock):
         """Create necessary reference data for price list tests."""
         # Create categories
-        client.post("/api/v1/reference/categories/", json={"name": "Цемент", "description": "Цементы"})
-        client.post("/api/v1/reference/categories/", json={"name": "Песок", "description": "Песок и щебень"})
+        client_mock.post("/api/v1/reference/categories/", json={"name": "Цемент", "description": "Цементы"})
+        client_mock.post("/api/v1/reference/categories/", json={"name": "Песок", "description": "Песок и щебень"})
         
         # Create units
-        client.post("/api/v1/reference/units/", json={"name": "кг", "description": "Килограмм"})
-        client.post("/api/v1/reference/units/", json={"name": "м³", "description": "Кубический метр"})
+        client_mock.post("/api/v1/reference/units/", json={"name": "кг", "description": "Килограмм"})
+        client_mock.post("/api/v1/reference/units/", json={"name": "м³", "description": "Кубический метр"})
     
-    def test_complete_price_list_workflow(self, client, setup_references):
+    def test_complete_price_list_workflow(self, client_mock):
         """Test complete price list processing workflow."""
         import io
         import time
         
+        # Setup references first
+        self._setup_references(client_mock)
+        
         # Create test CSV content
-        csv_content = """name,price,unit,description,category
+        csv_content = """name,price,unit,description,use_category
 Портландцемент М500,150.00,кг,Высококачественный цемент,Цемент
 Песок речной,800.00,м³,Чистый речной песок,Песок
 Цемент белый,200.00,кг,Белый цемент для декоративных работ,Цемент
@@ -35,7 +37,7 @@ class TestPriceListWorkflows:
         supplier_id = "test_supplier_workflow"
         
         # Step 1: Process price list
-        response = client.post(
+        response = client_mock.post(
             "/api/v1/prices/process",
             files={
                 "file": ("valid_prices.csv", csv_file, "text/csv"),
@@ -51,7 +53,7 @@ class TestPriceListWorkflows:
         assert "upload_date" in process_data
         
         # Step 2: Get latest price list
-        response = client.get(f"/api/v1/prices/{supplier_id}/latest")
+        response = client_mock.get(f"/api/v1/prices/{supplier_id}/latest")
         assert response.status_code == 200
         
         latest_data = response.json()
@@ -69,14 +71,14 @@ class TestPriceListWorkflows:
         # Step 3: Upload second price list (version 2)
         time.sleep(1)  # Ensure different timestamp
         
-        csv_content_v2 = """name,price,unit,description,category
-Портландцемент М500,155.00,кг,Высококачественный цемент обновленная цена,Цемент
+        csv_content_v2 = """name,price,unit,description,use_category
+Портландцемент М500,155.00,кг,Высококачественный цемент обновленная цена,Цемент  
 Песок речной,820.00,м³,Чистый речной песок обновленная цена,Песок
 Бетон М300,3500.00,м³,Готовый бетон марки М300,Цемент"""
         
         csv_file_v2 = io.BytesIO(csv_content_v2.encode('utf-8'))
         
-        response = client.post(
+        response = client_mock.post(
             "/api/v1/prices/process",
             files={
                 "file": ("prices_v2.csv", csv_file_v2, "text/csv"),
@@ -89,7 +91,7 @@ class TestPriceListWorkflows:
         assert process_data_v2["materials_processed"] == 3
         
         # Step 4: Get all price lists for supplier
-        response = client.get(f"/api/v1/prices/{supplier_id}/all")
+        response = client_mock.get(f"/api/v1/prices/{supplier_id}/all")
         assert response.status_code == 200
         
         all_data = response.json()
@@ -103,7 +105,7 @@ class TestPriceListWorkflows:
         assert price_lists[1]["materials_count"] == 4  # Original
         
         # Step 5: Verify latest is now v2
-        response = client.get(f"/api/v1/prices/{supplier_id}/latest")
+        response = client_mock.get(f"/api/v1/prices/{supplier_id}/latest")
         assert response.status_code == 200
         
         latest_v2_data = response.json()
@@ -118,20 +120,23 @@ class TestPriceListWorkflows:
         assert updated_cement["price"] == 155.00  # Updated price
         
         # Step 6: Delete all price lists
-        response = client.delete(f"/api/v1/prices/{supplier_id}")
+        response = client_mock.delete(f"/api/v1/prices/{supplier_id}")
         assert response.status_code == 200
         
         delete_data = response.json()
         assert f"All price lists for supplier {supplier_id} have been deleted" in delete_data["message"]
         
         # Step 7: Verify deletion
-        response = client.get(f"/api/v1/prices/{supplier_id}/latest")
+        response = client_mock.get(f"/api/v1/prices/{supplier_id}/latest")
         assert response.status_code == 404
         assert "No price lists found" in response.json()["detail"]
     
-    def test_price_list_validation_workflow(self, client, setup_references):
+    def test_price_list_validation_workflow(self, client_mock):
         """Test price list validation and error handling."""
         import io
+        
+        # Setup references first
+        self._setup_references(client_mock)
         
         supplier_id = "test_supplier_validation"
         
@@ -139,7 +144,7 @@ class TestPriceListWorkflows:
         text_content = "This is not a CSV file"
         text_file = io.BytesIO(text_content.encode('utf-8'))
         
-        response = client.post(
+        response = client_mock.post(
             "/api/v1/prices/process",
             files={
                 "file": ("invalid.txt", text_file, "text/plain"),
@@ -157,7 +162,7 @@ Material 2,Description 2"""
         
         invalid_file = io.BytesIO(invalid_csv.encode('utf-8'))
         
-        response = client.post(
+        response = client_mock.post(
             "/api/v1/prices/process",
             files={
                 "file": ("invalid_columns.csv", invalid_file, "text/csv"),
@@ -169,13 +174,13 @@ Material 2,Description 2"""
         assert "Missing required columns" in response.json()["detail"]
         
         # Test 3: Invalid price data
-        invalid_price_csv = """name,price,unit,description,category
+        invalid_price_csv = """name,price,unit,description,use_category
 Material 1,invalid_price,кг,Description 1,Цемент
 Material 2,200.00,кг,Description 2,Цемент"""
         
         invalid_price_file = io.BytesIO(invalid_price_csv.encode('utf-8'))
         
-        response = client.post(
+        response = client_mock.post(
             "/api/v1/prices/process",
             files={
                 "file": ("invalid_prices.csv", invalid_price_file, "text/csv"),
@@ -189,23 +194,26 @@ Material 2,200.00,кг,Description 2,Цемент"""
         assert data["materials_processed"] == 1  # Only valid row processed
         
         # Cleanup
-        client.delete(f"/api/v1/prices/{supplier_id}")
+        client_mock.delete(f"/api/v1/prices/{supplier_id}")
     
-    def test_price_list_retention_policy(self, client, setup_references):
+    def test_price_list_retention_policy(self, client_mock):
         """Test price list retention policy (max 3 versions)."""
         import io
         import time
+        
+        # Setup references first
+        self._setup_references(client_mock)
         
         supplier_id = "test_supplier_retention"
         
         # Upload 4 price lists
         for i in range(4):
-            csv_content = f"""name,price,unit,description,category
+            csv_content = f"""name,price,unit,description,use_category
 Material Version {i + 1},{100 + i * 10}.00,кг,Description {i + 1},Цемент"""
             
             csv_file = io.BytesIO(csv_content.encode('utf-8'))
             
-            response = client.post(
+            response = client_mock.post(
                 "/api/v1/prices/process",
                 files={
                     "file": (f"prices_v{i+1}.csv", csv_file, "text/csv"),
@@ -217,23 +225,26 @@ Material Version {i + 1},{100 + i * 10}.00,кг,Description {i + 1},Цемент
             time.sleep(0.1)  # Small delay to ensure different timestamps
         
         # Check that only 3 price lists are retained
-        response = client.get(f"/api/v1/prices/{supplier_id}/all")
+        response = client_mock.get(f"/api/v1/prices/{supplier_id}/all")
         assert response.status_code == 200
         
         data = response.json()
         assert data["total_price_lists"] == 3  # Should keep only last 3
         
         # Verify that the oldest (version 1) was deleted
-        latest_response = client.get(f"/api/v1/prices/{supplier_id}/latest")
+        latest_response = client_mock.get(f"/api/v1/prices/{supplier_id}/latest")
         latest_material = latest_response.json()["materials"][0]
         assert "Version 4" in latest_material["name"]  # Latest should be version 4
         
         # Cleanup
-        client.delete(f"/api/v1/prices/{supplier_id}")
+        client_mock.delete(f"/api/v1/prices/{supplier_id}")
     
-    def test_empty_file_handling(self, client, setup_references):
+    def test_empty_file_handling(self, client_mock):
         """Test handling of empty CSV file."""
         import io
+        
+        # Setup references first
+        self._setup_references(client_mock)
         
         supplier_id = "test_supplier_empty"
         
@@ -241,7 +252,7 @@ Material Version {i + 1},{100 + i * 10}.00,кг,Description {i + 1},Цемент
         empty_csv = ""
         empty_file = io.BytesIO(empty_csv.encode('utf-8'))
         
-        response = client.post(
+        response = client_mock.post(
             "/api/v1/prices/process",
             files={
                 "file": ("empty.csv", empty_file, "text/csv"),
@@ -253,10 +264,10 @@ Material Version {i + 1},{100 + i * 10}.00,кг,Description {i + 1},Цемент
         assert "empty" in response.json()["detail"].lower()
         
         # Test file with only headers
-        headers_only_csv = "name,price,unit,description,category"
+        headers_only_csv = "name,price,unit,description,use_category"
         headers_file = io.BytesIO(headers_only_csv.encode('utf-8'))
         
-        response = client.post(
+        response = client_mock.post(
             "/api/v1/prices/process",
             files={
                 "file": ("headers_only.csv", headers_file, "text/csv"),

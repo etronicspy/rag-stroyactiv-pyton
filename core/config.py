@@ -250,6 +250,7 @@ class Settings(BaseSettings):
     LOG_REQUEST_BODY: bool = Field(default=True, description="Log request bodies")
     LOG_RESPONSE_BODY: bool = Field(default=False, description="Log response bodies")
     ENABLE_STRUCTURED_LOGGING: bool = Field(default=False, description="Enable JSON structured logging")
+    ENABLE_REQUEST_LOGGING: bool = Field(default=True, description="Enable request logging middleware")
     
     model_config = ConfigDict(
         case_sensitive=True,
