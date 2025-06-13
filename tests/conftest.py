@@ -95,13 +95,34 @@ def client_mock():
             PROJECT_NAME="Test API",
             QDRANT_URL="https://test.qdrant.com",
             QDRANT_API_KEY="test-key",
-            OPENAI_API_KEY="test-openai-key",
+            OPENAI_API_KEY="sk-test-openai-key-1234567890",
             QDRANT_ONLY_MODE=True,
             ENABLE_FALLBACK_DATABASES=True,
             DISABLE_REDIS_CONNECTION=True,
-            DISABLE_POSTGRESQL_CONNECTION=True
+            DISABLE_POSTGRESQL_CONNECTION=True,
+            ENABLE_RATE_LIMITING=False,
+            LOG_REQUEST_BODY=False,
+            LOG_RESPONSE_BODY=False
         )
         mock_settings.return_value = settings
+        
+        # Создаем минимальное приложение без middleware для unit тестов
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from api.routes import reference, health, materials, prices, search
+        
+        app = FastAPI(title="Test API")
+        
+        # Добавляем только роутеры без middleware
+        app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
+        app.include_router(reference.router, prefix="/api/v1/reference", tags=["reference"])
+        app.include_router(materials.router, prefix="/api/v1/materials", tags=["materials"])
+        app.include_router(prices.router, prefix="/api/v1/prices", tags=["prices"])
+        app.include_router(search.router, prefix="/api/v1/search", tags=["search"])
+        
+        @app.get("/")
+        async def root():
+            return {"message": "Welcome to Test API", "version": "1.0.0"}
         
         with patch('core.config.get_vector_db_client') as mock_vector_client, \
              patch('core.config.get_ai_client') as mock_ai, \
@@ -111,7 +132,6 @@ def client_mock():
             mock_ai.return_value = Mock()
             mock_qdrant.return_value.get_collections.return_value = Mock()
             
-            from main import app
             return TestClient(app)
 
 @pytest.fixture
@@ -253,33 +273,46 @@ def mock_vector_db():
     return mock_db
 
 @pytest.fixture
-def mock_materials_service():
+def mock_materials_service(sample_material):
     """Mock MaterialsService"""
+    from core.schemas.materials import MaterialBatchResponse
+    
     service = Mock()
-    service.create_material = AsyncMock()
-    service.get_material = AsyncMock()
-    service.get_materials = AsyncMock(return_value=[])
-    service.update_material = AsyncMock()
+    service.create_material = AsyncMock(return_value=sample_material)
+    service.get_material = AsyncMock(return_value=sample_material)
+    service.get_materials = AsyncMock(return_value=[sample_material])
+    service.update_material = AsyncMock(return_value=sample_material)
     service.delete_material = AsyncMock(return_value=True)
-    service.search_materials = AsyncMock(return_value=[])
-    service.create_materials_batch = AsyncMock()
+    service.search_materials = AsyncMock(return_value=[sample_material])
+    
+    # Mock batch response
+    batch_response = MaterialBatchResponse(
+        success=True,
+        total_processed=1,
+        successful_creates=1,
+        failed_creates=0,
+        created_materials=[sample_material],
+        errors=[],
+        processing_time_seconds=0.1
+    )
+    service.create_materials_batch = AsyncMock(return_value=batch_response)
     return service
 
 @pytest.fixture
-def mock_category_service():
+def mock_category_service(sample_category):
     """Mock CategoryService"""
     service = Mock()
-    service.create_category = AsyncMock()
-    service.get_categories = AsyncMock(return_value=[])
+    service.create_category = AsyncMock(return_value=sample_category)
+    service.get_categories = AsyncMock(return_value=[sample_category])
     service.delete_category = AsyncMock(return_value=True)
     return service
 
 @pytest.fixture
-def mock_unit_service():
+def mock_unit_service(sample_unit):
     """Mock UnitService"""
     service = Mock()
-    service.create_unit = AsyncMock()
-    service.get_units = AsyncMock(return_value=[])
+    service.create_unit = AsyncMock(return_value=sample_unit)
+    service.get_units = AsyncMock(return_value=[sample_unit])
     service.delete_unit = AsyncMock(return_value=True)
     return service
 
@@ -346,6 +379,18 @@ def sample_material_data():
         "description": "Test cement for unit testing",
         "sku": "TEST_001"
     }
+
+@pytest.fixture
+def sample_material_create():
+    """Sample MaterialCreate для тестов"""
+    from core.schemas.materials import MaterialCreate
+    return MaterialCreate(
+        name="Портландцемент М500",
+        use_category="Цемент",
+        unit="кг",
+        description="Высококачественный цемент",
+        sku="PC500"
+    )
 
 @pytest.fixture
 def sample_price_data():

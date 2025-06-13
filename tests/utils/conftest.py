@@ -28,7 +28,7 @@ def mock_env_vars():
     
     # Устанавливаем тестовые значения
     test_env = {
-        'OPENAI_API_KEY': 'test-openai-key',
+        'OPENAI_API_KEY': 'sk-test-openai-key-1234567890',
         'QDRANT_URL': 'http://localhost:6333',
         'QDRANT_API_KEY': 'test-qdrant-key'
     }
