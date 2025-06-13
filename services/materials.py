@@ -45,16 +45,16 @@ class MaterialsService(BaseRepository):
         # Use factory defaults if not provided
         if vector_db is None:
             try:
-                from core.config import get_vector_db_client
-                vector_db = get_vector_db_client()
+                from core.database.factories import DatabaseFactory
+                vector_db = DatabaseFactory.create_vector_database()
             except Exception as e:
                 logger.warning(f"Failed to get vector DB client: {e}")
                 vector_db = None
         
         if ai_client is None:
             try:
-                from core.config import get_ai_client
-                ai_client = get_ai_client()
+                from core.database.factories import AIClientFactory
+                ai_client = AIClientFactory.create_ai_client()
             except Exception as e:
                 logger.warning(f"Failed to get AI client: {e}")
                 ai_client = None

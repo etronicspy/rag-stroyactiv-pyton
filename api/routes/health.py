@@ -79,32 +79,14 @@ class HealthChecker:
     async def _check_qdrant(self) -> Dict[str, Any]:
         """Check Qdrant health."""
         try:
-            client = get_vector_db_client()
-            
-            # Get cluster info
-            cluster_info = await asyncio.to_thread(client.get_cluster_info)
-            
-            # Get collections
-            collections = await asyncio.to_thread(client.get_collections)
-            
-            # Try to get collection info if materials collection exists
-            collection_info = None
-            if any(col.name == settings.QDRANT_COLLECTION_NAME for col in collections.collections):
-                collection_info = await asyncio.to_thread(
-                    client.get_collection,
-                    settings.QDRANT_COLLECTION_NAME
-                )
+            # Use adapter health check method
+            vector_db = DatabaseFactory.create_vector_database()
+            health_result = await vector_db.health_check()
             
             return {
-                "status": "healthy",
-                "details": {
-                    "url": settings.QDRANT_URL[:50] + "..." if len(settings.QDRANT_URL) > 50 else settings.QDRANT_URL,
-                    "collections_count": len(collections.collections),
-                    "cluster_status": cluster_info.status if hasattr(cluster_info, 'status') else "unknown",
-                    "collection_exists": collection_info is not None,
-                    "points_count": collection_info.points_count if collection_info else 0,
-                    "vectors_count": collection_info.vectors_count if collection_info else 0
-                }
+                "status": "healthy" if health_result.get("status") == "healthy" else "error",
+                "details": health_result.get("details", {}),
+                "error": health_result.get("error")
             }
             
         except Exception as e:
