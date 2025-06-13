@@ -19,7 +19,7 @@ from core.middleware import (
 )
 from core.middleware.rate_limiting_optimized import OptimizedRateLimitMiddleware
 from core.monitoring import setup_structured_logging, get_metrics_collector
-from api.routes import reference, health, materials, prices, search, monitoring
+from api.routes import reference, health, materials, prices, search, monitoring, advanced_search
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +155,7 @@ app.include_router(reference.router, prefix="/api/v1/reference", tags=["referenc
 app.include_router(materials.router, prefix="/api/v1/materials", tags=["materials"])
 app.include_router(prices.router, prefix="/api/v1/prices", tags=["prices"])
 app.include_router(search.router, prefix="/api/v1/search", tags=["search"])
+app.include_router(advanced_search.router)
 
 @app.get("/")
 async def root():
