@@ -5,6 +5,7 @@
 
 from typing import List, Dict, Any, Optional
 import logging
+import asyncio
 from datetime import datetime
 
 from qdrant_client import QdrantClient
@@ -77,7 +78,8 @@ class QdrantVectorDatabase(IVectorDatabase):
             
             distance = distance_map.get(distance_metric.lower(), Distance.COSINE)
             
-            self.client.create_collection(
+            await asyncio.to_thread(
+                self.client.create_collection,
                 collection_name=name,
                 vectors_config=VectorParams(
                     size=vector_size,
@@ -102,7 +104,7 @@ class QdrantVectorDatabase(IVectorDatabase):
             True if collection exists
         """
         try:
-            collections = self.client.get_collections()
+            collections = await asyncio.to_thread(self.client.get_collections)
             collection_names = [c.name for c in collections.collections]
             return name in collection_names
             
@@ -137,7 +139,9 @@ class QdrantVectorDatabase(IVectorDatabase):
                 )
                 points.append(point)
             
-            operation_info = self.client.upsert(
+            # Use asyncio.to_thread to avoid blocking the event loop
+            operation_info = await asyncio.to_thread(
+                self.client.upsert,
                 collection_name=collection_name,
                 points=points
             )
@@ -166,7 +170,8 @@ class QdrantVectorDatabase(IVectorDatabase):
             QueryError: If search operation fails
         """
         try:
-            search_result = self.client.search(
+            search_result = await asyncio.to_thread(
+                self.client.search,
                 collection_name=collection_name,
                 query_vector=query_vector,
                 limit=limit,
@@ -201,7 +206,8 @@ class QdrantVectorDatabase(IVectorDatabase):
             Vector data or None if not found
         """
         try:
-            results = self.client.retrieve(
+            results = await asyncio.to_thread(
+                self.client.retrieve,
                 collection_name=collection_name,
                 ids=[vector_id],
                 with_vectors=True
@@ -270,7 +276,8 @@ class QdrantVectorDatabase(IVectorDatabase):
             True if deletion successful
         """
         try:
-            operation_info = self.client.delete(
+            operation_info = await asyncio.to_thread(
+                self.client.delete,
                 collection_name=collection_name,
                 points_selector=[vector_id]
             )
@@ -317,30 +324,43 @@ class QdrantVectorDatabase(IVectorDatabase):
             Health status information
         """
         try:
-            # Test connection by getting collections
-            collections = self.client.get_collections()
+            # Simple connection test - get collections list
+            collections = await asyncio.to_thread(self.client.get_collections)
+            collections_count = len(collections.collections) if collections and hasattr(collections, 'collections') else 0
             
-            # Get collection info if default collection exists
-            collection_info = None
-            if await self.collection_exists(self.collection_name):
-                collection_info = self.client.get_collection(self.collection_name)
+            # Check if default collection exists (without detailed info to avoid parsing errors)
+            collection_exists = await self.collection_exists(self.collection_name)
+            
+            # Get basic collection stats if exists
+            vectors_count = 0
+            if collection_exists:
+                try:
+                    collection_info = await asyncio.to_thread(self.client.get_collection, self.collection_name)
+                    # Safely extract vectors count without relying on strict parsing
+                    if hasattr(collection_info, 'vectors_count'):
+                        vectors_count = collection_info.vectors_count
+                    elif hasattr(collection_info, 'result') and hasattr(collection_info.result, 'vectors_count'):
+                        vectors_count = collection_info.result.vectors_count
+                except:
+                    # If we can't get collection info, that's okay - connection still works
+                    pass
             
             return {
                 "status": "healthy",
-                "database_type": "Qdrant",
-                "url": self.config["url"],
-                "collections_count": len(collections.collections),
-                "default_collection": self.collection_name,
-                "default_collection_exists": collection_info is not None,
-                "collection_info": collection_info.dict() if collection_info else None,
-                "timestamp": datetime.utcnow().isoformat()
+                "details": {
+                    "database_type": "Qdrant",
+                    "url": self.config["url"],
+                    "collections_count": collections_count,
+                    "default_collection": self.collection_name,
+                    "default_collection_exists": collection_exists,
+                    "vectors_count": vectors_count,
+                    "connection_test": "passed"
+                }
             }
             
         except Exception as e:
             logger.error(f"Qdrant health check failed: {e}")
             return {
-                "status": "unhealthy",
-                "database_type": "Qdrant",
-                "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "status": "error",
+                "error": str(e)
             } 
