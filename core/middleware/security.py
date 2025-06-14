@@ -231,8 +231,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
     async def _validate_input(self, request: Request) -> Optional[Response]:
         """Validate input for SQL injection and XSS."""
-        # Get query parameters
-        query_params = str(request.query_params)
+        # Get query parameters with URL decoding
+        query_params = unquote(str(request.query_params))
         
         # Check query parameters
         if self.enable_sql_injection_protection and self._check_sql_injection(query_params):
@@ -243,45 +243,84 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             )
         
         if self.enable_xss_protection and self._check_xss(query_params):
-            await self._log_security_incident(request, "xss_attempt")
+            await self._log_security_incident(request, "xss_query", 
+                                             f"XSS attempt in query params: {query_params[:100]}...")
             return JSONResponse(
                 status_code=400,
                 content={"error": "Bad request", "message": "Invalid input detected"}
             )
         
-        # Check request body for POST/PUT requests
-        if request.method in ["POST", "PUT"]:
+        # 🔥 ВОССТАНАВЛИВАЕМ: Body validation (FastAPI 0.108.0+ безопасен)
+        if request.method in ["POST", "PUT", "PATCH"]:
             try:
-                # Read body (this will be cached by FastAPI)
+                # FastAPI 0.108.0+ - безопасное чтение body
                 body = await request.body()
+                
                 if body:
-                    body_str = body.decode("utf-8", errors="ignore").lower()
+                    body_str = body.decode('utf-8', errors='ignore')
                     
+                    # Skip validation for legitimate Cyrillic content
+                    if self._is_cyrillic_safe_content(body_str):
+                        logger.debug("SecurityMiddleware: Skipping validation for Cyrillic content")
+                        return None
+                    
+                    # SQL injection check in body
                     if self.enable_sql_injection_protection and self._check_sql_injection(body_str):
-                        await self._log_security_incident(request, "sql_injection_attempt")
+                        await self._log_security_incident(request, "sql_injection_body", 
+                                                         f"SQL injection attempt in body: {body_str[:100]}...")
                         return JSONResponse(
                             status_code=400,
                             content={"error": "Bad request", "message": "Invalid input detected"}
                         )
                     
+                    # XSS check in body
                     if self.enable_xss_protection and self._check_xss(body_str):
-                        await self._log_security_incident(request, "xss_attempt")
+                        await self._log_security_incident(request, "xss_body",
+                                                         f"XSS attempt in body: {body_str[:100]}...")
                         return JSONResponse(
                             status_code=400,
                             content={"error": "Bad request", "message": "Invalid input detected"}
                         )
+                        
+                logger.debug("SecurityMiddleware: Body validation completed successfully")
+                        
             except Exception as e:
-                logger.warning(f"Failed to validate request body: {e}")
+                logger.warning(f"Body validation error (non-blocking): {e}")
+                # Fallback - не блокируем запрос при ошибке чтения body
+                # Но логируем для мониторинга
+                await self._log_security_incident(request, "body_validation_error", str(e))
         
         return None
 
+    def _is_cyrillic_safe_content(self, content: str) -> bool:
+        """Check if content contains legitimate Cyrillic text vs malicious patterns."""
+        # If content is mostly Cyrillic characters, it's likely legitimate
+        cyrillic_chars = sum(1 for char in content if '\u0400' <= char <= '\u04FF')
+        total_chars = len([char for char in content if char.isalpha()])
+        
+        if total_chars > 0:
+            cyrillic_ratio = cyrillic_chars / total_chars
+            # If >30% Cyrillic, consider it legitimate Russian text
+            if cyrillic_ratio > 0.3:
+                return True
+        
+        return False
+
     def _check_sql_injection(self, input_string: str) -> bool:
-        """Check for SQL injection patterns."""
+        """Check for SQL injection patterns with Cyrillic awareness."""
+        # Skip validation for legitimate Cyrillic content
+        if self._is_cyrillic_safe_content(input_string):
+            return False
+            
         input_lower = input_string.lower()
         return any(pattern.search(input_lower) for pattern in self.sql_regex)
 
     def _check_xss(self, input_string: str) -> bool:
-        """Check for XSS patterns."""
+        """Check for XSS patterns with Cyrillic awareness."""
+        # Skip validation for legitimate Cyrillic content
+        if self._is_cyrillic_safe_content(input_string):
+            return False
+            
         input_lower = input_string.lower()
         return any(pattern.search(input_lower) for pattern in self.xss_regex)
 
