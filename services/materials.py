@@ -290,15 +290,26 @@ class MaterialsService(BaseRepository):
             material_id: Material identifier
             
         Returns:
-            True if deleted successfully
+            True if deleted successfully, False if material not found
             
         Raises:
             DatabaseError: If deletion fails
         """
         try:
+            # Check if material exists directly via vector DB (more efficient)
+            existing_data = await self.vector_db.get_by_id(
+                collection_name=self.collection_name,
+                vector_id=material_id
+            )
+            
+            if not existing_data:
+                logger.warning(f"Material not found for deletion: {material_id}")
+                return False
+            
+            # Delete the material
             await self.vector_db.delete(
                 collection_name=self.collection_name,
-                vector_ids=[material_id]
+                vector_id=material_id
             )
             
             logger.info(f"Material deleted successfully: {material_id}")

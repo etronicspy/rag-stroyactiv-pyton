@@ -54,6 +54,193 @@ class TestMaterialsWorkflowIntegration:
         # 5. Проверка, что материал удален
         get_deleted_response = client_real.get(f"/api/v1/materials/{material_id}")
         assert get_deleted_response.status_code == 404
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_create_delete_double_delete_cycle(self, client_real):
+        """
+        Тест полного цикла: создание → удаление → повторное удаление
+        
+        Проверяет исправление бага, когда удаление несуществующего материала
+        возвращало success вместо 404.
+        
+        Этот тест воспроизводит реальный сценарий использования API.
+        """
+        
+        # Подготовка тестовых данных (английский язык, чтобы избежать срабатывания security middleware)
+        test_material = {
+            "name": "Test Delete Cycle Material",
+            "use_category": "Testing",
+            "unit": "pc",
+            "sku": "TDC-001",
+            "description": "Material for testing delete cycle"
+        }
+        
+        # ===============================
+        # ЭТАП 1: Создание материала
+        # ===============================
+        create_response = client_real.post(
+            "/api/v1/materials/",
+            json=test_material
+        )
+        
+        # Проверяем успешное создание
+        assert create_response.status_code == 200, f"Failed to create material: {create_response.text}"
+        created_material = create_response.json()
+        material_id = created_material["id"]
+        
+        # Проверяем корректность созданных данных
+        assert created_material["name"] == test_material["name"]
+        assert created_material["use_category"] == test_material["use_category"]
+        assert created_material["sku"] == test_material["sku"]
+        assert "id" in created_material
+        assert "created_at" in created_material
+        assert "updated_at" in created_material
+        
+        print(f"✅ Material created successfully: {material_id}")
+        
+        # ===============================
+        # ЭТАП 2: Проверка существования
+        # ===============================
+        get_response = client_real.get(f"/api/v1/materials/{material_id}")
+        assert get_response.status_code == 200, f"Material should exist: {get_response.text}"
+        
+        print(f"✅ Material exists and retrievable: {material_id}")
+        
+        # ===============================
+        # ЭТАП 3: Первое удаление (должно пройти успешно)
+        # ===============================
+        first_delete_response = client_real.delete(f"/api/v1/materials/{material_id}")
+        
+        # Проверяем успешное удаление
+        assert first_delete_response.status_code == 200, f"First delete should succeed: {first_delete_response.text}"
+        delete_result = first_delete_response.json()
+        assert delete_result["success"] is True
+        
+        print(f"✅ First delete successful: {material_id}")
+        
+        # ===============================
+        # ЭТАП 4: Проверка, что материал действительно удален
+        # ===============================
+        get_after_delete_response = client_real.get(f"/api/v1/materials/{material_id}")
+        assert get_after_delete_response.status_code == 404, f"Material should not exist after delete: {get_after_delete_response.text}"
+        
+        print(f"✅ Material confirmed deleted: {material_id}")
+        
+        # ===============================
+        # ЭТАП 5: Повторное удаление (КЛЮЧЕВАЯ ПРОВЕРКА БАГА)
+        # ===============================
+        second_delete_response = client_real.delete(f"/api/v1/materials/{material_id}")
+        
+        # ⚠️ КРИТИЧЕСКАЯ ПРОВЕРКА: повторное удаление должно вернуть 404, а не success
+        assert second_delete_response.status_code == 404, f"Second delete should return 404: {second_delete_response.text}"
+        
+        error_result = second_delete_response.json()
+        assert "detail" in error_result
+        assert "not found" in error_result["detail"].lower()
+        
+        print(f"✅ Second delete correctly returned 404: {material_id}")
+        
+        # ===============================
+        # ЭТАП 6: Третье удаление (проверка стабильности)
+        # ===============================
+        third_delete_response = client_real.delete(f"/api/v1/materials/{material_id}")
+        
+        # Должно по-прежнему возвращать 404
+        assert third_delete_response.status_code == 404, f"Third delete should also return 404: {third_delete_response.text}"
+        
+        print(f"✅ Third delete also correctly returned 404: {material_id}")
+        
+        # ===============================
+        # ЭТАП 7: Финальная проверка
+        # ===============================
+        final_get_response = client_real.get(f"/api/v1/materials/{material_id}")
+        assert final_get_response.status_code == 404, f"Material should still not exist: {final_get_response.text}"
+        
+        print(f"✅ Full delete cycle test completed successfully for material: {material_id}")
+    
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_delete_nonexistent_material_from_start(self, client_real):
+        """
+        Тест удаления несуществующего материала с самого начала
+        
+        Проверяет, что удаление материала, который никогда не существовал,
+        возвращает корректный 404 ответ.
+        """
+        
+        # Используем заведомо несуществующий UUID
+        nonexistent_id = "00000000-0000-0000-0000-000000000000"
+        
+        # Попытка удаления
+        delete_response = client_real.delete(f"/api/v1/materials/{nonexistent_id}")
+        
+        # Должно вернуть 404
+        assert delete_response.status_code == 404, f"Delete of nonexistent material should return 404: {delete_response.text}"
+        
+        error_result = delete_response.json()
+        assert "detail" in error_result
+        assert "not found" in error_result["detail"].lower()
+        
+        print(f"✅ Delete of nonexistent material correctly returned 404: {nonexistent_id}")
+    
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_concurrent_delete_operations(self, client_real):
+        """
+        Тест конкурентных операций удаления одного материала
+        
+        Проверяет race condition при одновременном удалении.
+        """
+        
+        # Создание материала для теста (английский язык)
+        test_material = {
+            "name": "Concurrent Delete Test Material",  
+            "use_category": "Testing",
+            "unit": "pc",
+            "description": "Material for testing concurrent deletion"
+        }
+        
+        create_response = client_real.post(
+            "/api/v1/materials/",
+            json=test_material
+        )
+        assert create_response.status_code == 200
+        material_id = create_response.json()["id"]
+        
+        # Симуляция одновременных запросов удаления
+        import threading
+        import time
+        
+        results = []
+        
+        def delete_material():
+            response = client_real.delete(f"/api/v1/materials/{material_id}")
+            results.append((response.status_code, response.json()))
+        
+        # Запуск 3 одновременных удалений
+        threads = []
+        for i in range(3):
+            thread = threading.Thread(target=delete_material)
+            threads.append(thread)
+        
+        # Стартуем все потоки одновременно
+        for thread in threads:
+            thread.start()
+        
+        # Ждем завершения всех потоков
+        for thread in threads:
+            thread.join()
+        
+        # Анализ результатов
+        success_count = sum(1 for status, _ in results if status == 200)
+        not_found_count = sum(1 for status, _ in results if status == 404)
+        
+        # Только одна операция должна быть успешной
+        assert success_count == 1, f"Expected exactly 1 successful delete, got {success_count}"
+        assert not_found_count == 2, f"Expected exactly 2 not found responses, got {not_found_count}"
+        
+        print(f"✅ Concurrent delete test passed: {success_count} success, {not_found_count} not found")
     
     @pytest.mark.integration
     @pytest.mark.asyncio

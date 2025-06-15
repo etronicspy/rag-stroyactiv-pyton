@@ -830,7 +830,7 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
         """Delete material from vector database."""
         await self.vector_db.delete(
             collection_name=self.collection_name,
-            point_ids=[material_id]
+            vector_id=material_id
         )
     
     async def _delete_from_relational_db(self, material_id: str) -> None:

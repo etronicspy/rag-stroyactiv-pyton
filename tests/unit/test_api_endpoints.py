@@ -198,6 +198,94 @@ class TestMaterialsAPIEndpoints:
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
+
+    @pytest.mark.unit
+    def test_delete_nonexistent_material(self, client_mock):
+        """Тест удаления несуществующего материала - должен вернуть 404"""
+        material_id = "550e8400-e29b-41d4-a716-446655440002"
+        
+        with patch('api.routes.materials.MaterialsService') as mock_service_class:
+            mock_service = Mock()
+            # Сервис возвращает False для несуществующего материала
+            mock_service.delete_material = AsyncMock(return_value=False)
+            mock_service_class.return_value = mock_service
+            
+            response = client_mock.delete(f"/api/v1/materials/{material_id}")
+            
+            assert response.status_code == 404
+            data = response.json()
+            assert "detail" in data
+            assert "not found" in data["detail"].lower()
+
+    @pytest.mark.unit
+    def test_create_delete_double_delete_cycle_unit(self, client_mock):
+        """
+        Unit тест полного цикла: создание → удаление → повторное удаление
+        
+        Проверяет правильное поведение API на уровне endpoint'ов с моками.
+        """
+        material_id = "550e8400-e29b-41d4-a716-446655440002"
+        
+        # Подготовка данных для создания
+        create_data = {
+            "name": "Test Unit Delete Cycle",
+            "use_category": "Тестирование",
+            "unit": "шт",
+            "sku": "TDC-UNIT-001",
+            "description": "Unit тест цикла удаления"
+        }
+        
+        with patch('api.routes.materials.MaterialsService') as mock_service_class:
+            mock_service = Mock()
+            
+            # ===== ЭТАП 1: Создание материала =====
+            from core.schemas.materials import Material
+            from datetime import datetime
+            
+            created_material = Material(
+                id=material_id,
+                name=create_data["name"],
+                use_category=create_data["use_category"],
+                unit=create_data["unit"],
+                sku=create_data["sku"],
+                description=create_data["description"],
+                embedding=[0.1] * 10,  # Truncated embedding for response
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            
+            mock_service.create_material = AsyncMock(return_value=created_material)
+            mock_service_class.return_value = mock_service
+            
+            # Создание
+            create_response = client_mock.post("/api/v1/materials/", json=create_data)
+            assert create_response.status_code == 200
+            assert create_response.json()["id"] == material_id
+            
+            # ===== ЭТАП 2: Первое удаление (успешное) =====
+            mock_service.delete_material = AsyncMock(return_value=True)
+            
+            first_delete_response = client_mock.delete(f"/api/v1/materials/{material_id}")
+            assert first_delete_response.status_code == 200
+            assert first_delete_response.json()["success"] is True
+            
+            # ===== ЭТАП 3: Повторное удаление (404) =====
+            mock_service.delete_material = AsyncMock(return_value=False)
+            
+            second_delete_response = client_mock.delete(f"/api/v1/materials/{material_id}")
+            assert second_delete_response.status_code == 404
+            
+            delete_result = second_delete_response.json()
+            assert "detail" in delete_result
+            assert "not found" in delete_result["detail"].lower()
+            
+            # ===== ЭТАП 4: Третье удаление (снова 404) =====
+            third_delete_response = client_mock.delete(f"/api/v1/materials/{material_id}")
+            assert third_delete_response.status_code == 404
+            
+            # Проверяем, что сервис вызывался корректное количество раз
+            assert mock_service.create_material.call_count == 1
+            assert mock_service.delete_material.call_count == 2  # Только второе и третье удаление используют этот mock
     
     @pytest.mark.unit
     def test_batch_create_materials(self, client_mock, sample_material):
