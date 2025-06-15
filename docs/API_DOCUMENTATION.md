@@ -153,7 +153,7 @@ DISABLE_POSTGRESQL_CONNECTION=true
 **Query параметры**:
 - `pool_name` (string, optional): Имя конкретного пула
 
-**Ответ**:
+**Ответ при наличии пулов**:
 ```json
 {
   "timestamp": "2024-01-01T12:00:00.000Z",
@@ -166,6 +166,15 @@ DISABLE_POSTGRESQL_CONNECTION=true
       "utilization": 0.4
     }
   }
+}
+```
+
+**Ответ при отсутствии пулов**:
+```json
+{
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "pools": {},
+  "message": "No pools registered yet"
 }
 ```
 
@@ -291,7 +300,7 @@ DISABLE_POSTGRESQL_CONNECTION=true
   "unit": "кг",
   "sku": "CEM001",
   "description": "Портландцемент марки М400 для общестроительных работ",
-  "embedding": [0.1, 0.2, -0.3, ...],
+  "embedding": [0.1, 0.2, -0.3, 0.4, -0.5, "... (total: 1536 dimensions)"],
   "created_at": "2024-01-01T12:00:00.000Z",
   "updated_at": "2024-01-01T12:00:00.000Z"
 }
@@ -337,6 +346,11 @@ DISABLE_POSTGRESQL_CONNECTION=true
 - `skip` (int, default: 0): Количество пропускаемых материалов
 - `limit` (int, default: 10): Максимальное количество материалов  
 - `category` (string, optional): Фильтр по категории
+
+**Особенности ответа**:
+- Поле `embedding` теперь всегда показывает информативный превью вместо `null`
+- Для материалов с векторами: первые 5 значений + "... (total: N dimensions)"
+- Для материалов без векторов: "... (embeddings available, total: 1536 dimensions)"
 
 ### PUT /api/v1/materials/{material_id}
 Обновление материала с новым эмбеддингом.
@@ -660,7 +674,7 @@ GET /api/v1/search/?q=цемент портландский&limit=5
   "unit": "string", 
   "sku": "string",
   "description": "string",
-  "embedding": [0.1, 0.2, ...],  // Опционально
+      "embedding": [0.1, 0.2, -0.3, 0.4, -0.5, "... (total: 1536 dimensions)"],  // Всегда показывается, не null
   "created_at": "2024-01-01T12:00:00.000Z",
   "updated_at": "2024-01-01T12:00:00.000Z"
 }
