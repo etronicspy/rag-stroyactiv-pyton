@@ -462,6 +462,7 @@ class MaterialsService(BaseRepository):
         failed_creates = 0
         errors = []
         created_materials = []
+        failed_materials_list = []
         
         try:
             await self._ensure_collection_exists()
@@ -486,7 +487,14 @@ class MaterialsService(BaseRepository):
                 except Exception as e:
                     logger.error(f"Failed to generate embeddings for batch: {e}")
                     failed_creates += len(chunk)
-                    errors.append(f"Batch {i//batch_size + 1}: Failed to generate embeddings - {str(e)}")
+                    error_msg = f"Batch {i//batch_size + 1}: Failed to generate embeddings - {str(e)}"
+                    errors.append(error_msg)
+                    # Add failed materials to failed_materials_list
+                    for material in chunk:
+                        failed_materials_list.append({
+                            "error": f"Failed to generate embeddings: {str(e)}",
+                            "material": material.dict()
+                        })
                     continue
                 
                 # Prepare vector data for batch upsert
@@ -527,7 +535,12 @@ class MaterialsService(BaseRepository):
                         
                     except Exception as e:
                         failed_creates += 1
-                        errors.append(f"Material '{material.name}': {str(e)}")
+                        error_msg = f"Material '{material.name}': {str(e)}"
+                        errors.append(error_msg)
+                        failed_materials_list.append({
+                            "error": str(e),
+                            "material": material.dict()
+                        })
                         continue
                 
                 # Batch upsert to vector database
@@ -541,8 +554,15 @@ class MaterialsService(BaseRepository):
                         logger.debug(f"Successfully created batch of {len(vectors)} materials")
                     except Exception as e:
                         failed_creates += len(vectors)
-                        errors.append(f"Batch {i//batch_size + 1}: Database upsert failed - {str(e)}")
-                        # Remove failed materials from created_materials
+                        error_msg = f"Batch {i//batch_size + 1}: Database upsert failed - {str(e)}"
+                        errors.append(error_msg)
+                        # Add failed materials to failed_materials_list and remove from created_materials
+                        for j, material in enumerate(chunk):
+                            if j < len(vectors):  # Only for materials that had vectors created
+                                failed_materials_list.append({
+                                    "error": f"Database upsert failed: {str(e)}",
+                                    "material": material.dict()
+                                })
                         created_materials = created_materials[:-len(vectors)]
             
             end_time = time.time()
@@ -551,11 +571,11 @@ class MaterialsService(BaseRepository):
             logger.info(f"Batch creation completed: {successful_creates} successful, {failed_creates} failed, {processing_time:.2f}s")
             
             return MaterialBatchResponse(
-                successful_creates=successful_creates,
-                failed_creates=failed_creates,
-                total_materials=len(materials),
+                success=failed_creates == 0,
+                total_processed=len(materials),
+                successful_materials=created_materials,
+                failed_materials=failed_materials_list,
                 processing_time_seconds=processing_time,
-                created_materials=created_materials,
                 errors=errors
             )
             

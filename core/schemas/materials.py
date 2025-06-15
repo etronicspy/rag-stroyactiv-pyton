@@ -453,27 +453,34 @@ class MaterialBatchCreate(BaseModel):
     batch_size: int = Field(default=100, ge=1, le=500)
 
 class MaterialBatchResponse(BaseModel):
-    success: bool
-    total_processed: int
-    successful_materials: List[Material] = []
-    failed_materials: List[Dict[str, Any]] = []
-    processing_time_seconds: float
-    errors: List[str] = []
+    """Unified batch response schema.
     
+    Единая схема ответа для batch операций.
+    """
+    success: bool = Field(..., description="Overall operation success status")
+    total_processed: int = Field(..., description="Total number of materials processed")
+    successful_materials: List[Material] = Field(default=[], description="Successfully created materials")
+    failed_materials: List[Dict[str, Any]] = Field(default=[], description="Failed materials with error details")
+    processing_time_seconds: float = Field(..., description="Processing time in seconds")
+    errors: List[str] = Field(default=[], description="General error messages")
+    
+    # Computed properties for convenience
     @property
-    def successful_creates(self) -> int:
-        """Backward compatibility property"""
+    def successful_count(self) -> int:
+        """Number of successfully processed materials"""
         return len(self.successful_materials)
     
     @property
-    def failed_creates(self) -> int:
-        """Backward compatibility property"""
+    def failed_count(self) -> int:
+        """Number of failed materials"""
         return len(self.failed_materials)
     
     @property
-    def created_materials(self) -> List[Material]:
-        """Backward compatibility property"""
-        return self.successful_materials
+    def success_rate(self) -> float:
+        """Success rate as percentage"""
+        if self.total_processed == 0:
+            return 0.0
+        return (self.successful_count / self.total_processed) * 100
 
 # Schema for importing from JSON file format
 class MaterialImportItem(BaseModel):

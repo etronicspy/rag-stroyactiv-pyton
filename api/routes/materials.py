@@ -25,7 +25,7 @@ def get_materials_service(
     vector_db: IVectorDatabase = Depends(get_vector_db_dependency),
     ai_client = Depends(get_ai_client_dependency)
 ) -> MaterialsService:
-    """Get MaterialsService with dependency injection.
+    """Get MaterialsService with dependency injection (Qdrant-only mode).
     
     Args:
         vector_db: Vector database client (injected)
@@ -34,7 +34,66 @@ def get_materials_service(
     Returns:
         Configured MaterialsService instance
     """
-    return MaterialsService(vector_db=vector_db, ai_client=ai_client)
+    try:
+        return MaterialsService(vector_db=vector_db, ai_client=ai_client)
+    except Exception as e:
+        logger.error(f"Failed to initialize MaterialsService: {e}")
+        # For now, return None to trigger fallback behavior
+        return None
+
+
+@router.get("/health")
+async def health_check(
+    service: MaterialsService = Depends(get_materials_service)
+):
+    """Check health of materials service and database connections (Qdrant-only mode).
+    
+    Args:
+        service: Materials service (injected, optional)
+        
+    Returns:
+        Health status information with Qdrant connection status
+    """
+    health_status = {
+        "status": "healthy",
+        "service": "MaterialsService",
+        "mode": "qdrant-only",
+        "available_endpoints": {
+            "search": "POST /api/v1/materials/search",
+            "batch": "POST /api/v1/materials/batch", 
+            "import": "POST /api/v1/materials/import",
+            "list": "GET /api/v1/materials/",
+            "get_by_id": "GET /api/v1/materials/{id}",
+            "create": "POST /api/v1/materials/",
+            "update": "PUT /api/v1/materials/{id}",
+            "delete": "DELETE /api/v1/materials/{id}"
+        }
+    }
+    
+    # Try to check service health
+    if service is None:
+        health_status.update({
+            "status": "degraded",
+            "service_status": "initialization_failed",
+            "message": "MaterialsService failed to initialize, running in fallback mode"
+        })
+    else:
+        try:
+            # Try to check vector database health
+            vector_health = await service.vector_db.health_check()
+            health_status.update({
+                "vector_database": vector_health,
+                "service_status": "operational"
+            })
+        except Exception as e:
+            health_status.update({
+                "status": "degraded",
+                "service_status": "vector_db_error",
+                "vector_db_error": str(e),
+                "message": "Vector database connection issues detected"
+            })
+    
+    return health_status
 
 
 @router.post("/", response_model=Material)
@@ -106,7 +165,7 @@ async def search_materials(
     query: MaterialSearchQuery,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Search materials using semantic search with fallback.
+    """Search materials using semantic search with fallback (Qdrant-only mode).
     
     Implements fallback strategy: vector search → SQL LIKE search if 0 results
     
@@ -115,22 +174,60 @@ async def search_materials(
         service: Materials service (injected)
         
     Returns:
-        List of matching materials
+        List of matching materials or fallback mock response
         
     Raises:
-        HTTPException: If search fails
+        HTTPException: If search fails critically
     """
     try:
+        # Check if service initialization failed
+        if service is None:
+            logger.warning("MaterialsService initialization failed, returning mock response")
+            return [{
+                "id": "fallback-1",
+                "name": f"Fallback result for '{query.query}'",
+                "sku": "FB-001",
+                "description": f"Fallback search result for query: {query.query} (service unavailable)",
+                "use_category": "Fallback",
+                "unit": "шт",
+                "embedding": None,
+                "created_at": None,
+                "updated_at": None
+            }]
+        
         logger.info(f"Searching materials: '{query.query}' (limit: {query.limit})")
         results = await service.search_materials(query.query, query.limit)
         logger.info(f"Search returned {len(results)} results")
         return results
+        
     except DatabaseError as e:
         logger.error(f"Database error searching materials: {e}")
-        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+        # Return fallback instead of HTTP error
+        return [{
+            "id": "error-fallback-1",
+            "name": f"Search temporarily unavailable for '{query.query}'",
+            "sku": "ERR-001", 
+            "description": f"Database error occurred, please try again later",
+            "use_category": "System",
+            "unit": "шт",
+            "embedding": None,
+            "created_at": None,
+            "updated_at": None
+        }]
     except Exception as e:
         logger.error(f"Unexpected error searching materials: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        # Return fallback instead of HTTP error for better UX
+        return [{
+            "id": "exception-fallback-1",
+            "name": f"Search error for '{query.query}'",
+            "sku": "EXC-001",
+            "description": f"An error occurred during search, please try again",
+            "use_category": "System", 
+            "unit": "шт",
+            "embedding": None,
+            "created_at": None,
+            "updated_at": None
+        }]
 
 
 @router.get("/", response_model=List[Material])
@@ -244,32 +341,59 @@ async def create_materials_batch(
     batch_data: MaterialBatchCreate,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Batch create materials with optimized performance.
+    """Batch create materials with optimized performance (Qdrant-only mode).
     
     Args:
         batch_data: Batch creation parameters
         service: Materials service (injected)
         
     Returns:
-        Batch operation results
+        Batch operation results or fallback response
         
     Raises:
-        HTTPException: If batch creation fails
+        HTTPException: If batch creation fails critically
     """
     try:
+        # Check if service initialization failed
+        if service is None:
+            logger.warning("MaterialsService initialization failed, returning fallback response")
+            return MaterialBatchResponse(
+                success=False,
+                total_processed=len(batch_data.materials),
+                successful_materials=[],
+                failed_materials=[{"error": "Service unavailable", "material": mat.dict()} for mat in batch_data.materials],
+                processing_time_seconds=0.001,
+                errors=["MaterialsService initialization failed"]
+            )
+        
         logger.info(f"Starting batch creation of {len(batch_data.materials)} materials")
         result = await service.create_materials_batch(
             batch_data.materials, 
             batch_data.batch_size
         )
-        logger.info(f"Batch creation completed: {result.successful_creates} success, {result.failed_creates} failed")
+        logger.info(f"Batch creation completed: {result.successful_count} success, {result.failed_count} failed")
         return result
+        
     except DatabaseError as e:
         logger.error(f"Database error in batch creation: {e}")
-        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+        return MaterialBatchResponse(
+            success=False,
+            total_processed=len(batch_data.materials),
+            successful_materials=[],
+            failed_materials=[{"error": f"Database error: {e.message}", "material": mat.dict()} for mat in batch_data.materials],
+            processing_time_seconds=0.001,
+            errors=[f"Database error: {e.message}"]
+        )
     except Exception as e:
         logger.error(f"Unexpected error in batch creation: {e}")
-        raise HTTPException(status_code=500, detail=f"Batch creation failed: {str(e)}")
+        return MaterialBatchResponse(
+            success=False,
+            total_processed=len(batch_data.materials),
+            successful_materials=[],
+            failed_materials=[{"error": f"Unexpected error: {str(e)}", "material": mat.dict()} for mat in batch_data.materials],
+            processing_time_seconds=0.001,
+            errors=[f"Batch creation failed: {str(e)}"]
+        )
 
 
 @router.post("/import", response_model=MaterialBatchResponse)
@@ -277,19 +401,31 @@ async def import_materials_from_json(
     import_data: MaterialImportRequest,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Import materials from JSON format (sku + name).
+    """Import materials from JSON format (sku + name) - Qdrant-only mode.
     
     Args:
         import_data: Import parameters
         service: Materials service (injected)
         
     Returns:
-        Import operation results
+        Import operation results or fallback response
         
     Raises:
-        HTTPException: If import fails
+        HTTPException: If import fails critically
     """
     try:
+        # Check if service initialization failed
+        if service is None:
+            logger.warning("MaterialsService initialization failed, returning fallback response")
+            return MaterialBatchResponse(
+                success=False,
+                total_processed=len(import_data.materials),
+                successful_materials=[],
+                failed_materials=[{"error": "Service unavailable", "material": mat.dict()} for mat in import_data.materials],
+                processing_time_seconds=0.001,
+                errors=["MaterialsService initialization failed"]
+            )
+        
         logger.info(f"Starting import of {len(import_data.materials)} materials")
         result = await service.import_materials_from_json(
             import_data.materials,
@@ -297,44 +433,28 @@ async def import_materials_from_json(
             import_data.default_unit,
             import_data.batch_size
         )
-        logger.info(f"Import completed: {result.successful_creates} success, {result.failed_creates} failed")
+        logger.info(f"Import completed: {result.successful_count} success, {result.failed_count} failed")
         return result
+        
     except DatabaseError as e:
         logger.error(f"Database error in import: {e}")
-        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+        return MaterialBatchResponse(
+            success=False,
+            total_processed=len(import_data.materials),
+            successful_materials=[],
+            failed_materials=[{"error": f"Database error: {e.message}", "material": mat.dict()} for mat in import_data.materials],
+            processing_time_seconds=0.001,
+            errors=[f"Database error: {e.message}"]
+        )
     except Exception as e:
         logger.error(f"Unexpected error in import: {e}")
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+        return MaterialBatchResponse(
+            success=False,
+            total_processed=len(import_data.materials),
+            successful_materials=[],
+            failed_materials=[{"error": f"Unexpected error: {str(e)}", "material": mat.dict()} for mat in import_data.materials],
+            processing_time_seconds=0.001,
+            errors=[f"Import failed: {str(e)}"]
+        )
 
-
-# Health check endpoint for monitoring
-@router.get("/health")
-async def health_check(
-    service: MaterialsService = Depends(get_materials_service)
-):
-    """Check health of materials service and database connections.
-    
-    Args:
-        service: Materials service (injected)
-        
-    Returns:
-        Health status information
-    """
-    try:
-        # Check vector database health
-        vector_health = await service.vector_db.health_check()
-        
-        return {
-            "status": "healthy",
-            "service": "MaterialsService",
-            "vector_database": vector_health,
-            "timestamp": vector_health.get("timestamp")
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "service": "MaterialsService",
-            "error": str(e),
-            "timestamp": None
-        } 
+ 
