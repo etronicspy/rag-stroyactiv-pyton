@@ -129,9 +129,10 @@ app.add_middleware(SecurityMiddleware,
 if settings.ENABLE_RATE_LIMITING:
     try:
         app.add_middleware(RateLimitMiddleware,
-            calls=settings.RATE_LIMIT_RPM,      # Fixed: use correct setting name
-            period=60,                          # 60 seconds for RPM
-            enable_performance_logging=True,   # 🔥 RESTORED: Performance metrics
+            default_requests_per_minute=settings.RATE_LIMIT_RPM,  # Fixed: use correct parameter name
+            default_requests_per_hour=1000,                       # Default hourly limit
+            enable_burst_protection=True,                         # Enable burst protection
+            rate_limit_headers=True,                              # Include rate limit headers
         )
         logger.info("✅ RateLimitMiddleware initialized with full functionality")
     except Exception as e:

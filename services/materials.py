@@ -16,6 +16,7 @@ from core.schemas.materials import (
 from core.database.interfaces import IVectorDatabase
 from core.database.exceptions import DatabaseError, ConnectionError, QueryError
 from core.repositories.base import BaseRepository
+from core.monitoring.metrics import get_metrics_collector
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ class MaterialsService(BaseRepository):
     - Batch operations with performance optimization
     - Category and unit inference
     - JSON import functionality
+    - Performance tracking and metrics collection
     """
     
     def __init__(self, vector_db: IVectorDatabase = None, ai_client = None):
@@ -62,7 +64,11 @@ class MaterialsService(BaseRepository):
         super().__init__(vector_db=vector_db, ai_client=ai_client)
         self.collection_name = "materials"
         
-        logger.info("MaterialsService initialized with consolidated architecture")
+        # Initialize performance tracking
+        self.metrics_collector = get_metrics_collector()
+        self.performance_tracker = self.metrics_collector.get_performance_tracker()
+        
+        logger.info("MaterialsService initialized with consolidated architecture and performance tracking")
     
     async def initialize(self) -> None:
         """Initialize service and ensure collection exists.
@@ -121,69 +127,56 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If creation fails
         """
-        try:
-            await self._ensure_collection_exists()
-            
-            # Generate embedding for semantic search
-            text_for_embedding = self._prepare_text_for_embedding(material)
-            embedding = await self.get_embedding(text_for_embedding)
-            
-            # Create material ID and timestamps
-            material_id = str(uuid.uuid4())
-            current_time = datetime.utcnow()
-            
-            # Prepare vector data
-            vector_data = {
-                "id": material_id,
-                "vector": embedding,
-                "payload": {
-                    "name": material.name,
-                    "use_category": material.use_category,
-                    "unit": material.unit,
-                    "sku": material.sku,
-                    "description": material.description,
-                    "created_at": current_time.isoformat(),
-                    "updated_at": current_time.isoformat()
+        with self.performance_tracker.time_operation("materials_service", "create_material", 1):
+            try:
+                await self._ensure_collection_exists()
+                
+                # Generate embedding for semantic search
+                text_for_embedding = self._prepare_text_for_embedding(material)
+                embedding = await self.get_embedding(text_for_embedding)
+                
+                # Create material ID and timestamps
+                material_id = str(uuid.uuid4())
+                current_time = datetime.utcnow()
+                
+                # Prepare vector data
+                vector_data = {
+                    "id": material_id,
+                    "vector": embedding,
+                    "payload": {
+                        "name": material.name,
+                        "use_category": material.use_category,
+                        "unit": material.unit,
+                        "sku": material.sku,
+                        "description": material.description,
+                        "created_at": current_time.isoformat(),
+                        "updated_at": current_time.isoformat()
+                    }
                 }
-            }
-            
-            # Store in vector database (using adapter)
-            vector_data = {
-                "id": material_id,
-                "vector": embedding,
-                "payload": {
-                    "name": material.name,
-                    "use_category": material.use_category,
-                    "unit": material.unit,
-                    "sku": material.sku,
-                    "description": material.description,
-                    "created_at": current_time.isoformat(),
-                    "updated_at": current_time.isoformat()
-                }
-            }
-            
-            await self.vector_db.upsert(
-                collection_name=self.collection_name,
-                vectors=[vector_data]
-            )
-            
-            logger.info(f"Material created successfully: {material.name} (ID: {material_id})")
-            
-            return Material(
-                id=material_id,
-                name=material.name,
-                use_category=material.use_category,
-                unit=material.unit,
-                sku=material.sku,
-                description=material.description,
-                embedding=embedding,  # Full embedding, will be formatted by field_serializer
-                created_at=current_time,
-                updated_at=current_time
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to create material '{material.name}': {e}")
-            await self._handle_database_error("create_material", e)
+                
+                # Store in vector database (using adapter)
+                await self.vector_db.upsert(
+                    collection_name=self.collection_name,
+                    vectors=[vector_data]
+                )
+                
+                logger.info(f"Material created successfully: {material.name} (ID: {material_id})")
+                
+                return Material(
+                    id=material_id,
+                    name=material.name,
+                    use_category=material.use_category,
+                    unit=material.unit,
+                    sku=material.sku,
+                    description=material.description,
+                    embedding=embedding,  # Full embedding, will be formatted by field_serializer
+                    created_at=current_time,
+                    updated_at=current_time
+                )
+                
+            except Exception as e:
+                logger.error(f"Failed to create material '{material.name}': {e}")
+                await self._handle_database_error("create_material", e)
     
     async def get_material(self, material_id: str) -> Optional[Material]:
         """Get material by ID.
@@ -336,29 +329,30 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If search fails
         """
-        try:
-            await self._ensure_collection_exists()
-            
-            # Check if vector_db is available
-            if self.vector_db is None:
-                logger.warning("Vector DB not available, returning empty results")
+        with self.performance_tracker.time_operation("materials_service", "search_materials", limit):
+            try:
+                await self._ensure_collection_exists()
+                
+                # Check if vector_db is available
+                if self.vector_db is None:
+                    logger.warning("Vector DB not available, returning empty results")
+                    return []
+                
+                # Primary: Vector semantic search
+                logger.debug(f"Performing vector search for: '{query}'")
+                vector_results = await self._search_vector(query, limit)
+                
+                if vector_results:
+                    logger.info(f"Vector search returned {len(vector_results)} results")
+                    return vector_results
+                
+                # Fallback: Text search (будет реализовано с PostgreSQL)
+                logger.info("Vector search returned 0 results, fallback not yet implemented")
                 return []
-            
-            # Primary: Vector semantic search
-            logger.debug(f"Performing vector search for: '{query}'")
-            vector_results = await self._search_vector(query, limit)
-            
-            if vector_results:
-                logger.info(f"Vector search returned {len(vector_results)} results")
-                return vector_results
-            
-            # Fallback: Text search (будет реализовано с PostgreSQL)
-            logger.info("Vector search returned 0 results, fallback not yet implemented")
-            return []
-            
-        except Exception as e:
-            logger.error(f"Failed to search materials for query '{query}': {e}")
-            await self._handle_database_error("search_materials", e)
+                
+            except Exception as e:
+                logger.error(f"Failed to search materials for query '{query}': {e}")
+                await self._handle_database_error("search_materials", e)
     
     async def _search_vector(self, query: str, limit: int) -> List[Material]:
         """Perform vector semantic search."""
@@ -403,42 +397,43 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If retrieval fails
         """
-        try:
-            await self._ensure_collection_exists()
-            
-            # Build filter conditions
-            filter_conditions = None
-            if category:
-                filter_conditions = {"use_category": category}
-            
-            # Get materials from vector database
-            # Note: This is a simplified implementation
-            # In production, you might want to use scroll/pagination
-            all_results = await self.vector_db.search(
-                collection_name=self.collection_name,
-                query_vector=[0.0] * 1536,  # Dummy vector for getting all
-                limit=limit + skip,
-                filter_conditions=filter_conditions
-            )
-            
-            # Apply skip and convert to Material objects
-            materials = []
-            for i, result in enumerate(all_results):
-                if i < skip:
-                    continue
-                if len(materials) >= limit:
-                    break
-                    
-                material = self._convert_vector_result_to_material(result)
-                if material:
-                    materials.append(material)
-            
-            logger.info(f"Retrieved {len(materials)} materials (skip={skip}, limit={limit})")
-            return materials
-            
-        except Exception as e:
-            logger.error(f"Failed to get materials: {e}")
-            await self._handle_database_error("get_materials", e)
+        with self.performance_tracker.time_operation("materials_service", "get_materials", limit):
+            try:
+                await self._ensure_collection_exists()
+                
+                # Build filter conditions
+                filter_conditions = None
+                if category:
+                    filter_conditions = {"use_category": category}
+                
+                # Get materials from vector database
+                # Note: This is a simplified implementation
+                # In production, you might want to use scroll/pagination
+                all_results = await self.vector_db.search(
+                    collection_name=self.collection_name,
+                    query_vector=[0.0] * 1536,  # Dummy vector for getting all
+                    limit=limit + skip,
+                    filter_conditions=filter_conditions
+                )
+                
+                # Apply skip and convert to Material objects
+                materials = []
+                for i, result in enumerate(all_results):
+                    if i < skip:
+                        continue
+                    if len(materials) >= limit:
+                        break
+                        
+                    material = self._convert_vector_result_to_material(result)
+                    if material:
+                        materials.append(material)
+                
+                logger.info(f"Retrieved {len(materials)} materials (skip={skip}, limit={limit})")
+                return materials
+                
+            except Exception as e:
+                logger.error(f"Failed to get materials: {e}")
+                await self._handle_database_error("get_materials", e)
     
     # === Batch Operations ===
     

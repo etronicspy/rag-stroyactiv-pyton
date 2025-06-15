@@ -11,6 +11,10 @@ import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 
+from services.materials import MaterialsService
+from core.schemas.materials import MaterialCreate
+from core.database.exceptions import DatabaseError
+
 
 class TestCategoryService:
     """Unit тесты для CategoryService"""
