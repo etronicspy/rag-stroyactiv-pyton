@@ -84,6 +84,27 @@ BATCH_SIZE=100
 MAX_CONCURRENT_UPLOADS=5
 ```
 
+### Middleware настройки (Важно для производительности)
+
+```bash
+# BodyCacheMiddleware - решение проблемы зависания FastAPI
+BODY_CACHE_TIMEOUT=30  # Таймаут чтения request.body() в секундах
+
+# SecurityMiddleware
+ENABLE_INPUT_VALIDATION=true  # Включить валидацию XSS/SQL injection
+SECURITY_LOG_LEVEL=INFO       # Уровень логирования безопасности
+
+# LoggingMiddleware
+LOG_REQUEST_BODY=true         # Логировать тело запроса (использует кеш)
+LOG_RESPONSE_BODY=false       # Логировать тело ответа
+LOGGING_SENSITIVE_FIELDS=[]   # Поля для маскировки в логах
+
+# RateLimitMiddleware
+RATE_LIMIT_ENABLED=true       # Включить ограничение скорости
+RATE_LIMIT_REQUESTS=100       # Запросов на окно времени
+RATE_LIMIT_WINDOW=60          # Окно времени в секундах
+```
+
 ## 🏗️ Фабрики клиентов
 
 ### Векторная база данных
