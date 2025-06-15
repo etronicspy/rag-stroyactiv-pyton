@@ -1,0 +1,149 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Git Workflow Rules
+
+## Стратегия ветвления
+- **main** - продакшн готовый код, только через PR
+- **develop** - основная ветка разработки
+- **feature/** - новые функции (feature/vector-search-optimization)
+- **fix/** - исправления багов (fix/database-connection-timeout)
+- **hotfix/** - критические исправления в продакшн
+
+## Naming Conventions для веток
+- **feature/**: `feature/description-with-hyphens`
+- **fix/**: `fix/issue-description`
+- **hotfix/**: `hotfix/critical-issue-name`
+- **refactor/**: `refactor/component-name`
+- **test/**: `test/test-type-description`
+
+## Commit Message Conventions
+### Формат
+```
+type(scope): description
+
+[optional body]
+
+[optional footer]
+```
+
+### Типы коммитов
+- **feat**: новая функциональность
+- **fix**: исправление бага
+- **docs**: изменения в документации
+- **style**: форматирование, отсутствие изменений кода
+- **refactor**: рефакторинг кода без изменения функциональности
+- **test**: добавление/изменение тестов
+- **chore**: обновление зависимостей, конфигурации
+
+### Примеры коммитов
+```
+feat(vector-search): add Qdrant similarity search with fallback
+fix(database): resolve connection timeout in PostgreSQL async pool
+docs(api): update OpenAPI schema for materials endpoint
+test(integration): add end-to-end tests for CSV upload workflow
+```
+
+## Pull Request Guidelines
+### Требования к PR
+- **Название**: четкое описание изменений
+- **Описание**: что изменено, зачем, как тестировалось
+- **Связанные Issues**: ссылки на задачи
+- **Screenshots**: для UI изменений
+- **Checklist**: самопроверка перед review
+
+### Обязательная самопроверка
+- [ ] Все тесты проходят локально
+- [ ] Код следует PEP 8 и type hints
+- [ ] Добавлены/обновлены тесты для новой функциональности
+- [ ] Обновлена документация при необходимости
+- [ ] Проверена совместимость с существующими API
+- [ ] Логирование добавлено для новых операций БД
+
+## Code Review Process
+### Для reviewer
+- Проверить архитектурные решения
+- Убедиться в наличии тестов
+- Проверить обработку ошибок для БД операций
+- Валидация безопасности (SQL injection, input validation)
+- Производительность (connection pooling, batch operations)
+
+### Для автора PR
+- Отвечать на комментарии в течение 24 часов
+- Исправлять замечания в отдельных коммитах
+- Не force push после начала review
+- Помечать resolved комментарии
+
+## Branch Protection Rules
+### main ветка
+- Запрет прямых push
+- Обязательный PR review (минимум 1 approver)
+- Обязательное прохождение CI/CD
+- Актуальность с develop веткой
+
+### develop ветка  
+- Обязательное прохождение тестов
+- Линейная история коммитов предпочтительна
+
+## Работа с зависимостями
+### Python пакеты
+- **requirements.txt**: основные зависимости
+- **requirements-dev.txt**: инструменты разработки
+- Фиксировать версии критичных пакетов (SQLAlchemy, FastAPI)
+- Регулярно обновлять security patches
+
+### Database миграции
+- Alembic миграции в отдельных коммитах
+- Описательные названия миграций
+- Rollback процедуры для критичных изменений
+- Тестирование миграций на копии продакшн данных
+
+## Release Management
+### Версионирование (Semantic Versioning)
+- **MAJOR**: breaking changes в API
+- **MINOR**: новая функциональность (backward compatible)
+- **PATCH**: исправления багов
+
+### Release процесс
+1. Создание release ветки от develop
+2. Финальное тестирование
+3. Обновление CHANGELOG.md
+4. Merge в main с тегом версии
+5. Deploy в продакшн
+6. Merge обратно в develop
+
+## Git Hooks (рекомендуемые)
+### Pre-commit
+- Форматирование кода (black, isort)
+- Линтер проверки (flake8, mypy)
+- Проверка requirements.txt актуальности
+
+### Pre-push
+- Запуск unit тестов
+- Проверка миграций БД
+- Валидация OpenAPI схемы
+
+## Работа с конфиденциальными данными
+### Файлы для .gitignore
+- `.env*` файлы (кроме `.env.example`)
+- `secrets/` директория
+- `*.key`, `*.pem` файлы
+- База данных файлы (`*.db`, `*.sqlite`)
+- Логи с API ключами
+
+### API ключи и секреты
+- Никогда не коммитить реальные API ключи
+- Использовать env.example для шаблонов
+- Ротация ключей при компрометации
+- Отдельные ключи для разных сред (dev/staging/prod)
+
+## Мониторинг репозитория
+### Metrics для отслеживания
+- Частота коммитов и PR
+- Время от создания до merge PR
+- Покрытие кода тестами
+- Количество критических уязвимостей
+- Время восстановления после hotfix
+

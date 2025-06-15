@@ -1,0 +1,29 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Python Rules for RAG Construction Materials API
+
+## Язык и стиль Python
+- Python 3.9+ обязательно
+- FastAPI фреймворк с async/await везде где возможно
+- Строгое соблюдение PEP 8
+- Type hints для всех функций, методов и переменных
+- Docstrings для всех публичных функций, классов и методов
+- Pydantic модели: обязательные примеры (example, schema_extra) для автодокументации
+
+## Архитектура Python приложения
+- Dependency injection для БД подключений с @lru_cache
+- Абстрактные интерфейсы (ABC) для БД операций
+- SQLAlchemy 2.0+ с async для работы с PostgreSQL
+- Alembic миграции для схемы БД
+
+## FastAPI специфичные правила
+- UTF8JSONResponse для всех ответов API
+- Валидация всех входящих данных через Pydantic
+
+## Тестирование Python
+- pytest как основной фреймворк тестирования
+- Фикстуры для каждого типа БД
+- Моки для внешних БД в unit тестах

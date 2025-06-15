@@ -1,0 +1,27 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Development and Debugging Rules
+
+## Среда разработки
+- Файл .env.local существует с рабочими настройками реальных API
+- QDRANT_URL, QDRANT_API_KEY, OPENAI_API_KEY настроены на реальные сервисы  
+- Не создавать новые .env файлы без необходимости - использовать существующий .env.local
+- При ошибках подключения проверять логику кода, а не конфигурацию API ключей
+- Реальные API ключи уже настроены - фокусироваться на логике приложения
+
+## Отладка подключений
+- При ошибках "[Errno 8] nodename nor servname provided" - проверять логику подключения, не конфигурацию
+- При отладке подключений использовать увеличенные timeout значения
+
+## Timeout и retry настройки
+- Добавлять timeout и retry настройки для повышения стабильности подключений
+- Добавлять дополнительные timeout настройки (QDRANT_TIMEOUT, OPENAI_TIMEOUT)
+- Увеличивать OPENAI_MAX_RETRIES при нестабильных подключениях
+
+## Fallback стратегии  
+- Включать ENABLE_FALLBACK_DATABASES для graceful degradation
+
+
