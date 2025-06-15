@@ -97,16 +97,26 @@ async def get_pool_metrics(
         metrics = pool_manager.get_pool_metrics(pool_name)
         
         if not metrics:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Pool '{pool_name}' not found" if pool_name else "No pools registered"
-            )
+            if pool_name:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Pool '{pool_name}' not found"
+                )
+            else:
+                # Return empty result instead of error when no pools registered
+                return {
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "pools": {},
+                    "message": "No pools registered yet"
+                }
         
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "pools": metrics
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get pool metrics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -156,7 +166,7 @@ async def get_pool_recommendations():
             "low": [r for r in recommendations if r.get("priority") == "low"]
         }
         
-        return {
+        result = {
             "timestamp": datetime.utcnow().isoformat(),
             "total_recommendations": len(recommendations),
             "recommendations": categorized,
@@ -166,6 +176,11 @@ async def get_pool_recommendations():
                 "low_priority": len(categorized["low"])
             }
         }
+        
+        if len(recommendations) == 0:
+            result["message"] = "No pools registered or no recommendations available"
+        
+        return result
         
     except Exception as e:
         logger.error(f"Failed to get recommendations: {e}")
@@ -229,7 +244,8 @@ async def get_pool_statistics():
                     "active_connections": 0,
                     "idle_connections": 0,
                     "average_utilization": 0.0
-                }
+                },
+                "message": "No pools registered yet"
             }
         
         # Calculate summary statistics
