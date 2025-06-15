@@ -24,3 +24,111 @@ alwaysApply: true
 - Обязательно документировать: изменения производительности БД, миграции данных, изменения алгоритмов поиска
 - Использовать git commit messages для мелких улучшений вместо отдельных документов
 - Создавать планы отладки (PROJECT_DEBUG_PREPARATION_PLAN.md) для системного анализа проблем
+
+# Strict Code Documentation Rules
+
+## Docstrings обязательны для:
+- Всех публичных классов, методов и функций
+- Всех API эндпоинтов с примерами запросов/ответов
+- Всех Pydantic моделей с описанием полей
+- Всех repository классов и database операций
+- Всех utility функций и helper методов
+
+## Формат docstrings:
+- Google style для Python
+- Обязательные секции: Args, Returns, Raises, Example
+- Русский или английский язык (не смешивать в одном файле)
+
+# API Documentation Requirements
+
+## OpenAPI спецификация:
+- Обязательные description для всех эндпоинтов
+- Примеры запросов и ответов в Pydantic моделях
+- Описание всех возможных HTTP статус кодов
+- Теги и группировка эндпоинтов по модулям
+
+## Postman коллекции:
+- Автоматическая генерация из OpenAPI
+- Примеры для всех сценариев использования
+- Environment переменные для разных сред
+
+# Architecture Documentation Standards
+
+## Обязательные документы:
+- docs/ARCHITECTURE.md - общая архитектура системы
+- docs/DATABASE_DESIGN.md - схема БД и relationships
+- docs/API_DESIGN.md - принципы дизайна API
+- docs/DEPLOYMENT.md - инструкции по развертыванию
+- docs/TROUBLESHOOTING.md - типичные проблемы и решения
+
+## ADR (Architecture Decision Records):
+- Все архитектурные решения в docs/adr/
+- Формат: YYYYMMDD-decision-title.md
+- Обязательные секции: Context, Decision, Consequences
+
+# Change Documentation Rules
+
+## CHANGELOG.md обязателен:
+- Semantic versioning
+- Категории: Added, Changed, Deprecated, Removed, Fixed, Security
+- Дата и номер версии для каждого релиза
+- Обратная совместимость и breaking changes
+
+## Migration guides:
+- Для major версий обязательные migration guides
+- Пошаговые инструкции обновления
+- Примеры кода до и после изменений
+
+# Code Comments Standards
+
+## Обязательные комментарии:
+- Сложные алгоритмы (векторный поиск, обработка данных)
+- Временные решения с TODO и deadline
+- Важные business logic решения
+- Performance критические секции
+- Security related код
+
+## Формат комментариев:
+- # TODO: описание задачи (deadline: YYYY-MM-DD)
+- # FIXME: описание проблемы и причины
+- # HACK: временное решение с планом исправления
+- # PERFORMANCE: оптимизация для конкретного случая
+
+# README Documentation Standards
+
+## Корневой README.md обязательные секции:
+- Project Overview
+- Quick Start (< 5 минут до запуска)
+- Installation & Setup
+- Configuration
+- API Documentation ссылки
+- Development Guidelines
+- Contributing
+- License
+
+## README для каждого модуля:
+- app/services/README.md
+- app/repositories/README.md  
+- app/core/README.md
+- tests/README.md
+
+# Documentation Quality Control
+
+## Pre-commit hooks для документации:
+- Проверка наличия docstrings
+- Валидация markdown файлов
+- Проверка ссылок в документации
+- Spell checking для русского и английского
+
+## CI/CD проверки:
+- Автоматическая генерация API документации
+- Проверка актуальности примеров кода
+- Валидация OpenAPI спецификации
+
+# Documentation-First Approach
+
+## Строгие меры:
+- Documentation-First подход: Новые features начинаются с документации
+- Review requirement: PR не принимается без обновления документации
+- Documentation metrics: Отслеживание процента покрытия документацией
+- Quarterly reviews: Ежеквартальный аудит актуальности документации

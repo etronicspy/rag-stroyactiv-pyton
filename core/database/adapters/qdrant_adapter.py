@@ -289,7 +289,53 @@ class QdrantVectorDatabase(IVectorDatabase):
             logger.error(f"Failed to delete vector {vector_id} from {collection_name}: {e}")
             return False
     
-    async def batch_upsert(self, collection_name: str, vectors: List[Dict[str, Any]], 
+    async def scroll_all(self, collection_name: str, with_payload: bool = True, with_vectors: bool = False) -> List[Dict[str, Any]]:
+        """Get all records from collection using scroll method.
+        
+        Args:
+            collection_name: Collection name
+            with_payload: Include payload data
+            with_vectors: Include vector data
+            
+        Returns:
+            List of all records in collection
+        """
+        try:
+            all_records = []
+            next_page_offset = None
+            
+            while True:
+                # Scroll through records
+                records, next_page_offset = await asyncio.to_thread(
+                    self.client.scroll,
+                    collection_name=collection_name,
+                    limit=100,  # Process in chunks of 100
+                    offset=next_page_offset,
+                    with_payload=with_payload,
+                    with_vectors=with_vectors
+                )
+                
+                # Convert to standard format
+                for record in records:
+                    result = {
+                        "id": str(record.id),
+                        "payload": record.payload if with_payload else {}
+                    }
+                    if with_vectors:
+                        result["vector"] = record.vector
+                    all_records.append(result)
+                
+                # Break if no more records
+                if next_page_offset is None:
+                    break
+            
+            return all_records
+            
+        except Exception as e:
+            logger.error(f"Failed to scroll all records from {collection_name}: {e}")
+            return []
+
+    async def batch_upsert(self, collection_name: str, vectors: List[Dict[str, Any]],  
                           batch_size: int = 100) -> bool:
         """Insert or update multiple vectors in batches.
         

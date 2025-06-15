@@ -442,10 +442,14 @@ class PopularQuery(BaseModel):
 class Category(BaseModel):
     name: str
     description: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Unit(BaseModel):
     name: str
     description: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 # Batch operations schemas
 class MaterialBatchCreate(BaseModel):

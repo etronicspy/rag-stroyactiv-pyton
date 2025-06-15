@@ -760,88 +760,317 @@ class MaterialsService(BaseRepository):
 # === Separate Services for Categories and Units ===
 
 class CategoryService:
-    """Service for managing material categories."""
+    """Service for managing material categories with Qdrant persistence."""
     
     def __init__(self, vector_db: IVectorDatabase = None):
         self.vector_db = vector_db
-        self.collection_name = "categories"
-        # Mock storage for testing
-        self.categories = {}
-        logger.info("CategoryService initialized")
+        self.collection_name = "categories_v2"
+        logger.info("CategoryService initialized with Qdrant persistence")
+    
+    async def _ensure_collection_exists(self) -> None:
+        """Ensure categories collection exists in Qdrant."""
+        try:
+            if self.vector_db:
+                # Check if collection exists
+                exists = await self.vector_db.collection_exists(self.collection_name)
+                
+                if not exists:
+                    # Create collection if it doesn't exist
+                    await self.vector_db.create_collection(
+                        name=self.collection_name,
+                        vector_size=384,
+                        distance_metric="cosine"
+                    )
+                    logger.debug(f"Categories collection '{self.collection_name}' created")
+        except Exception as e:
+            logger.error(f"Failed to ensure categories collection: {e}")
+            pass
     
     async def create_category(self, name: str, description: Optional[str] = None) -> Category:
-        """Create a new category."""
+        """Create a new category and save to Qdrant."""
         try:
-            logger.info(f"Creating category: {name}")
+            if not self.vector_db:
+                raise Exception("Vector database not available")
+            
+            # Ensure collection exists
+            await self._ensure_collection_exists()
+            
             category = Category(name=name, description=description)
-            self.categories[name] = category
+            
+            # Create a simple embedding for the category (using name + description)
+            category_text = f"{name} {description or ''}"
+            
+            # Generate a simple hash-based vector for category
+            import hashlib
+            import uuid
+            hash_obj = hashlib.md5(category_text.encode())
+            hash_hex = hash_obj.hexdigest()
+            
+            # Create 384-dimensional vector
+            vector = []
+            for i in range(384):
+                byte_index = i % len(hash_hex)
+                value = int(hash_hex[byte_index], 16) / 15.0 - 0.5
+                vector.append(value)
+            
+            # Generate UUID for Qdrant ID
+            category_id = str(uuid.uuid4())
+            
+            # Save to Qdrant
+            await self.vector_db.upsert(
+                collection_name=self.collection_name,
+                vectors=[{
+                    "id": category_id,
+                    "vector": vector,
+                    "payload": {
+                        "name": name,
+                        "description": description,
+                        "type": "category",
+                        "created_at": category.created_at.isoformat(),
+                        "updated_at": category.updated_at.isoformat()
+                    }
+                }]
+            )
+            
+            logger.info(f"Category '{name}' created and saved to Qdrant")
             return category
         except Exception as e:
             logger.error(f"Failed to create category {name}: {e}")
             raise e
     
     async def get_categories(self) -> List[Category]:
-        """Get all categories."""
+        """Get all categories from Qdrant."""
         try:
-            logger.info(f"Getting {len(self.categories)} categories")
-            return list(self.categories.values())
+            if not self.vector_db:
+                logger.warning("Vector DB not available, returning empty categories list")
+                return []
+            
+            # Ensure collection exists
+            await self._ensure_collection_exists()
+            
+            # Get all categories from Qdrant using scroll_all
+            results = await self.vector_db.scroll_all(
+                collection_name=self.collection_name,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            categories = []
+            for result in results:
+                payload = result.get("payload", {})
+                if payload.get("type") == "category":
+                    category = Category(
+                        name=payload.get("name"),
+                        description=payload.get("description"),
+                        created_at=datetime.fromisoformat(payload.get("created_at", datetime.utcnow().isoformat())),
+                        updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
+                    )
+                    categories.append(category)
+            
+            return categories
+            
         except Exception as e:
             logger.error(f"Failed to get categories: {e}")
-            raise e
+            # Return empty list instead of raising error
+            return []
     
     async def delete_category(self, name: str) -> bool:
-        """Delete a category."""
+        """Delete a category from Qdrant by finding it by name."""
         try:
-            if name in self.categories:
-                del self.categories[name]
-                logger.info(f"Category {name} deleted")
+            if not self.vector_db:
+                logger.warning("Vector DB not available")
+                return False
+            
+            # First, get all categories to find the one with matching name
+            results = await self.vector_db.scroll_all(
+                collection_name=self.collection_name,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            # Find category by name
+            category_id = None
+            for result in results:
+                payload = result.get("payload", {})
+                if payload.get("type") == "category" and payload.get("name") == name:
+                    category_id = result.get("id")
+                    break
+            
+            if not category_id:
+                logger.warning(f"Category '{name}' not found in Qdrant")
+                return False
+            
+            # Delete from Qdrant using the found ID
+            deleted = await self.vector_db.delete(
+                collection_name=self.collection_name,
+                vector_id=category_id
+            )
+            
+            if deleted:
+                logger.info(f"Category '{name}' deleted from Qdrant")
                 return True
-            logger.warning(f"Category {name} not found")
-            return False
+            else:
+                logger.warning(f"Failed to delete category '{name}' from Qdrant")
+                return False
+                
         except Exception as e:
             logger.error(f"Failed to delete category {name}: {e}")
-            raise e
+            return False
 
 
 class UnitService:
-    """Service for managing material units."""
+    """Service for managing material units with Qdrant persistence."""
     
     def __init__(self, vector_db: IVectorDatabase = None):
         self.vector_db = vector_db
-        self.collection_name = "units"
-        # Mock storage for testing
-        self.units = {}
-        logger.info("UnitService initialized")
+        self.collection_name = "units_v2"
+        logger.info("UnitService initialized with Qdrant persistence")
+    
+    async def _ensure_collection_exists(self) -> None:
+        """Ensure units collection exists in Qdrant."""
+        try:
+            if self.vector_db:
+                # Check if collection exists
+                exists = await self.vector_db.collection_exists(self.collection_name)
+                
+                if not exists:
+                    # Create collection if it doesn't exist
+                    await self.vector_db.create_collection(
+                        name=self.collection_name,
+                        vector_size=384,
+                        distance_metric="cosine"
+                    )
+                    logger.debug(f"Units collection '{self.collection_name}' created")
+        except Exception as e:
+            logger.error(f"Failed to ensure units collection: {e}")
+            pass
     
     async def create_unit(self, name: str, description: Optional[str] = None) -> Unit:
-        """Create a new unit."""
+        """Create a new unit and save to Qdrant."""
         try:
-            logger.info(f"Creating unit: {name}")
+            # Ensure collection exists
+            await self._ensure_collection_exists()
+            
             unit = Unit(name=name, description=description)
-            self.units[name] = unit
+            
+            # Save to Qdrant
+            if self.vector_db:
+                # Create a simple embedding for the unit (using name + description)
+                unit_text = f"{name} {description or ''}"
+                
+                # Generate a simple hash-based vector for unit
+                import hashlib
+                import uuid
+                hash_obj = hashlib.md5(unit_text.encode())
+                hash_hex = hash_obj.hexdigest()
+                
+                # Create 384-dimensional vector
+                vector = []
+                for i in range(384):
+                    byte_index = i % len(hash_hex)
+                    value = int(hash_hex[byte_index], 16) / 15.0 - 0.5
+                    vector.append(value)
+                
+                # Generate UUID for Qdrant ID
+                unit_id = str(uuid.uuid4())
+                
+                # Save to Qdrant
+                await self.vector_db.upsert(
+                    collection_name=self.collection_name,
+                    vectors=[{
+                        "id": unit_id,
+                        "vector": vector,
+                        "payload": {
+                            "name": name,
+                            "description": description,
+                            "type": "unit",
+                            "created_at": unit.created_at.isoformat(),
+                            "updated_at": unit.updated_at.isoformat()
+                        }
+                    }]
+                )
+                logger.info(f"Unit '{name}' created and saved to Qdrant")
+            
             return unit
         except Exception as e:
             logger.error(f"Failed to create unit {name}: {e}")
             raise e
     
     async def get_units(self) -> List[Unit]:
-        """Get all units."""
+        """Get all units from Qdrant."""
         try:
-            logger.info(f"Getting {len(self.units)} units")
-            return list(self.units.values())
+            if not self.vector_db:
+                logger.warning("Vector DB not available, returning empty units list")
+                return []
+            
+            # Ensure collection exists
+            await self._ensure_collection_exists()
+            
+            # Get all units from Qdrant using scroll_all
+            results = await self.vector_db.scroll_all(
+                collection_name=self.collection_name,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            units = []
+            for result in results:
+                payload = result.get("payload", {})
+                if payload.get("type") == "unit":
+                    unit = Unit(
+                        name=payload.get("name"),
+                        description=payload.get("description"),
+                        created_at=datetime.fromisoformat(payload.get("created_at", datetime.utcnow().isoformat())),
+                        updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
+                    )
+                    units.append(unit)
+            
+            return units
+            
         except Exception as e:
             logger.error(f"Failed to get units: {e}")
-            raise e
+            # Return empty list instead of raising error
+            return []
     
     async def delete_unit(self, name: str) -> bool:
-        """Delete a unit."""
+        """Delete a unit from Qdrant by finding it by name."""
         try:
-            if name in self.units:
-                del self.units[name]
-                logger.info(f"Unit {name} deleted")
+            if not self.vector_db:
+                logger.warning("Vector DB not available")
+                return False
+            
+            # First, get all units to find the one with matching name
+            results = await self.vector_db.scroll_all(
+                collection_name=self.collection_name,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            # Find unit by name
+            unit_id = None
+            for result in results:
+                payload = result.get("payload", {})
+                if payload.get("type") == "unit" and payload.get("name") == name:
+                    unit_id = result.get("id")
+                    break
+            
+            if not unit_id:
+                logger.warning(f"Unit '{name}' not found in Qdrant")
+                return False
+            
+            # Delete from Qdrant using the found ID
+            deleted = await self.vector_db.delete(
+                collection_name=self.collection_name,
+                vector_id=unit_id
+            )
+            
+            if deleted:
+                logger.info(f"Unit '{name}' deleted from Qdrant")
                 return True
-            logger.warning(f"Unit {name} not found")
-            return False
+            else:
+                logger.warning(f"Failed to delete unit '{name}' from Qdrant")
+                return False
+                
         except Exception as e:
             logger.error(f"Failed to delete unit {name}: {e}")
-            raise e 
+            return False 
