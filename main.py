@@ -104,6 +104,13 @@ cors_settings = security_middleware.get_cors_settings()
 # ✅ FULL MIDDLEWARE STACK RESTORED - All tested individually and working
 # Order: LIFO (Last In First Out) - reverse order of execution
 
+# 0. Body Cache middleware (FIRST - для единого чтения body)
+from core.middleware.body_cache import BodyCacheMiddleware
+app.add_middleware(BodyCacheMiddleware,
+    max_body_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,  # Используем тот же лимит
+    methods_to_cache=["POST", "PUT", "PATCH"],  # Методы с body
+)
+
 # 1. Compression middleware (🔥 FULL FUNCTIONALITY RESTORED)
 app.add_middleware(CompressionMiddleware,
     minimum_size=2048,                    # 2KB minimum
@@ -115,13 +122,13 @@ app.add_middleware(CompressionMiddleware,
     enable_performance_logging=True,      # 🔥 RESTORED: Performance metrics
 )
 
-# 2. Security middleware (Query params validation only - tested ✅)
+# 2. Security middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
 app.add_middleware(SecurityMiddleware,
     max_request_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,
     enable_security_headers=True,
-    enable_input_validation=True,   # Query params only - tested ✅
-    enable_xss_protection=True,     # Query params only - tested ✅
-    enable_sql_injection_protection=True,  # Query params only - tested ✅
+    enable_input_validation=True,   # 🔥 RESTORED: Полная валидация body через кеш
+    enable_xss_protection=True,     # 🔥 RESTORED: XSS защита для body
+    enable_sql_injection_protection=True,  # 🔥 RESTORED: SQL injection защита для body
     enable_path_traversal_protection=True,
 )
 
@@ -138,10 +145,10 @@ if settings.ENABLE_RATE_LIMITING:
     except Exception as e:
         logger.warning(f"Failed to initialize RateLimitMiddleware: {e}")
 
-# 4. Logging middleware (🔥 FULL FUNCTIONALITY RESTORED)
+# 4. Logging middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
 app.add_middleware(LoggingMiddleware,
     log_level=settings.LOG_LEVEL,
-    log_request_body=True,      # 🔥 RESTORED: Full request body logging
+    log_request_body=True,      # 🔥 RESTORED: Полное логирование body через кеш
     log_response_body=True,     # 🔥 RESTORED: Full response body logging
     max_body_size=64*1024,      # 🔥 RESTORED: 64KB limit (was 1KB)
     include_headers=True,       # 🔥 RESTORED: Headers logging

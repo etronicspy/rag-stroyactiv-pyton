@@ -153,7 +153,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         self.logger.info(f"Request: {json.dumps(log_data)}")
 
     async def _capture_request_body(self, request: Request):
-        """Capture request body for logging (with size limits)."""
+        """Capture request body for logging using cached body (with size limits)."""
         try:
             content_type = request.headers.get("content-type", "")
             
@@ -163,23 +163,25 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             ]):
                 return
             
-            # Check content length
-            content_length = request.headers.get("content-length")
-            if content_length and int(content_length) > self.max_body_size:
-                request.state.request_body = f"[Body too large: {content_length} bytes]"
-                return
+            # Используем кешированный body из BodyCacheMiddleware
+            from core.middleware.body_cache import get_cached_body_str, get_cached_body_bytes
             
-            # Read body
-            body = await request.body()
-            if len(body) > self.max_body_size:
-                request.state.request_body = f"[Body too large: {len(body)} bytes]"
-            else:
-                try:
-                    # Try to decode as UTF-8
-                    body_str = body.decode("utf-8")
+            body_str = get_cached_body_str(request)
+            if body_str:
+                if len(body_str) > self.max_body_size:
+                    request.state.request_body = f"[Body too large: {len(body_str)} bytes]"
+                else:
                     request.state.request_body = body_str
-                except UnicodeDecodeError:
-                    request.state.request_body = "[Binary content]"
+            elif hasattr(request.state, 'body_cache_available'):
+                if request.state.body_cache_available:
+                    # Кеш доступен, но body пустой
+                    request.state.request_body = ""
+                else:
+                    # Кеш недоступен
+                    request.state.request_body = "[Body cache not available]"
+            else:
+                # BodyCacheMiddleware не был выполнен
+                request.state.request_body = "[Body cache middleware not configured]"
                     
         except Exception as e:
             self.logger.warning(f"Failed to capture request body: {e}")

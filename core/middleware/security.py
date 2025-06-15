@@ -250,15 +250,14 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 content={"error": "Bad request", "message": "Invalid input detected"}
             )
         
-        # 🔥 ВОССТАНАВЛИВАЕМ: Body validation (FastAPI 0.108.0+ безопасен)
+        # 🔥 ВОССТАНАВЛИВАЕМ: Body validation (используем кешированный body)
         if request.method in ["POST", "PUT", "PATCH"]:
             try:
-                # FastAPI 0.108.0+ - безопасное чтение body
-                body = await request.body()
+                # Используем кешированный body из BodyCacheMiddleware
+                from core.middleware.body_cache import get_cached_body_str
+                body_str = get_cached_body_str(request)
                 
-                if body:
-                    body_str = body.decode('utf-8', errors='ignore')
-                    
+                if body_str:
                     # Skip validation for legitimate Cyrillic content
                     if self._is_cyrillic_safe_content(body_str):
                         logger.debug("SecurityMiddleware: Skipping validation for Cyrillic content")
@@ -281,6 +280,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                             status_code=400,
                             content={"error": "Bad request", "message": "Invalid input detected"}
                         )
+                elif hasattr(request.state, 'body_cache_available') and not request.state.body_cache_available:
+                    logger.debug("SecurityMiddleware: Body validation skipped - cache not available")
                         
                 logger.debug("SecurityMiddleware: Body validation completed successfully")
                         
