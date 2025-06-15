@@ -176,7 +176,7 @@ class MaterialsService(BaseRepository):
                 unit=material.unit,
                 sku=material.sku,
                 description=material.description,
-                embedding=embedding[:10],  # Truncate for response
+                embedding=embedding,  # Full embedding, will be formatted by field_serializer
                 created_at=current_time,
                 updated_at=current_time
             )
@@ -508,7 +508,7 @@ class MaterialsService(BaseRepository):
                             unit=material.unit,
                             sku=material.sku,
                             description=material.description,
-                            embedding=embedding[:10],  # Truncate for response
+                            embedding=embedding,  # Full embedding, will be formatted by field_serializer
                             created_at=current_time,
                             updated_at=current_time
                         )
@@ -617,6 +617,16 @@ class MaterialsService(BaseRepository):
             created_at = self._parse_timestamp(payload.get("created_at"))
             updated_at = self._parse_timestamp(payload.get("updated_at"))
             
+            # Handle embedding - always provide some data instead of None
+            embedding_data = result.get("vector", [])
+            if embedding_data:
+                # Keep full embedding data for the Material object
+                # The formatting will be handled by the model_dump method
+                formatted_embedding = embedding_data
+            else:
+                # Even if no embedding data, we'll let the model_dump handle the display
+                formatted_embedding = None
+            
             return Material(
                 id=str(result.get("id")),
                 name=payload.get("name"),
@@ -624,7 +634,7 @@ class MaterialsService(BaseRepository):
                 unit=payload.get("unit"),
                 sku=payload.get("sku"),
                 description=payload.get("description"),
-                embedding=result.get("vector", [])[:10] if result.get("vector") else None,
+                embedding=formatted_embedding,
                 created_at=created_at,
                 updated_at=updated_at
             )

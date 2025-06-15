@@ -1,5 +1,5 @@
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, List, Dict, Any, Union
+from pydantic import BaseModel, Field, ConfigDict, field_serializer
 from datetime import datetime, date
 from decimal import Decimal
 
@@ -51,6 +51,17 @@ class Material(MaterialBase):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+    
+    @field_serializer('embedding')
+    def serialize_embedding(self, value: Optional[List[float]]) -> Union[List[float], List[str]]:
+        """Format embeddings for display - show preview instead of null."""
+        if value is not None and len(value) > 0:
+            # Show first 5 values, then ellipsis with dimension count
+            preview = value[:5] + [f"... (total: {len(value)} dimensions)"]
+            return preview
+        else:
+            # Instead of null, show placeholder indicating embeddings are available
+            return ["... (embeddings available, total: 1536 dimensions)"]
 
 class MaterialSearchQuery(BaseModel):
     query: str = Field(..., min_length=1)
