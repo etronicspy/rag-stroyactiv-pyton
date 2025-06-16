@@ -280,8 +280,10 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                             status_code=400,
                             content={"error": "Bad request", "message": "Invalid input detected"}
                         )
-                elif hasattr(request.state, 'body_cache_available') and not request.state.body_cache_available:
-                    logger.debug("SecurityMiddleware: Body validation skipped - cache not available")
+                elif hasattr(request, "scope") and "_cached_body" in request.scope:
+                    cache = request.scope["_cached_body"]
+                    if not cache.get("available", False):
+                        logger.debug("SecurityMiddleware: Body validation skipped - cache not available")
                         
                 logger.debug("SecurityMiddleware: Body validation completed successfully")
                         

@@ -172,8 +172,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                     request.state.request_body = f"[Body too large: {len(body_str)} bytes]"
                 else:
                     request.state.request_body = body_str
-            elif hasattr(request.state, 'body_cache_available'):
-                if request.state.body_cache_available:
+            elif hasattr(request, "scope") and "_cached_body" in request.scope:
+                cache = request.scope["_cached_body"]
+                if cache.get("available", False):
                     # Кеш доступен, но body пустой
                     request.state.request_body = ""
                 else:

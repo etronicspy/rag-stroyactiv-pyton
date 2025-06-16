@@ -151,7 +151,7 @@ app.add_middleware(CompressionMiddleware,
     enable_performance_logging=True,      # 🔥 RESTORED: Performance metrics
 )
 
-# 0. Body Cache middleware (🚨 CRITICAL: добавляем ПОСЛЕДНИМ - выполнится ПЕРВЫМ!)
+# 0. Body Cache middleware (🔥 FIXED: добавляем ПОСЛЕДНИМ - выполнится ПЕРВЫМ!)
 # Это middleware ДОЛЖЕН выполниться первым для чтения и кеширования body
 from core.middleware.body_cache import BodyCacheMiddleware
 app.add_middleware(BodyCacheMiddleware,
