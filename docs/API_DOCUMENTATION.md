@@ -11,36 +11,53 @@
 - **Swagger UI**: `http://localhost:8000/docs`
 - **ReDoc**: `http://localhost:8000/redoc`
 
-## 🎯 Режимы работы
+## 🎯 Режимы развертывания
 
-### 🔵 Qdrant-Only Mode (Рекомендуемый)
+### 🔧 Development Mode (Текущий)
+**Qdrant-Only режим для локальной разработки**
+
 Система настроена для работы только с Qdrant векторной БД с mock-адаптерами для PostgreSQL и Redis:
 
 ```bash
-# Переменные окружения для Qdrant-only режима
+# Переменные окружения для Development режима (по умолчанию)
 QDRANT_ONLY_MODE=true
 ENABLE_FALLBACK_DATABASES=true
 DISABLE_REDIS_CONNECTION=true
 DISABLE_POSTGRESQL_CONNECTION=true
 ```
 
-**Особенности Qdrant-only режима:**
-- ✅ **Полная функциональность** через Qdrant
-- ✅ **Mock адаптеры** для PostgreSQL и Redis
+**Особенности Development режима:**
+- ✅ **Быстрый старт** без PostgreSQL/Redis инфраструктуры
+- ✅ **Полная функциональность** через Qdrant + mock адаптеры
 - ✅ **Fallback стратегии** при недоступности реальных БД
 - ✅ **Автоматическое переключение** на mock-реализации
 - ✅ **Все API эндпоинты работают** без изменений
+- ✅ **Идеально для разработки** и тестирования
 
-### 🔄 Multi-Database Mode
-Полная мульти-БД архитектура с реальными подключениями к PostgreSQL, Redis и векторным БД.
+### 🚀 Production Mode (Планируемый)
+**Полная мульти-БД архитектура для продакшн среды**
+
+```bash
+# Переменные окружения для Production режима
+QDRANT_ONLY_MODE=false
+DATABASE_URL=postgresql://user:pass@localhost:5432/materials
+REDIS_URL=redis://localhost:6379/0
+QDRANT_URL=https://cluster.qdrant.tech:6333
+```
+
+**Компоненты Production режима:**
+- 🎯 **PostgreSQL** - основная реляционная БД для структурированных данных
+- 🎯 **Qdrant** - векторная БД для семантического поиска
+- 🎯 **Redis** - кеширование и управление сессиями
+- 🎯 **OpenAI** - генерация эмбеддингов
 
 ---
 
 ## 📊 Структура API
 
-### **Всего эндпоинтов**: 44
-- **Активные**: 35 (подключены в main.py)
-- **Неактивные**: 9 (advanced search - не подключены)
+### **Всего эндпоинтов**: 31
+- **Все эндпоинты активны** (подключены в main.py)
+- **Advanced Search полностью функционален**
 
 ### **HTTP методы**:
 - **GET**: 23 эндпоинта
@@ -89,7 +106,7 @@ DISABLE_POSTGRESQL_CONNECTION=true
 ### GET /api/v1/health/detailed
 Детальная проверка всех сервисов включая mock адаптеры.
 
-**Ответ в Qdrant-only режиме**:
+**Ответ в Development режиме (Qdrant-Only)**:
 ```json
 {
   "status": "healthy",
@@ -106,12 +123,12 @@ DISABLE_POSTGRESQL_CONNECTION=true
   "postgresql": {
     "type": "mock",
     "status": "healthy",
-    "message": "Using mock PostgreSQL adapter (Qdrant-only mode)"
+    "message": "Using mock PostgreSQL adapter (Development mode)"
   },
   "redis": {
     "type": "mock", 
     "status": "healthy",
-    "message": "Using mock Redis adapter (Qdrant-only mode)"
+    "message": "Using mock Redis adapter (Development mode)"
   },
   "ai_service": {
     "type": "openai",
@@ -129,12 +146,6 @@ DISABLE_POSTGRESQL_CONNECTION=true
 - 207 (degraded) 
 - 503 (unhealthy)
 
-### GET /api/v1/health/metrics
-Метрики производительности системы.
-
-### GET /api/v1/health/performance
-Детальные метрики производительности.
-
 ### GET /api/v1/health/config
 Статус конфигурации системы.
 
@@ -143,72 +154,9 @@ DISABLE_POSTGRESQL_CONNECTION=true
 ## 📊 Monitoring Endpoints
 
 ### GET /api/v1/monitoring/health
-Комплексная проверка здоровья системы включая пулы подключений.
+Комплексная проверка здоровья системы.
 
 **HTTP статусы**: 200 (healthy), 207 (degraded), 503 (unhealthy)
-
-### GET /api/v1/monitoring/pools
-Метрики пулов подключений.
-
-**Query параметры**:
-- `pool_name` (string, optional): Имя конкретного пула
-
-**Ответ при наличии пулов**:
-```json
-{
-  "timestamp": "2024-01-01T12:00:00.000Z",
-  "pools": {
-    "qdrant_pool": {
-      "active_connections": 5,
-      "idle_connections": 3,
-      "total_connections": 8,
-      "max_connections": 20,
-      "utilization": 0.4
-    }
-  }
-}
-```
-
-**Ответ при отсутствии пулов**:
-```json
-{
-  "timestamp": "2024-01-01T12:00:00.000Z",
-  "pools": {},
-  "message": "No pools registered yet"
-}
-```
-
-### GET /api/v1/monitoring/pools/history
-История корректировок пулов.
-
-**Query параметры**:
-- `pool_name` (string, optional): Имя пула
-- `limit` (int, 1-200, default: 50): Максимальное количество записей
-
-### GET /api/v1/monitoring/pools/recommendations
-Рекомендации по оптимизации пулов.
-
-### POST /api/v1/monitoring/pools/{pool_name}/resize
-Ручное изменение размера пула.
-
-**Path параметры**:
-- `pool_name` (string): Имя пула
-
-**Query параметры**:
-- `new_size` (int, 1-100, required): Новый размер пула
-- `reason` (string, optional): Причина изменения
-
-### GET /api/v1/monitoring/pools/stats
-Сводная статистика пулов.
-
-### GET /api/v1/monitoring/optimizations
-Метрики и статистика оптимизации.
-
-### GET /api/v1/monitoring/middleware/stats
-Детальная статистика производительности middleware.
-
-### POST /api/v1/monitoring/optimizations/benchmark
-Запуск бенчмарка оптимизации.
 
 ---
 
@@ -552,13 +500,7 @@ GET /api/v1/search/?q=цемент портландский&limit=5
 
 ---
 
-## 🔍 Advanced Search Endpoints (НЕ ПОДКЛЮЧЕНЫ)
-
-> **⚠️ ВНИМАНИЕ**: Эндпоинты advanced search существуют в коде (`api/routes/advanced_search.py`), но НЕ подключены в `main.py`. Для их активации необходимо добавить в main.py:
-> ```python
-> from api.routes import advanced_search
-> app.include_router(advanced_search.router, prefix="/api/v1/search", tags=["advanced-search"])
-> ```
+## 🔍 Advanced Search Endpoints
 
 ### POST /api/v1/search/advanced
 Продвинутый поиск с комплексной фильтрацией и сортировкой.

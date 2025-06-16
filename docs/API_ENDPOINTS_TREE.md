@@ -124,55 +124,45 @@ RAG Construction Materials API
 │       ├── Path: supplier_id (string)
 │       └── Path: product_id (string)
 │
-├── /api/v1/search/ - Простой поиск материалов
-│   └── GET / - Search materials
-│       ├── Query: q (string, required, search query)
-│       └── Query: limit (int, default: 10, max results)
+├── /api/v1/search/ - Поиск материалов (включая продвинутый поиск)
+│   ├── GET / - Simple search materials
+│   │   ├── Query: q (string, required, search query)
+│   │   └── Query: limit (int, default: 10, max results)
+│   ├── POST /advanced - Advanced search with filtering
+│   │   └── Body: AdvancedSearchQuery {
+│   │       query: string (optional)
+│   │       search_type: "vector"|"sql"|"hybrid"|"fuzzy" (default: "hybrid")
+│   │       filters: MaterialFilterOptions {
+│   │           categories: string[] (optional)
+│   │           units: string[] (optional)
+│   │           sku_pattern: string (optional, supports wildcards)
+│   │           created_after: datetime (optional)
+│   │           created_before: datetime (optional)
+│   │           updated_after: datetime (optional)
+│   │           updated_before: datetime (optional)
+│   │           search_fields: string[] (default: ["name", "description", "use_category"])
+│   │           min_similarity: float (0.0-1.0, default: 0.3)
+│   │       }
+│   │       sort_by: SortOption[] {
+│   │           field: string (required)
+│   │           direction: "asc"|"desc" (default: "asc")
+│   │       }
+│   │       pagination: PaginationOptions {
+│   │           page: int (>=1, default: 1)
+│   │           page_size: int (1-100, default: 20)
+│   │           cursor: string (optional)
+│   │       }
+│   │       fuzzy_threshold: float (0.0-1.0, default: 0.8)
+│   │       include_suggestions: bool (default: false)
+│   │       highlight_matches: bool (default: false)
+│   │   }
+│   ├── GET /suggestions - Search autocomplete suggestions
+│   │   ├── Query: q (string, min 1 char, required)
+│   │   └── Query: limit (int, 1-20, default: 8)
+│   ├── GET /categories - Get available categories
+│   └── GET /units - Get available units
 │
-└── /api/v1/search/ - Продвинутый поиск (advanced_search.py - НЕ подключен)
-    ├── POST /advanced - Advanced search with filtering
-    │   └── Body: AdvancedSearchQuery {
-    │       query: string (optional)
-    │       search_type: "vector"|"sql"|"hybrid"|"fuzzy" (default: "hybrid")
-    │       filters: MaterialFilterOptions {
-    │           categories: string[] (optional)
-    │           units: string[] (optional)
-    │           sku_pattern: string (optional, supports wildcards)
-    │           created_after: datetime (optional)
-    │           created_before: datetime (optional)
-    │           updated_after: datetime (optional)
-    │           updated_before: datetime (optional)
-    │           search_fields: string[] (default: ["name", "description", "use_category"])
-    │           min_similarity: float (0.0-1.0, default: 0.3)
-    │       }
-    │       sort_by: SortOption[] {
-    │           field: string (required)
-    │           direction: "asc"|"desc" (default: "asc")
-    │       }
-    │       pagination: PaginationOptions {
-    │           page: int (>=1, default: 1)
-    │           page_size: int (1-100, default: 20)
-    │           cursor: string (optional)
-    │       }
-    │       fuzzy_threshold: float (0.0-1.0, default: 0.8)
-    │       include_suggestions: bool (default: false)
-    │       highlight_matches: bool (default: false)
-    │   }
-    ├── GET /suggestions - Search autocomplete suggestions
-    │   ├── Query: q (string, min 1 char, required)
-    │   └── Query: limit (int, 1-20, default: 8)
-    ├── GET /popular-queries - Popular search queries statistics
-    │   └── Query: limit (int, 1-50, default: 10)
-    ├── GET /analytics - Search analytics
-    │   ├── Query: start_date (datetime, optional, default: 7 days ago)
-    │   └── Query: end_date (datetime, optional, default: now)
-    ├── GET /categories - Get available categories
-    ├── GET /units - Get available units
-    ├── POST /fuzzy - Fuzzy search
-    │   ├── Query: q (string, min 1 char, required)
-    │   ├── Query: threshold (float, 0.0-1.0, default: 0.8)
-    │   └── Query: limit (int, 1-100, default: 10)
-    └── GET /health - Search service health check
+
 ```
 
 ---
@@ -231,14 +221,6 @@ RAG Construction Materials API
 **Параметры**: Нет  
 **HTTP статусы**: 200 (healthy), 207 (degraded), 503 (unhealthy)
 
-#### `GET /api/v1/health/metrics`
-**Описание**: Метрики производительности  
-**Параметры**: Нет
-
-#### `GET /api/v1/health/performance`
-**Описание**: Детальные метрики производительности  
-**Параметры**: Нет
-
 #### `GET /api/v1/health/config`
 **Описание**: Статус конфигурации системы  
 **Параметры**: Нет
@@ -252,44 +234,6 @@ RAG Construction Materials API
 **Параметры**: Нет  
 **HTTP статусы**: 200 (healthy), 207 (degraded), 503 (unhealthy)
 
-#### `GET /api/v1/monitoring/pools`
-**Описание**: Метрики пулов подключений  
-**Query параметры**:
-- `pool_name` (string, optional): Имя конкретного пула
-
-#### `GET /api/v1/monitoring/pools/history`
-**Описание**: История корректировок пулов  
-**Query параметры**:
-- `pool_name` (string, optional): Имя пула
-- `limit` (int, 1-200, default: 50): Максимальное количество записей
-
-#### `GET /api/v1/monitoring/pools/recommendations`
-**Описание**: Рекомендации по оптимизации пулов  
-**Параметры**: Нет
-
-#### `POST /api/v1/monitoring/pools/{pool_name}/resize`
-**Описание**: Ручное изменение размера пула  
-**Path параметры**:
-- `pool_name` (string): Имя пула  
-**Query параметры**:
-- `new_size` (int, 1-100, required): Новый размер пула
-- `reason` (string, optional): Причина изменения
-
-#### `GET /api/v1/monitoring/pools/stats`
-**Описание**: Сводная статистика пулов  
-**Параметры**: Нет
-
-#### `GET /api/v1/monitoring/optimizations`
-**Описание**: Метрики и статистика оптимизации  
-**Параметры**: Нет
-
-#### `GET /api/v1/monitoring/middleware/stats`
-**Описание**: Детальная статистика производительности middleware  
-**Параметры**: Нет
-
-#### `POST /api/v1/monitoring/optimizations/benchmark`
-**Описание**: Запуск бенчмарка оптимизации  
-**Параметры**: Нет
 
 ---
 
@@ -493,9 +437,9 @@ RAG Construction Materials API
 
 ---
 
-### 🔍 Advanced Search Endpoints (НЕ ПОДКЛЮЧЕНЫ)
+### 🔍 Advanced Search Endpoints
 
-> **⚠️ ВНИМАНИЕ**: Эндпоинты advanced search существуют в коде, но НЕ подключены в main.py
+**✅ Все эндпоинты advanced search активны и функциональны**
 
 #### `POST /api/v1/search/advanced`
 **Описание**: Продвинутый поиск с комплексной фильтрацией  
@@ -534,17 +478,6 @@ RAG Construction Materials API
 - `q` (string, min 1 char): Запрос для предложений
 - `limit` (int, 1-20, default: 8): Максимальное количество предложений
 
-#### `GET /api/v1/search/popular-queries`
-**Описание**: Статистика популярных запросов  
-**Query параметры**:
-- `limit` (int, 1-50, default: 10): Максимальное количество запросов
-
-#### `GET /api/v1/search/analytics`
-**Описание**: Аналитика поиска  
-**Query параметры**:  
-- `start_date` (datetime, optional): Начальная дата (по умолчанию: 7 дней назад)
-- `end_date` (datetime, optional): Конечная дата (по умолчанию: сейчас)
-
 #### `GET /api/v1/search/categories`
 **Описание**: Получение доступных категорий  
 **Параметры**: Нет
@@ -553,12 +486,6 @@ RAG Construction Materials API
 **Описание**: Получение доступных единиц измерения  
 **Параметры**: Нет
 
-#### `POST /api/v1/search/fuzzy`
-**Описание**: Нечеткий поиск  
-**Query параметры**:
-- `q` (string, min 1 char): Поисковый запрос
-- `threshold` (float, 0.0-1.0, default: 0.8): Порог сходства
-- `limit` (int, 1-100, default: 10): Максимальное количество результатов
 
 #### `GET /api/v1/search/health`
 **Описание**: Проверка здоровья сервиса поиска  
