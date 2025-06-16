@@ -215,37 +215,43 @@ class BaseRepository(ABC):
         Raises:
             DatabaseError: If embedding generation fails
         """
-        # TEMPORARY: Use mock embedding for testing to avoid OpenAI timeout issues
-        self.logger.info(f"🔧 Using mock embedding for testing: {text[:50]}...")
-        return await self._generate_mock_embedding(text)
+        if not self.ai_client:
+            # NO FALLBACK - AI client is required for embeddings
+            raise DatabaseError(
+                message="AI client not available - cannot generate embeddings",
+                details="OpenAI API client not properly initialized"
+            )
         
-        # Original code (commented out for testing)
-        # if not self.ai_client:
-        #     # Fallback to mock embedding if no AI client
-        #     return await self._generate_mock_embedding(text)
-        # 
-        # try:
-        #     # For mock AI client (testing)
-        #     if hasattr(self.ai_client, 'get_embedding'):
-        #         return await self.ai_client.get_embedding(text)
-        #     
-        #     # For real OpenAI client
-        #     if hasattr(self.ai_client, 'embeddings'):
-        #         response = await self.ai_client.embeddings.create(
-        #             input=text,
-        #             model="text-embedding-3-small",
-        #             dimensions=1536
-        #         )
-        #         return response.data[0].embedding
-        #     
-        #     # Fallback
-        #     self.logger.warning("AI client doesn't support embedding generation, using mock")
-        #     return await self._generate_mock_embedding(text)
-        #     
-        # except Exception as e:
-        #     self.logger.error(f"Failed to generate embedding for text: {e}")
-        #     # Return mock embedding as fallback
-        #     return await self._generate_mock_embedding(text)
+        try:
+            # For real OpenAI client (primary)
+            if hasattr(self.ai_client, 'embeddings'):
+                self.logger.info(f"🧠 Using OpenAI embeddings for: {text[:50]}...")
+                response = await self.ai_client.embeddings.create(
+                    input=text,
+                    model="text-embedding-3-small",
+                    dimensions=1536
+                )
+                return response.data[0].embedding
+            
+            # For mock AI client (testing only)
+            elif hasattr(self.ai_client, 'get_embedding'):
+                self.logger.info(f"🔧 Using mock AI client for testing: {text[:50]}...")
+                return await self.ai_client.get_embedding(text)
+            
+            # No valid AI client interface
+            else:
+                raise DatabaseError(
+                    message="AI client doesn't support embedding generation",
+                    details=f"Client type: {type(self.ai_client)}, Available methods: {dir(self.ai_client)}"
+                )
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate embedding for text: {e}")
+            # NO FALLBACK - embedding generation must work
+            raise DatabaseError(
+                message="Failed to generate embedding",
+                details=str(e)
+            )
     
     async def get_embeddings_batch(self, texts: list) -> list:
         """Get embeddings for multiple texts.

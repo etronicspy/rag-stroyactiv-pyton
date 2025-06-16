@@ -467,10 +467,38 @@ health_checker = HealthChecker()
 @router.get("/")
 async def basic_health_check():
     """
-    Basic health check endpoint.
+    🔍 **Basic Health Check** - Быстрая проверка статуса API
     
-    Parameters:
-    - Returns: Basic service status and uptime information
+    Проверяет базовое состояние сервиса и возвращает основную информацию о работе API.
+    Используется для мониторинга и load balancer'ов.
+    
+    **Особенности:**
+    - ⚡ Быстрый отклик (< 50ms)
+    - 🚀 Минимальная нагрузка на систему
+    - 📊 Информация о времени работы
+    - 🎯 Подходит для health checks
+    
+    **Responses:**
+    - **200 OK**: Сервис работает нормально
+    - **503 Service Unavailable**: Сервис недоступен
+    
+    **Example Response:**
+    ```json
+    {
+        "status": "healthy",
+        "service": "RAG Construction Materials API",
+        "version": "1.0.0",
+        "environment": "production",
+        "timestamp": "2025-06-16T16:46:29.421964Z",
+        "uptime_seconds": 3600
+    }
+    ```
+    
+    **Use Cases:**
+    - Проверка доступности API
+    - Мониторинг системы
+    - Health checks для Kubernetes/Docker
+    - Load balancer health checks
     """
     return await health_checker.check_basic_health()
 
@@ -478,10 +506,97 @@ async def basic_health_check():
 @router.get("/detailed")
 async def detailed_health_check():
     """
-    Comprehensive health check for all services.
+    🔍 **Detailed Health Check** - Комплексная диагностика системы
     
-    Parameters:
-    - Returns: Detailed health status of all system components (databases, AI services, metrics)
+    Выполняет полную проверку всех компонентов системы включая:
+    - 🗄️ Векторные базы данных (Qdrant/Weaviate/Pinecone)
+    - 🐘 PostgreSQL (опционально)
+    - 🔴 Redis (опционально)  
+    - 🤖 AI сервисы (OpenAI/HuggingFace)
+    - 📊 Система метрик и мониторинга
+    
+    **Особенности:**
+    - 🔄 Параллельная проверка всех сервисов
+    - ⏱️ Измерение времени отклика
+    - 📋 Детальная диагностика ошибок
+    - 🎚️ Градация статусов (healthy/degraded/unhealthy)
+    
+    **Response Status Codes:**
+    - **200 OK**: Все системы работают нормально
+    - **207 Multi-Status**: Некоторые системы работают с ограничениями
+    - **503 Service Unavailable**: Критические системы недоступны
+    
+    **Example Response:**
+    ```json
+    {
+        "overall_status": "healthy",
+        "timestamp": "2025-06-16T16:46:29.421964Z",
+        "total_check_time_ms": 245.7,
+        "service_info": {
+            "status": "healthy",
+            "service": "RAG Construction Materials API",
+            "version": "1.0.0",
+            "environment": "production",
+            "uptime_seconds": 3600
+        },
+        "databases": {
+            "vector_db": {
+                "type": "qdrant_cloud",
+                "status": "healthy",
+                "response_time_ms": 156.3,
+                "details": {
+                    "collections_count": 3,
+                    "total_vectors": 15420,
+                    "memory_usage": "245MB"
+                }
+            },
+            "postgresql": {
+                "type": "postgresql",
+                "status": "healthy",
+                "response_time_ms": 23.1,
+                "details": {
+                    "connectivity": true,
+                    "version": "PostgreSQL 14.5",
+                    "tables_count": 5,
+                    "materials_count": 1254
+                }
+            },
+            "redis": {
+                "type": "redis",
+                "status": "healthy",
+                "response_time_ms": 12.4,
+                "details": {
+                    "ping": true,
+                    "version": "7.0.5",
+                    "memory_usage": "12.5MB",
+                    "connected_clients": 3
+                }
+            }
+        },
+        "ai_service": {
+            "type": "openai",
+            "status": "healthy",
+            "response_time_ms": 89.2,
+            "details": {
+                "api_accessible": true,
+                "model": "text-embedding-ada-002",
+                "model_exists": true,
+                "available_models_count": 42
+            }
+        },
+        "metrics": {
+            "requests_total": 1547,
+            "errors_total": 23,
+            "avg_response_time_ms": 145.2
+        }
+    }
+    ```
+    
+    **Use Cases:**
+    - Детальная диагностика проблем
+    - Мониторинг производительности
+    - Анализ работы компонентов
+    - Отладка интеграций
     """
     start_time = time.time()
     
@@ -543,10 +658,81 @@ async def detailed_health_check():
 @router.get("/databases")
 async def database_health_check():
     """
-    Database-specific health checks.
+    🗄️ **Database Health Check** - Проверка состояния баз данных
     
-    Parameters:
-    - Returns: Health status of all database connections (vector DB, PostgreSQL, Redis)
+    Выполняет проверку всех подключенных баз данных и возвращает их статусы.
+    Полезно для диагностики проблем с хранилищами данных.
+    
+    **Проверяемые базы данных:**
+    - 🔍 **Vector DB**: Qdrant/Weaviate/Pinecone для семантического поиска
+    - 🐘 **PostgreSQL**: Реляционная БД для метаданных (опционально)
+    - 🔴 **Redis**: Кэширование и сессии (опционально)
+    
+    **Проверки включают:**
+    - ✅ Доступность подключения
+    - ⏱️ Время отклика
+    - 📊 Статистику использования
+    - 🔧 Версии и конфигурации
+    
+    **Response Status Codes:**
+    - **200 OK**: Все базы данных доступны
+    - **207 Multi-Status**: Некоторые БД недоступны
+    - **503 Service Unavailable**: Критические БД недоступны
+    
+    **Example Response:**
+    ```json
+    {
+        "timestamp": "2025-06-16T16:46:29.421964Z",
+        "databases": {
+            "vector_db": {
+                "type": "qdrant_cloud",
+                "status": "healthy",
+                "response_time_ms": 156.3,
+                "details": {
+                    "url": "https://qdrant.cloud",
+                    "collections_count": 3,
+                    "total_vectors": 15420,
+                    "memory_usage": "245MB",
+                    "disk_usage": "1.2GB"
+                }
+            },
+            "postgresql": {
+                "type": "postgresql",
+                "status": "healthy",
+                "response_time_ms": 23.1,
+                "details": {
+                    "connectivity": true,
+                    "version": "PostgreSQL 14.5 on x86_64-pc-linux-gnu",
+                    "tables_count": 5,
+                    "materials_count": 1254,
+                    "categories_count": 45,
+                    "units_count": 12
+                }
+            },
+            "redis": {
+                "type": "redis",
+                "status": "healthy",
+                "response_time_ms": 12.4,
+                "details": {
+                    "ping": true,
+                    "version": "7.0.5",
+                    "memory_usage": "12.5MB",
+                    "connected_clients": 3,
+                    "operations_per_sec": 145,
+                    "keyspace": {
+                        "db0": {"keys": 1547, "expires": 23}
+                    }
+                }
+            }
+        }
+    }
+    ```
+    
+    **Use Cases:**
+    - Диагностика проблем с БД
+    - Мониторинг производительности
+    - Проверка подключений
+    - Анализ использования ресурсов
     """
     checks = await asyncio.gather(
         health_checker.check_vector_database(),

@@ -141,6 +141,20 @@ class CompressionMiddleware(BaseHTTPMiddleware):
 
     def _compress_content(self, content: bytes, algorithm: str) -> bytes:
         """Compress content using specified algorithm."""
+        # Safety check - ensure content is valid
+        if content is None:
+            raise ValueError("Content cannot be None for compression")
+        
+        if not isinstance(content, (bytes, str)):
+            raise ValueError(f"Content must be bytes or str, got {type(content)}")
+        
+        if isinstance(content, str):
+            content = content.encode('utf-8')
+        
+        if len(content) == 0:
+            logger.debug("⚠️  Empty content provided for compression, returning as-is")
+            return content
+        
         if algorithm == "gzip":
             return gzip.compress(content, compresslevel=self.compression_level)
         elif algorithm == "deflate":
@@ -174,9 +188,15 @@ class CompressionMiddleware(BaseHTTPMiddleware):
                     buffer = BytesIO()
                     with gzip.GzipFile(fileobj=buffer, mode='wb', compresslevel=self.compression_level) as gz:
                         async for chunk in response.body_iterator:
+                            if chunk is None:  # Skip None chunks
+                                continue
                             if isinstance(chunk, str):
                                 chunk = chunk.encode('utf-8')
-                            gz.write(chunk)
+                            elif not isinstance(chunk, bytes):
+                                chunk = str(chunk).encode('utf-8')
+                            
+                            if chunk:  # Only write non-empty chunks
+                                gz.write(chunk)
                     
                     buffer.seek(0)
                     while True:
@@ -187,8 +207,15 @@ class CompressionMiddleware(BaseHTTPMiddleware):
                 else:
                     # For deflate and brotli
                     async for chunk in response.body_iterator:
+                        if chunk is None:  # Skip None chunks
+                            continue
                         if isinstance(chunk, str):
                             chunk = chunk.encode('utf-8')
+                        elif not isinstance(chunk, bytes):
+                            chunk = str(chunk).encode('utf-8')
+                        
+                        if not chunk:  # Skip empty chunks
+                            continue
                         
                         if algorithm == "deflate":
                             compressed_chunk = compressor.compress(chunk)
@@ -211,7 +238,8 @@ class CompressionMiddleware(BaseHTTPMiddleware):
                 logger.error(f"Streaming compression error: {e}")
                 # Fallback to original content
                 async for chunk in response.body_iterator:
-                    yield chunk
+                    if chunk is not None:  # Only yield non-None chunks
+                        yield chunk
 
         return StreamingResponse(
             compressed_generator(),
@@ -261,16 +289,62 @@ class CompressionMiddleware(BaseHTTPMiddleware):
                 self.compressed_responses += 1
                 
             else:
-                # Handle regular response
-                if hasattr(response, 'body') and response.body is not None:
-                    original_content = response.body
-                    if isinstance(original_content, str):
-                        original_content = original_content.encode('utf-8')
-                else:
-                    # Skip compression for responses without content
+                # Handle regular response - IMPROVED NULL CHECK
+                if not hasattr(response, 'body'):
+                    logger.debug(f"⚠️  Skipping compression: response has no body attribute for {request.method} {request.url.path}")
                     return response
                 
-                compressed_content = self._compress_content(original_content, algorithm)
+                try:
+                    original_content = getattr(response, 'body', None)
+                except Exception as e:
+                    logger.warning(f"⚠️  Cannot access response.body for {request.method} {request.url.path}: {e}")
+                    return response
+                
+                # Additional safety check - ensure content is not None or empty
+                if original_content is None:
+                    logger.debug(f"⚠️  Skipping compression: response.body is None for {request.method} {request.url.path}")
+                    return response
+                
+                # Convert string to bytes if needed
+                if isinstance(original_content, str):
+                    if not original_content.strip():  # Skip empty strings
+                        logger.debug(f"⚠️  Skipping compression: empty content for {request.method} {request.url.path}")
+                        return response
+                    original_content = original_content.encode('utf-8')
+                elif isinstance(original_content, bytes):
+                    if len(original_content) == 0:  # Skip empty bytes
+                        logger.debug(f"⚠️  Skipping compression: empty bytes for {request.method} {request.url.path}")
+                        return response
+                else:
+                    # Handle other types - convert to string first
+                    try:
+                        content_str = str(original_content)
+                        if not content_str.strip():
+                            logger.debug(f"⚠️  Skipping compression: empty converted content for {request.method} {request.url.path}")
+                            return response
+                        original_content = content_str.encode('utf-8')
+                    except Exception as e:
+                        logger.warning(f"⚠️  Cannot convert response.body to bytes for compression: {e}")
+                        return response
+                
+                # Final safety check before compression
+                if not original_content:
+                    logger.debug(f"⚠️  Skipping compression: final content check failed for {request.method} {request.url.path}")
+                    return response
+                
+                # DEBUG: Add detailed logging before compression
+                logger.debug(f"🔍 DEBUG: About to compress content for {request.method} {request.url.path}")
+                logger.debug(f"🔍 DEBUG: original_content type: {type(original_content)}")
+                logger.debug(f"🔍 DEBUG: original_content is None: {original_content is None}")
+                logger.debug(f"🔍 DEBUG: original_content length: {len(original_content) if original_content else 'N/A'}")
+                logger.debug(f"🔍 DEBUG: algorithm: {algorithm}")
+                
+                try:
+                    compressed_content = self._compress_content(original_content, algorithm)
+                except Exception as compression_error:
+                    logger.error(f"❌ _compress_content failed for {request.method} {request.url.path}: {compression_error}")
+                    logger.error(f"❌ Content type was: {type(original_content)}, Content is None: {original_content is None}")
+                    return response
                 
                 # Update response
                 response.body = compressed_content
@@ -289,7 +363,7 @@ class CompressionMiddleware(BaseHTTPMiddleware):
                     compression_ratio = len(compressed_content) / len(original_content)
                     
                     logger.debug(
-                        f"Compressed {request.method} {request.url.path}: "
+                        f"✅ Compressed {request.method} {request.url.path}: "
                         f"{len(original_content)}B -> {len(compressed_content)}B "
                         f"({compression_ratio:.2f} ratio, {algorithm}, {compression_time*1000:.2f}ms)"
                     )
@@ -297,8 +371,8 @@ class CompressionMiddleware(BaseHTTPMiddleware):
             return response
             
         except Exception as e:
-            logger.error(f"Compression error: {e}")
-            # Return original response if compression fails
+            logger.error(f"Compression error for {request.method} {request.url.path}: {e}")
+            # Return original response if compression fails  
             return response
 
     def get_compression_stats(self) -> Dict[str, Any]:

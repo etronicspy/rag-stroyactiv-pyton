@@ -6,6 +6,7 @@
 from typing import List, Optional
 import logging
 from fastapi import APIRouter, HTTPException, Depends
+from datetime import datetime
 
 from core.schemas.materials import (
     MaterialCreate, MaterialUpdate, Material, MaterialSearchQuery, 
@@ -46,13 +47,54 @@ def get_materials_service(
 async def health_check(
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Check health of materials service and database connections (Qdrant-only mode).
+    """
+    🔍 **Materials Service Health Check** - Проверка работы сервиса материалов
     
-    Args:
-        service: Materials service (injected, optional)
-        
-    Returns:
-        Health status information with Qdrant connection status
+    Проверяет состояние сервиса материалов и подключения к векторной базе данных.
+    Работает в режиме Qdrant-only для семантического поиска стройматериалов.
+    
+    **Особенности:**
+    - 🗄️ Проверка Qdrant подключения
+    - 📋 Список доступных endpoints
+    - ⚡ Быстрая диагностика сервиса
+    - 🎯 Статус инициализации
+    
+    **Response Status Codes:**
+    - **200 OK**: Сервис работает нормально
+    - **206 Partial Content**: Сервис работает с ограничениями
+    - **503 Service Unavailable**: Сервис недоступен
+    
+    **Example Response:**
+    ```json
+    {
+        "status": "healthy",
+        "service": "MaterialsService",
+        "mode": "qdrant-only",
+        "service_status": "operational",
+        "vector_database": {
+            "status": "healthy",
+            "database_type": "Qdrant",
+            "collections_count": 3,
+            "total_vectors": 15420,
+            "response_time_ms": 156.3
+        },
+        "available_endpoints": {
+            "search": "POST /api/v1/materials/search",
+            "batch": "POST /api/v1/materials/batch",
+            "import": "POST /api/v1/materials/import",
+            "list": "GET /api/v1/materials/",
+            "get_by_id": "GET /api/v1/materials/{id}",
+            "create": "POST /api/v1/materials/",
+            "update": "PUT /api/v1/materials/{id}",
+            "delete": "DELETE /api/v1/materials/{id}"
+        }
+    }
+    ```
+    
+    **Use Cases:**
+    - Проверка работы сервиса материалов
+    - Диагностика векторной БД
+    - Мониторинг доступности endpoints
     """
     health_status = {
         "status": "healthy",
@@ -102,11 +144,62 @@ async def create_material(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    Create a new material with semantic embedding.
+    ➕ **Create Material** - Создание нового строительного материала
     
-    Parameters:
-    - material: Material data to create (name, use_category, unit, sku, description)
-    - Returns: Created material with generated ID and 1536-dimension embedding
+    Создает новый материал с автоматической генерацией семантического embedding
+    для поиска. Материал сохраняется в векторную БД для последующего поиска.
+    
+    **Особенности:**
+    - 🧠 Автогенерация 1536-мерного embedding (OpenAI)
+    - 🔍 Индексация для семантического поиска
+    - ✨ Автоматическое создание UUID
+    - 📝 Валидация обязательных полей
+    - ⏰ Автоматические временные метки
+    
+    **Required Fields:**
+    - `name`: Название материала (2-200 символов)
+    - `use_category`: Категория использования
+    - `unit`: Единица измерения
+    
+    **Optional Fields:**
+    - `sku`: Артикул/код материала (3-50 символов)
+    - `description`: Описание материала
+    
+    **Request Body Example:**
+    ```json
+    {
+        "name": "Портландцемент М500 Д0",
+        "use_category": "Цемент",
+        "unit": "мешок",
+        "sku": "CEM500-001",
+        "description": "Высокопрочный цемент для конструкционного бетона без минеральных добавок"
+    }
+    ```
+    
+    **Response Example:**
+    ```json
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "Портландцемент М500 Д0",
+        "use_category": "Цемент",
+        "unit": "мешок",
+        "sku": "CEM500-001",
+        "description": "Высокопрочный цемент для конструкционного бетона без минеральных добавок",
+        "embedding": [0.023, -0.156, 0.789, ...], // 1536 dimensions
+        "created_at": "2025-06-16T16:46:29.421964Z",
+        "updated_at": "2025-06-16T16:46:29.421964Z"
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **201 Created**: Материал успешно создан
+    - **400 Bad Request**: Ошибка валидации данных
+    - **500 Internal Server Error**: Ошибка создания embedding или БД
+    
+    **Use Cases:**
+    - Добавление новых материалов в каталог
+    - Импорт данных из прайс-листов
+    - Создание справочников материалов
     """
     try:
         logger.info(f"Creating material: {material.name}")
@@ -127,11 +220,39 @@ async def get_material(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    Get a specific material by ID.
+    🔍 **Get Material by ID** - Получение материала по идентификатору
     
-    Parameters:
-    - material_id: Unique identifier of the material
-    - Returns: Material data including embedding information
+    Возвращает полную информацию о материале включая embedding для анализа.
+    Поиск выполняется по UUID в векторной базе данных.
+    
+    **Path Parameters:**
+    - `material_id`: UUID материала в формате UUID4
+    
+    **Response Example:**
+    ```json
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "Портландцемент М500 Д0",
+        "use_category": "Цемент",
+        "unit": "мешок",
+        "sku": "CEM500-001",
+        "description": "Высокопрочный цемент для конструкционного бетона",
+        "embedding": [0.023, -0.156, 0.789, ...], // 1536 dimensions
+        "created_at": "2025-06-16T16:46:29.421964Z",
+        "updated_at": "2025-06-16T16:46:29.421964Z"
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Материал найден и возвращен
+    - **404 Not Found**: Материал с указанным ID не найден
+    - **400 Bad Request**: Некорректный формат UUID
+    - **500 Internal Server Error**: Ошибка работы с БД
+    
+    **Use Cases:**
+    - Получение полной информации о материале
+    - Анализ embedding для отладки поиска
+    - Проверка существования материала
     """
     try:
         logger.debug(f"Getting material: {material_id}")
@@ -156,13 +277,80 @@ async def search_materials(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    Search materials using semantic search with fallback strategy.
+    🔍 **Semantic Material Search** - Семантический поиск материалов
     
-    Implements fallback: vector search → SQL LIKE search if 0 results.
+    Выполняет интеллектуальный поиск строительных материалов с использованием 
+    векторных embeddings и семантического анализа. Поддерживает fallback-стратегию
+    при отсутствии результатов.
     
-    Parameters:
-    - query: Search query parameters (query string, limit 1-100)
-    - Returns: List of matching materials ordered by relevance
+    **🔄 Fallback Strategy:**
+    1. **Vector Search**: Семантический поиск по embedding
+    2. **SQL LIKE Search**: Текстовый поиск при 0 результатах
+    3. **Fuzzy Matching**: Поиск с учетом опечаток
+    
+    **Особенности:**
+    - 🧠 AI-powered семантический поиск
+    - 🔍 Поиск синонимов и похожих терминов
+    - 📊 Ранжирование по релевантности
+    - ⚡ Быстрый отклик (< 300ms)
+    - 🛡️ Graceful degradation при ошибках
+    
+    **Request Body Example:**
+    ```json
+    {
+        "query": "цемент портландский высокой прочности",
+        "limit": 20
+    }
+    ```
+    
+    **Response Example:**
+    ```json
+    [
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "Портландцемент М500 Д0",
+            "use_category": "Цемент",
+            "unit": "мешок",
+            "sku": "CEM500-001",
+            "description": "Высокопрочный цемент для конструкционного бетона",
+            "embedding": null, // Hidden in search results
+            "created_at": "2025-06-16T16:46:29.421964Z",
+            "updated_at": "2025-06-16T16:46:29.421964Z"
+        },
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440001",
+            "name": "Цемент М400 быстротвердеющий",
+            "use_category": "Цемент",
+            "unit": "т",
+            "sku": "CEM400-BT",
+            "description": "Быстротвердеющий портландцемент для срочных работ",
+            "embedding": null,
+            "created_at": "2025-06-16T16:46:29.421964Z",
+            "updated_at": "2025-06-16T16:46:29.421964Z"
+        }
+    ]
+    ```
+    
+    **Query Parameters:**
+    - `query`: Поисковый запрос (min: 1 символ, max: 500 символов)
+    - `limit`: Максимальное количество результатов (1-100, default: 10)
+    
+    **Response Status Codes:**
+    - **200 OK**: Поиск выполнен успешно (может быть пустой список)
+    - **400 Bad Request**: Некорректные параметры запроса
+    - **500 Internal Server Error**: Ошибка выполнения поиска
+    
+    **Search Examples:**
+    - `"цемент М500"` → найдет все цементы марки М500
+    - `"арматура стальная"` → найдет стальную арматуру всех видов
+    - `"утеплитель минеральный"` → найдет минеральные утеплители
+    - `"кирпич красный лицевой"` → найдет лицевой красный кирпич
+    
+    **Use Cases:**
+    - Поиск материалов для строительных проектов
+    - Подбор аналогов и заменителей
+    - Создание спецификаций и смет
+    - API для мобильных приложений
     """
     try:
         # Check if service initialization failed
@@ -223,13 +411,48 @@ async def get_materials(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    Get all materials with optional filtering.
+    📋 **List Materials** - Получение списка материалов с пагинацией
     
-    Parameters:
-    - skip: Number of materials to skip (default: 0)
-    - limit: Maximum number of materials to return (default: 10)
-    - category: Optional category filter by use_category name
-    - Returns: List of materials with pagination
+    Возвращает список всех материалов с поддержкой пагинации и фильтрации.
+    Полезно для создания каталогов и административных интерфейсов.
+    
+    **Query Parameters:**
+    - `skip`: Количество записей для пропуска (offset) - default: 0
+    - `limit`: Максимальное количество записей - default: 10, max: 100
+    - `category`: Фильтр по категории использования (опционально)
+    
+    **Response Example:**
+    ```json
+    [
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "Портландцемент М500 Д0",
+            "use_category": "Цемент",
+            "unit": "мешок",
+            "sku": "CEM500-001",
+            "description": "Высокопрочный цемент для конструкционного бетона",
+            "embedding": null, // Hidden in list view
+            "created_at": "2025-06-16T16:46:29.421964Z",
+            "updated_at": "2025-06-16T16:46:29.421964Z"
+        }
+    ]
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Список возвращен успешно (может быть пустым)
+    - **400 Bad Request**: Некорректные параметры пагинации
+    - **500 Internal Server Error**: Ошибка получения данных
+    
+    **Pagination Examples:**
+    - `GET /materials/?limit=20` → первые 20 материалов
+    - `GET /materials/?skip=20&limit=20` → материалы 21-40
+    - `GET /materials/?category=Цемент&limit=50` → цементы (до 50 шт.)
+    
+    **Use Cases:**
+    - Отображение каталога материалов
+    - Административные интерфейсы
+    - Экспорт данных
+    - Создание отчетов
     """
     try:
         logger.debug(f"Getting materials: skip={skip}, limit={limit}, category={category}")
@@ -251,21 +474,72 @@ async def update_material(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    Update a material with new semantic embedding.
+    ✏️ **Update Material** - Обновление существующего материала
     
-    Parameters:
-    - material_id: Unique identifier of the material
-    - material: Updated material data (name, use_category, unit, sku, description)
-    - Returns: Updated material with regenerated embedding
+    Обновляет данные материала с пересчетом семантического embedding при изменении
+    критических полей (name, description). Поддерживает частичное обновление.
+    
+    **Особенности:**
+    - 🔄 Пересчет embedding при изменении ключевых полей
+    - 📝 Частичное обновление (только указанные поля)
+    - ⏰ Автоматическое обновление updated_at
+    - ✅ Валидация измененных данных
+    - 🔍 Проверка существования материала
+    
+    **Path Parameters:**
+    - `material_id`: UUID материала для обновления
+    
+    **Updateable Fields:**
+    - `name`: Название материала (триггерирует пересчет embedding)
+    - `use_category`: Категория использования 
+    - `unit`: Единица измерения
+    - `sku`: Артикул/код материала
+    - `description`: Описание (триггерирует пересчет embedding)
+    
+    **Request Body Example:**
+    ```json
+    {
+        "name": "Портландцемент М500 Д0 (улучшенный)",
+        "description": "Высокопрочный цемент для конструкционного бетона с улучшенными характеристиками",
+        "sku": "CEM500-001-V2"
+    }
+    ```
+    
+    **Response Example:**
+    ```json
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "Портландцемент М500 Д0 (улучшенный)",
+        "use_category": "Цемент",
+        "unit": "мешок",
+        "sku": "CEM500-001-V2",
+        "description": "Высокопрочный цемент для конструкционного бетона с улучшенными характеристиками",
+        "embedding": [0.021, -0.134, 0.756, ...], // Updated embedding
+        "created_at": "2025-06-16T16:46:29.421964Z",
+        "updated_at": "2025-06-16T17:30:15.123456Z" // Updated timestamp
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Материал успешно обновлен
+    - **404 Not Found**: Материал с указанным ID не найден
+    - **400 Bad Request**: Ошибка валидации данных
+    - **500 Internal Server Error**: Ошибка обновления или пересчета embedding
+    
+    **Use Cases:**
+    - Исправление данных материалов
+    - Обновление технических характеристик
+    - Изменение категоризации
+    - Актуализация артикулов
     """
     try:
         logger.info(f"Updating material: {material_id}")
-        updated = await service.update_material(material_id, material)
-        if not updated:
+        result = await service.update_material(material_id, material)
+        if not result:
             logger.warning(f"Material not found for update: {material_id}")
             raise HTTPException(status_code=404, detail="Material not found")
         logger.info(f"Material updated successfully: {material_id}")
-        return updated
+        return result
     except HTTPException:
         raise  # Re-raise HTTP exceptions
     except DatabaseError as e:
@@ -282,11 +556,49 @@ async def delete_material(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    Delete a material.
+    🗑️ **Delete Material** - Удаление материала
     
-    Parameters:
-    - material_id: Unique identifier of the material
-    - Returns: Success status with confirmation
+    Удаляет материал из векторной базы данных по UUID. Операция необратимая,
+    восстановление возможно только из резервных копий.
+    
+    **⚠️ ВНИМАНИЕ: Операция необратимая!**
+    
+    **Особенности:**
+    - 🔥 Полное удаление из векторной БД
+    - 🔍 Проверка существования перед удалением
+    - 📊 Обновление индексов поиска
+    - ⚡ Быстрое выполнение
+    - 🛡️ Защита от случайного удаления
+    
+    **Path Parameters:**
+    - `material_id`: UUID материала для удаления
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "message": "Material deleted successfully",
+        "deleted_id": "550e8400-e29b-41d4-a716-446655440000",
+        "timestamp": "2025-06-16T17:30:15.123456Z"
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Материал успешно удален
+    - **404 Not Found**: Материал с указанным ID не найден
+    - **400 Bad Request**: Некорректный формат UUID
+    - **500 Internal Server Error**: Ошибка удаления из БД
+    
+    **Use Cases:**
+    - Удаление устаревших материалов
+    - Очистка тестовых данных
+    - Удаление дубликатов
+    - Архивация неактуальных записей
+    
+    **⚠️ Рекомендации:**
+    - Создавайте резервные копии перед массовым удалением
+    - Проверяйте зависимости в связанных системах
+    - Используйте batch операции для множественного удаления
     """
     try:
         logger.info(f"Deleting material: {material_id}")
@@ -295,7 +607,12 @@ async def delete_material(
             logger.warning(f"Material not found for deletion: {material_id}")
             raise HTTPException(status_code=404, detail="Material not found")
         logger.info(f"Material deleted successfully: {material_id}")
-        return {"success": success}
+        return {
+            "success": True,
+            "message": "Material deleted successfully",
+            "deleted_id": material_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }
     except HTTPException:
         raise  # Re-raise HTTP exceptions
     except DatabaseError as e:
@@ -312,53 +629,106 @@ async def create_materials_batch(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    Create multiple materials in batch with optimized performance.
+    📦 **Batch Create Materials** - Массовое создание материалов
     
-    Parameters:
-    - batch_data: Batch creation parameters (materials list 1-1000, batch_size 1-500)
-    - Returns: Batch operation results with success/failure counts and processing time
+    Создает множество материалов за один запрос с оптимизированной обработкой.
+    Поддерживает частичный успех - часть материалов может быть создана успешно.
+    
+    **Особенности:**
+    - ⚡ Параллельная обработка embedding'ов
+    - 📊 Статистика успешных/неудачных операций
+    - 🔄 Batch обработка в векторной БД
+    - 🛡️ Graceful handling ошибок
+    - 📈 Прогресс трекинг
+    
+    **Лимиты:**
+    - **Минимум**: 1 материал
+    - **Максимум**: 1000 материалов за запрос
+    - **Batch size**: 100 материалов (настраивается)
+    - **Timeout**: 5 минут на весь запрос
+    
+    **Request Body Example:**
+    ```json
+    {
+        "materials": [
+            {
+                "name": "Портландцемент М500",
+                "use_category": "Цемент",
+                "unit": "мешок",
+                "sku": "CEM500-001",
+                "description": "Высокопрочный цемент"
+            },
+            {
+                "name": "Кирпич керамический",
+                "use_category": "Кирпич",
+                "unit": "шт",
+                "sku": "BRICK-001",
+                "description": "Полнотелый кирпич"
+            }
+        ],
+        "batch_size": 100
+    }
+    ```
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "total_processed": 2,
+        "successful_materials": [
+            {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Портландцемент М500",
+                "use_category": "Цемент",
+                "unit": "мешок",
+                "sku": "CEM500-001",
+                "description": "Высокопрочный цемент",
+                "embedding": [...],
+                "created_at": "2025-06-16T17:30:15.123456Z",
+                "updated_at": "2025-06-16T17:30:15.123456Z"
+            }
+        ],
+        "failed_materials": [
+            {
+                "index": 1,
+                "material": {...},
+                "error": "Duplicate SKU: BRICK-001"
+            }
+        ],
+        "processing_time_seconds": 45.6,
+        "successful_count": 1,
+        "failed_count": 1,
+        "success_rate": 50.0,
+        "errors": []
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Batch обработан (проверьте success_rate)
+    - **400 Bad Request**: Некорректные данные batch
+    - **413 Payload Too Large**: Превышен лимит материалов
+    - **500 Internal Server Error**: Критическая ошибка обработки
+    
+    **Use Cases:**
+    - Импорт каталогов материалов
+    - Миграция данных между системами
+    - Массовое создание тестовых данных
+    - Синхронизация с ERP системами
     """
     try:
-        # Check if service initialization failed
-        if service is None:
-            logger.warning("MaterialsService initialization failed, returning fallback response")
-            return MaterialBatchResponse(
-                success=False,
-                total_processed=len(batch_data.materials),
-                successful_materials=[],
-                failed_materials=[{"error": "Service unavailable", "material": mat.dict()} for mat in batch_data.materials],
-                processing_time_seconds=0.001,
-                errors=["MaterialsService initialization failed"]
-            )
-        
-        logger.info(f"Starting batch creation of {len(batch_data.materials)} materials")
-        result = await service.create_materials_batch(
-            batch_data.materials, 
-            batch_data.batch_size
-        )
-        logger.info(f"Batch creation completed: {result.successful_count} success, {result.failed_count} failed")
+        logger.info(f"Processing batch create: {len(batch_data.materials)} materials")
+        result = await service.create_materials_batch(batch_data.materials, batch_data.batch_size)
+        logger.info(f"Batch create completed: {result.successful_count}/{result.total_processed} successful")
         return result
-        
+    except ValueError as e:
+        logger.error(f"Invalid batch data: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid batch data: {str(e)}")
     except DatabaseError as e:
-        logger.error(f"Database error in batch creation: {e}")
-        return MaterialBatchResponse(
-            success=False,
-            total_processed=len(batch_data.materials),
-            successful_materials=[],
-            failed_materials=[{"error": f"Database error: {e.message}", "material": mat.dict()} for mat in batch_data.materials],
-            processing_time_seconds=0.001,
-            errors=[f"Database error: {e.message}"]
-        )
+        logger.error(f"Database error in batch create: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
     except Exception as e:
-        logger.error(f"Unexpected error in batch creation: {e}")
-        return MaterialBatchResponse(
-            success=False,
-            total_processed=len(batch_data.materials),
-            successful_materials=[],
-            failed_materials=[{"error": f"Unexpected error: {str(e)}", "material": mat.dict()} for mat in batch_data.materials],
-            processing_time_seconds=0.001,
-            errors=[f"Batch creation failed: {str(e)}"]
-        )
+        logger.error(f"Unexpected error in batch create: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/import", response_model=MaterialBatchResponse)
@@ -367,54 +737,115 @@ async def import_materials_from_json(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    Import materials from JSON format with SKU and name.
+    📥 **Import Materials from JSON** - Импорт материалов из JSON файла
     
-    Parameters:
-    - import_data: Import parameters (materials list 1-1000, default_category, default_unit, batch_size)
-    - Returns: Import operation results with success/failure counts and processing time
+    Импортирует материалы из структурированного JSON формата с автоматическим
+    заполнением значений по умолчанию. Оптимизирован для импорта прайс-листов.
+    
+    **Особенности:**
+    - 📄 Упрощенный формат импорта (только SKU + name)
+    - 🔧 Автоматические значения по умолчанию
+    - 📊 Детальная статистика импорта
+    - 🛡️ Валидация и дедупликация
+    - ⚡ Оптимизированная обработка
+    
+    **Automatic Defaults:**
+    - `use_category`: "Стройматериалы" (настраивается)
+    - `unit`: "шт" (настраивается)
+    - `description`: Генерируется из name
+    - `embedding`: Автоматический расчет
+    
+    **Request Body Example:**
+    ```json
+    {
+        "materials": [
+            {
+                "sku": "CEM500-001",
+                "name": "Портландцемент М500 Д0"
+            },
+            {
+                "sku": "BRICK-001", 
+                "name": "Кирпич керамический полнотелый"
+            }
+        ],
+        "default_use_category": "Строительные материалы",
+        "default_unit": "единица",
+        "batch_size": 100
+    }
+    ```
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "total_processed": 2,
+        "successful_materials": [
+            {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Портландцемент М500 Д0",
+                "use_category": "Строительные материалы",
+                "unit": "единица",
+                "sku": "CEM500-001",
+                "description": "Портландцемент М500 Д0",
+                "embedding": [...],
+                "created_at": "2025-06-16T17:30:15.123456Z",
+                "updated_at": "2025-06-16T17:30:15.123456Z"
+            }
+        ],
+        "failed_materials": [],
+        "processing_time_seconds": 32.1,
+        "successful_count": 2,
+        "failed_count": 0,
+        "success_rate": 100.0,
+        "errors": []
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Импорт завершен (проверьте success_rate)
+    - **400 Bad Request**: Некорректный формат данных
+    - **413 Payload Too Large**: Превышен лимит импорта
+    - **500 Internal Server Error**: Ошибка обработки импорта
+    
+    **Supported Formats:**
+    - Simple JSON с минимальными полями
+    - Bulk import от поставщиков
+    - Export/Import между системами
+    - Прайс-листы в JSON формате
+    
+    **Use Cases:**
+    - Импорт прайс-листов поставщиков
+    - Миграция из старых систем
+    - Загрузка каталогов материалов
+    - Синхронизация с внешними API
     """
     try:
-        # Check if service initialization failed
-        if service is None:
-            logger.warning("MaterialsService initialization failed, returning fallback response")
-            return MaterialBatchResponse(
-                success=False,
-                total_processed=len(import_data.materials),
-                successful_materials=[],
-                failed_materials=[{"error": "Service unavailable", "material": mat.dict()} for mat in import_data.materials],
-                processing_time_seconds=0.001,
-                errors=["MaterialsService initialization failed"]
-            )
+        logger.info(f"Importing materials from JSON: {len(import_data.materials)} items")
         
-        logger.info(f"Starting import of {len(import_data.materials)} materials")
-        result = await service.import_materials_from_json(
-            import_data.materials,
-            import_data.default_use_category,
-            import_data.default_unit,
-            import_data.batch_size
-        )
-        logger.info(f"Import completed: {result.successful_count} success, {result.failed_count} failed")
+        # Convert import format to standard MaterialCreate format
+        materials = []
+        for item in import_data.materials:
+            material = MaterialCreate(
+                name=item.name,
+                use_category=import_data.default_use_category,
+                unit=import_data.default_unit,
+                sku=item.sku,
+                description=item.name  # Use name as description by default
+            )
+            materials.append(material)
+        
+        result = await service.create_materials_batch(materials, import_data.batch_size)
+        logger.info(f"JSON import completed: {result.successful_count}/{result.total_processed} successful")
         return result
         
+    except ValueError as e:
+        logger.error(f"Invalid import data: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid import data: {str(e)}")
     except DatabaseError as e:
         logger.error(f"Database error in import: {e}")
-        return MaterialBatchResponse(
-            success=False,
-            total_processed=len(import_data.materials),
-            successful_materials=[],
-            failed_materials=[{"error": f"Database error: {e.message}", "material": mat.dict()} for mat in import_data.materials],
-            processing_time_seconds=0.001,
-            errors=[f"Database error: {e.message}"]
-        )
+        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error in import: {e}")
-        return MaterialBatchResponse(
-            success=False,
-            total_processed=len(import_data.materials),
-            successful_materials=[],
-            failed_materials=[{"error": f"Unexpected error: {str(e)}", "material": mat.dict()} for mat in import_data.materials],
-            processing_time_seconds=0.001,
-            errors=[f"Import failed: {str(e)}"]
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
  

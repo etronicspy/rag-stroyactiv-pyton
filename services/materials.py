@@ -57,9 +57,14 @@ class MaterialsService(BaseRepository):
             try:
                 from core.database.factories import AIClientFactory
                 ai_client = AIClientFactory.create_ai_client()
+                logger.info("✅ AI client successfully created")
             except Exception as e:
-                logger.warning(f"Failed to get AI client: {e}")
-                ai_client = None
+                logger.error(f"❌ CRITICAL: Failed to create AI client: {e}")
+                # NO FALLBACK - AI client is required for embeddings
+                raise DatabaseError(
+                    message="Failed to initialize AI client for embeddings",
+                    details=f"Cannot proceed without OpenAI API access: {str(e)}"
+                )
         
         super().__init__(vector_db=vector_db, ai_client=ai_client)
         self.collection_name = "materials"
