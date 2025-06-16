@@ -7,13 +7,11 @@ Advanced Search API Routes (Simplified)
 - Поддерживают основные функции продвинутого поиска
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 import logging
-import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.schemas.materials import Material
@@ -36,10 +34,7 @@ class SearchSuggestion(BaseModel):
     score: float
     type: str
 
-class PopularQuery(BaseModel):
-    query: str
-    count: int
-    last_used: datetime
+
 
 class AdvancedSearchResponse(BaseModel):
     results: List[Material]
@@ -54,7 +49,9 @@ async def advanced_search(request: AdvancedSearchRequest):
     """
     Perform advanced search with comprehensive options.
     
-    Выполнить продвинутый поиск с комплексными опциями.
+    Parameters:
+    - request: Advanced search parameters (query, search_type, limit, categories, units)  
+    - Returns: Search results with analytics (timing, suggestions, total count)
     """
     start_time = datetime.now()
     
@@ -120,7 +117,10 @@ async def get_search_suggestions(
     """
     Get search suggestions for autocomplete.
     
-    Получить предложения для автодополнения поиска.
+    Parameters:
+    - q: Search query for suggestions (minimum 1 character)
+    - limit: Maximum number of suggestions (default: 8, max: 20)
+    - Returns: List of search suggestions with scores and types
     """
     try:
         logger.debug(f"Getting suggestions for query: '{q}'")
@@ -151,74 +151,13 @@ async def get_search_suggestions(
         logger.error(f"Failed to get suggestions: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get suggestions: {str(e)}")
 
-@router.get("/popular-queries", response_model=List[PopularQuery])
-async def get_popular_queries(
-    limit: int = Query(10, ge=1, le=50, description="Maximum number of popular queries")
-):
-    """
-    Get popular search queries (mock implementation).
-    
-    Получить популярные поисковые запросы (mock реализация).
-    """
-    try:
-        # Mock popular queries
-        popular_queries = [
-            PopularQuery(query="цемент", count=150, last_used=datetime.now()),
-            PopularQuery(query="бетон", count=120, last_used=datetime.now() - timedelta(hours=1)),
-            PopularQuery(query="кирпич", count=100, last_used=datetime.now() - timedelta(hours=2)),
-            PopularQuery(query="песок строительный", count=80, last_used=datetime.now() - timedelta(hours=3)),
-            PopularQuery(query="арматура", count=75, last_used=datetime.now() - timedelta(hours=4)),
-        ]
-        
-        return popular_queries[:limit]
-        
-    except Exception as e:
-        logger.error(f"Failed to get popular queries: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get popular queries: {str(e)}")
-
-@router.get("/analytics")
-async def get_search_analytics(
-    start_date: Optional[datetime] = Query(None, description="Start date"),
-    end_date: Optional[datetime] = Query(None, description="End date")
-):
-    """
-    Get search analytics (mock implementation).
-    
-    Получить аналитику поиска (mock реализация).
-    """
-    try:
-        # Mock analytics data
-        analytics = {
-            "period": {
-                "start": start_date or (datetime.now() - timedelta(days=7)),
-                "end": end_date or datetime.now()
-            },
-            "total_searches": 1247,
-            "unique_queries": 892,
-            "average_results_per_query": 8.3,
-            "most_popular_categories": [
-                {"category": "Цемент", "searches": 234},
-                {"category": "Бетон", "searches": 189},
-                {"category": "Кирпич", "searches": 156}
-            ],
-            "search_trends": {
-                "growing": ["утеплитель", "гидроизоляция"],
-                "declining": ["асбест", "старые материалы"]
-            }
-        }
-        
-        return analytics
-        
-    except Exception as e:
-        logger.error(f"Failed to get analytics: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
-
 @router.get("/categories", response_model=List[str])
 async def get_available_categories():
     """
     Get available material categories.
     
-    Получить доступные категории материалов.
+    Parameters:
+    - Returns: List of all available material categories
     """
     try:
         service = MaterialsService()
@@ -241,7 +180,8 @@ async def get_available_units():
     """
     Get available measurement units.
     
-    Получить доступные единицы измерения.
+    Parameters:
+    - Returns: List of all available measurement units
     """
     try:
         service = MaterialsService()
@@ -257,68 +197,4 @@ async def get_available_units():
     except Exception as e:
         logger.error(f"Failed to get units: {e}")
         # Return mock units if service fails
-        return ["кг", "м3", "м2", "м", "шт", "т", "л", "упак"]
-
-@router.post("/fuzzy", response_model=List[Material])
-async def fuzzy_search(
-    q: str = Query(..., min_length=1, description="Search query"),
-    threshold: float = Query(0.8, ge=0.0, le=1.0, description="Similarity threshold"),
-    limit: int = Query(10, ge=1, le=100, description="Maximum results")
-):
-    """
-    Perform fuzzy search with similarity matching.
-    
-    Выполнить нечеткий поиск с сопоставлением сходства.
-    """
-    try:
-        logger.debug(f"Fuzzy search: '{q}', threshold: {threshold}")
-        
-        # Use standard search - MaterialsService already has good fuzzy matching
-        service = MaterialsService()
-        results = await service.search_materials(query=q, limit=limit)
-        
-        logger.debug(f"Fuzzy search completed: {len(results)} results")
-        return results
-        
-    except Exception as e:
-        logger.error(f"Fuzzy search failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Fuzzy search failed: {str(e)}")
-
-@router.get("/health")
-async def search_health_check():
-    """
-    Health check for search service.
-    
-    Проверка здоровья поискового сервиса.
-    """
-    try:
-        # Test basic search functionality
-        service = MaterialsService()
-        health = await service.get_health_status()
-        
-        # Add search-specific checks
-        search_health = {
-            **health,
-            "advanced_search": "ok",
-            "endpoints": {
-                "advanced": "ok",
-                "suggestions": "ok",
-                "analytics": "ok",
-                "categories": "ok",
-                "units": "ok",
-                "fuzzy": "ok"
-            },
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        logger.debug("Advanced search health check passed")
-        return search_health
-        
-    except Exception as e:
-        logger.error(f"Advanced search health check failed: {e}")
-        return {
-            "service": "advanced_search",
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        } 
+        return ["кг", "м3", "м2", "м", "шт", "т", "л", "упак"] 

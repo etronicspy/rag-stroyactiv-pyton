@@ -14,7 +14,12 @@ async def search_materials(
     limit: int = Query(10, description="Maximum number of results to return")
 ) -> List[Material]:
     """
-    Search materials using semantic search
+    Search materials using semantic search with fallback strategy.
+    
+    Parameters:
+    - q: Search query string (minimum 1 character)
+    - limit: Maximum number of results to return (default: 10, max: 100)
+    - Returns: List of materials ordered by relevance
     """
     try:
         service = MaterialsService()

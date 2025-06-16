@@ -24,7 +24,7 @@ import logging
 from core.schemas.materials import (
     AdvancedSearchQuery, MaterialFilterOptions, SortOption, PaginationOptions,
     SearchResponse, MaterialSearchResult, SearchSuggestion, SearchHighlight,
-    SearchAnalytics, PopularQuery, Material
+    SearchAnalytics, Material
 )
 from core.repositories.cached_materials import CachedMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
@@ -643,53 +643,12 @@ class AdvancedSearchService:
             analytics_key = f"{self.analytics_cache_key}:{datetime.utcnow().strftime('%Y-%m-%d')}"
             await self.redis_db.lpush(analytics_key, analytics.dict())
             
-            # Update popular queries
-            await self._update_popular_queries(query.query)
+
             
         except Exception as e:
             logger.warning(f"Failed to track analytics: {e}")
     
-    async def _update_popular_queries(self, query: str):
-        """Update popular queries statistics."""
-        try:
-            # Increment query count
-            query_key = f"{self.popular_queries_key}:{query.lower()}"
-            await self.redis_db.hincrby(query_key, "count", 1)
-            await self.redis_db.hset(query_key, "last_searched", datetime.utcnow().isoformat())
-            await self.redis_db.expire(query_key, 86400 * 30)  # 30 days
-            
-        except Exception as e:
-            logger.warning(f"Failed to update popular queries: {e}")
-    
-    async def _get_popular_queries(self, limit: int = 10) -> List[PopularQuery]:
-        """Get popular search queries."""
-        try:
-            # Get all query keys
-            pattern = f"{self.popular_queries_key}:*"
-            keys = await self.redis_db.keys(pattern)
-            
-            popular_queries = []
-            for key in keys:
-                query_data = await self.redis_db.hgetall(key)
-                if query_data:
-                    query_text = key.split(":", 2)[-1]
-                    popular_queries.append(PopularQuery(
-                        query=query_text,
-                        count=int(query_data.get("count", 0)),
-                        avg_results=float(query_data.get("avg_results", 0)),
-                        avg_time_ms=float(query_data.get("avg_time_ms", 0)),
-                        last_searched=datetime.fromisoformat(
-                            query_data.get("last_searched", datetime.utcnow().isoformat())
-                        )
-                    ))
-            
-            # Sort by count and return top queries
-            popular_queries.sort(key=lambda x: x.count, reverse=True)
-            return popular_queries[:limit]
-            
-        except Exception as e:
-            logger.warning(f"Failed to get popular queries: {e}")
-            return []
+
     
     async def get_search_analytics(
         self,
@@ -708,7 +667,7 @@ class AdvancedSearchService:
                 'avg_search_time': 0.0,
                 'avg_results_count': 0.0,
                 'search_types': defaultdict(int),
-                'popular_queries': await self._get_popular_queries(20),
+                'popular_queries': [],
                 'daily_stats': {}
             }
             

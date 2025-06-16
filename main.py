@@ -173,8 +173,7 @@ app.include_router(advanced_search.router)
 
 # Test endpoints (только для development)
 if settings.ENVIRONMENT == "development":
-    from api.routes import test_endpoints
-    app.include_router(test_endpoints.router, prefix="/api/v1/test", tags=["testing", "middleware"])
+    pass  # Test endpoints removed
 
 @app.get("/")
 async def root():

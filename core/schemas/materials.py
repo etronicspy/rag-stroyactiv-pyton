@@ -417,27 +417,7 @@ class SearchAnalytics(BaseModel):
             }
         }
 
-class PopularQuery(BaseModel):
-    """Popular search query statistics.
-    
-    Статистика популярных поисковых запросов.
-    """
-    query: str = Field(..., description="Search query")
-    count: int = Field(..., description="Number of times searched")
-    avg_results: float = Field(..., description="Average number of results")
-    avg_time_ms: float = Field(..., description="Average search time")
-    last_searched: datetime = Field(..., description="Last search timestamp")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "query": "цемент",
-                "count": 1250,
-                "avg_results": 45.2,
-                "avg_time_ms": 38.7,
-                "last_searched": "2024-01-01T12:00:00Z"
-            }
-        }
+
 
 class Category(BaseModel):
     name: str

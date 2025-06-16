@@ -466,13 +466,23 @@ health_checker = HealthChecker()
 
 @router.get("/")
 async def basic_health_check():
-    """Basic health check endpoint."""
+    """
+    Basic health check endpoint.
+    
+    Parameters:
+    - Returns: Basic service status and uptime information
+    """
     return await health_checker.check_basic_health()
 
 
 @router.get("/detailed")
 async def detailed_health_check():
-    """Comprehensive health check for all services."""
+    """
+    Comprehensive health check for all services.
+    
+    Parameters:
+    - Returns: Detailed health status of all system components (databases, AI services, metrics)
+    """
     start_time = time.time()
     
     # Run all health checks concurrently
@@ -532,7 +542,12 @@ async def detailed_health_check():
 
 @router.get("/databases")
 async def database_health_check():
-    """Database-specific health checks."""
+    """
+    Database-specific health checks.
+    
+    Parameters:
+    - Returns: Health status of all database connections (vector DB, PostgreSQL, Redis)
+    """
     checks = await asyncio.gather(
         health_checker.check_vector_database(),
         health_checker.check_postgresql(),
@@ -552,70 +567,4 @@ async def database_health_check():
     }
 
 
-@router.get("/metrics")
-async def metrics_endpoint():
-    """Get application metrics."""
-    return health_checker.metrics_collector.get_metrics_summary()
-
-
-@router.get("/performance")
-async def performance_metrics():
-    """Get performance metrics for database operations."""
-    performance_data = health_checker.metrics_collector.get_performance_tracker().get_database_summary()
-    
-    # Если нет данных после перезапуска, возвращаем структуру с нулевыми значениями
-    if not performance_data:
-        return {
-            "status": "no_data",
-            "message": "Нет данных о производительности после перезапуска сервера. Данные будут накапливаться по мере использования API.",
-            "server_info": {
-                "uptime_seconds": time.time() - getattr(health_checker, '_startup_time', time.time()),
-                "service": settings.PROJECT_NAME,
-                "version": settings.VERSION,
-                "environment": settings.ENVIRONMENT
-            },
-            "monitoring": {
-                "metrics_collection": "active",
-                "performance_tracking": "active",
-                "data_retention": "in_memory_only"
-            },
-            "expected_metrics": {
-                "database_types": ["postgresql", "qdrant", "redis"],
-                "operations": ["search", "insert", "update", "delete", "health_check"],
-                "tracked_stats": ["operation_count", "avg_duration_ms", "success_rate", "error_count"]
-            },
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    
-    # Добавляем дополнительную информацию к существующим данным
-    performance_data["server_info"] = {
-        "uptime_seconds": time.time() - getattr(health_checker, '_startup_time', time.time()),
-        "service": settings.PROJECT_NAME,
-        "version": settings.VERSION,
-        "environment": settings.ENVIRONMENT
-    }
-    performance_data["timestamp"] = datetime.utcnow().isoformat()
-    
-    return performance_data
-
-
-@router.get("/config")
-async def config_status():
-    """Get configuration status and service information."""
-    return {
-        "service": settings.PROJECT_NAME,
-        "version": settings.VERSION,
-        "environment": settings.ENVIRONMENT,
-        "configuration": {
-            "database_type": settings.DATABASE_TYPE.value,
-            "ai_provider": settings.AI_PROVIDER.value,
-            "features": {
-                "auto_migrate": settings.AUTO_MIGRATE,
-                "auto_seed": settings.AUTO_SEED,
-                "rate_limiting": settings.ENABLE_RATE_LIMITING,
-                "security_headers": settings.ENABLE_SECURITY_HEADERS,
-                "structured_logging": settings.ENABLE_STRUCTURED_LOGGING
-            }
-        },
-        "timestamp": datetime.utcnow().isoformat()
-    } 
+ 

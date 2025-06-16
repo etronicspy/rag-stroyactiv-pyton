@@ -101,17 +101,12 @@ async def create_material(
     material: MaterialCreate,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Create a new material with semantic embedding.
+    """
+    Create a new material with semantic embedding.
     
-    Args:
-        material: Material data to create
-        service: Materials service (injected)
-        
-    Returns:
-        Created material with ID and embedding
-        
-    Raises:
-        HTTPException: If creation fails
+    Parameters:
+    - material: Material data to create (name, use_category, unit, sku, description)
+    - Returns: Created material with generated ID and 1536-dimension embedding
     """
     try:
         logger.info(f"Creating material: {material.name}")
@@ -131,17 +126,12 @@ async def get_material(
     material_id: str,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Get a specific material by ID.
+    """
+    Get a specific material by ID.
     
-    Args:
-        material_id: Material identifier
-        service: Materials service (injected)
-        
-    Returns:
-        Material if found
-        
-    Raises:
-        HTTPException: If material not found or retrieval fails
+    Parameters:
+    - material_id: Unique identifier of the material
+    - Returns: Material data including embedding information
     """
     try:
         logger.debug(f"Getting material: {material_id}")
@@ -165,19 +155,14 @@ async def search_materials(
     query: MaterialSearchQuery,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Search materials using semantic search with fallback (Qdrant-only mode).
+    """
+    Search materials using semantic search with fallback strategy.
     
-    Implements fallback strategy: vector search → SQL LIKE search if 0 results
+    Implements fallback: vector search → SQL LIKE search if 0 results.
     
-    Args:
-        query: Search query parameters
-        service: Materials service (injected)
-        
-    Returns:
-        List of matching materials or fallback mock response
-        
-    Raises:
-        HTTPException: If search fails critically
+    Parameters:
+    - query: Search query parameters (query string, limit 1-100)
+    - Returns: List of matching materials ordered by relevance
     """
     try:
         # Check if service initialization failed
@@ -237,19 +222,14 @@ async def get_materials(
     category: Optional[str] = None,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Get all materials with optional filtering.
+    """
+    Get all materials with optional filtering.
     
-    Args:
-        skip: Number of materials to skip
-        limit: Maximum number of materials to return
-        category: Optional category filter
-        service: Materials service (injected)
-        
-    Returns:
-        List of materials
-        
-    Raises:
-        HTTPException: If retrieval fails
+    Parameters:
+    - skip: Number of materials to skip (default: 0)
+    - limit: Maximum number of materials to return (default: 10)
+    - category: Optional category filter by use_category name
+    - Returns: List of materials with pagination
     """
     try:
         logger.debug(f"Getting materials: skip={skip}, limit={limit}, category={category}")
@@ -270,18 +250,13 @@ async def update_material(
     material: MaterialUpdate,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Update a material with new semantic embedding.
+    """
+    Update a material with new semantic embedding.
     
-    Args:
-        material_id: Material identifier
-        material: Updated material data
-        service: Materials service (injected)
-        
-    Returns:
-        Updated material
-        
-    Raises:
-        HTTPException: If material not found or update fails
+    Parameters:
+    - material_id: Unique identifier of the material
+    - material: Updated material data (name, use_category, unit, sku, description)
+    - Returns: Updated material with regenerated embedding
     """
     try:
         logger.info(f"Updating material: {material_id}")
@@ -306,17 +281,12 @@ async def delete_material(
     material_id: str,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Delete a material.
+    """
+    Delete a material.
     
-    Args:
-        material_id: Material identifier
-        service: Materials service (injected)
-        
-    Returns:
-        Success status
-        
-    Raises:
-        HTTPException: If material not found or deletion fails
+    Parameters:
+    - material_id: Unique identifier of the material
+    - Returns: Success status with confirmation
     """
     try:
         logger.info(f"Deleting material: {material_id}")
@@ -341,17 +311,12 @@ async def create_materials_batch(
     batch_data: MaterialBatchCreate,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Batch create materials with optimized performance (Qdrant-only mode).
+    """
+    Create multiple materials in batch with optimized performance.
     
-    Args:
-        batch_data: Batch creation parameters
-        service: Materials service (injected)
-        
-    Returns:
-        Batch operation results or fallback response
-        
-    Raises:
-        HTTPException: If batch creation fails critically
+    Parameters:
+    - batch_data: Batch creation parameters (materials list 1-1000, batch_size 1-500)
+    - Returns: Batch operation results with success/failure counts and processing time
     """
     try:
         # Check if service initialization failed
@@ -401,17 +366,12 @@ async def import_materials_from_json(
     import_data: MaterialImportRequest,
     service: MaterialsService = Depends(get_materials_service)
 ):
-    """Import materials from JSON format (sku + name) - Qdrant-only mode.
+    """
+    Import materials from JSON format with SKU and name.
     
-    Args:
-        import_data: Import parameters
-        service: Materials service (injected)
-        
-    Returns:
-        Import operation results or fallback response
-        
-    Raises:
-        HTTPException: If import fails critically
+    Parameters:
+    - import_data: Import parameters (materials list 1-1000, default_category, default_unit, batch_size)
+    - Returns: Import operation results with success/failure counts and processing time
     """
     try:
         # Check if service initialization failed

@@ -173,12 +173,7 @@ class MaterialsAPI {
         return await response.json();
     }
     
-    async getPopularQueries(limit = 20) {
-        const response = await fetch(
-            `${this.baseURL}/api/v1/search/popular-queries?limit=${limit}`
-        );
-        return await response.json();
-    }
+
 }
 
 // Использование
@@ -288,7 +283,7 @@ curl -X POST "http://localhost:8000/api/v1/search/advanced" \
 curl -X GET "http://localhost:8000/api/v1/search/suggestions?query=цемент&limit=5"
 
 # Получение популярных запросов
-curl -X GET "http://localhost:8000/api/v1/search/popular-queries?limit=10&period=week"
+
 
 # Загрузка прайс-листа
 curl -X POST "http://localhost:8000/api/v1/prices/process" \
@@ -411,27 +406,14 @@ class MaterialsAnalytics {
         return await response.json();
     }
     
-    async getSearchAnalytics(period = 'week') {
-        const response = await fetch(
-            `${this.apiBase}/api/v1/search/analytics?period=${period}`
-        );
-        return await response.json();
-    }
+
     
     async generateReport() {
-        const [health, analytics, popular] = await Promise.all([
-            this.getSystemHealth(),
-            this.getSearchAnalytics(),
-            fetch(`${this.apiBase}/api/v1/search/popular-queries?limit=10`)
-                .then(r => r.json())
-        ]);
+        const health = await this.getSystemHealth();
         
         return {
             timestamp: new Date().toISOString(),
             system_status: health.status,
-            total_searches: analytics.analytics.total_searches,
-            avg_search_time: analytics.analytics.avg_search_time_ms,
-            top_queries: popular.popular_queries.slice(0, 5),
             database_health: {
                 postgresql: health.components.postgresql.status,
                 qdrant: health.components.qdrant.status,

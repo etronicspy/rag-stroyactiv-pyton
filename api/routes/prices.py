@@ -120,6 +120,7 @@ async def get_latest_price_list(
     
     Parameters:
     - supplier_id: Unique identifier of the supplier
+    - Returns: Latest price list with materials/raw products
     """
     try:
         result = price_processor.get_latest_price_list(supplier_id)
@@ -143,10 +144,11 @@ async def get_all_price_lists(
     price_processor: PriceProcessor = Depends(get_price_processor)
 ):
     """
-    Get all price lists for a specific supplier (grouped by upload date).
+    Get all price lists for a specific supplier grouped by upload date.
     
     Parameters:
     - supplier_id: Unique identifier of the supplier
+    - Returns: All price lists grouped by upload date
     """
     try:
         result = price_processor.get_all_price_lists(supplier_id)
@@ -165,6 +167,7 @@ async def delete_supplier_price_list(
     
     Parameters:
     - supplier_id: Unique identifier of the supplier
+    - Returns: Deletion confirmation message
     """
     try:
         success = price_processor.delete_supplier_prices(supplier_id)
@@ -185,11 +188,12 @@ async def get_raw_products_by_pricelist(
     price_processor: PriceProcessor = Depends(get_price_processor)
 ):
     """
-    Get raw products by specific pricelist ID (new format only).
+    Get raw products by specific pricelist ID.
     
     Parameters:
     - supplier_id: Unique identifier of the supplier
     - pricelistid: Specific price list ID
+    - Returns: Raw products from the specified pricelist
     """
     try:
         # For now, use the existing method but add filtering logic in processor
@@ -232,6 +236,7 @@ async def mark_product_as_processed(
     Parameters:
     - supplier_id: Unique identifier of the supplier
     - product_id: Unique identifier of the product
+    - Returns: Processing confirmation with status
     """
     try:
         # Add method to price processor for marking as processed
