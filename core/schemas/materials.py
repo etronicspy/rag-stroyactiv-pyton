@@ -417,15 +417,15 @@ class SearchAnalytics(BaseModel):
             }
         }
 
-
-
 class Category(BaseModel):
+    id: Optional[str] = None  # UUID from Qdrant
     name: str
     description: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Unit(BaseModel):
+    id: Optional[str] = None  # UUID from Qdrant
     name: str
     description: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)

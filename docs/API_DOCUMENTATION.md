@@ -176,8 +176,11 @@ QDRANT_URL=https://cluster.qdrant.tech:6333
 **Ответ**:
 ```json
 {
+  "id": "550e8400-e29b-41d4-a716-446655440000",
   "name": "Цемент",
-  "description": "Вяжущие материалы на основе портландцемента"
+  "description": "Вяжущие материалы на основе портландцемента",
+  "created_at": "2024-01-01T12:00:00.000Z",
+  "updated_at": "2024-01-01T12:00:00.000Z"
 }
 ```
 
@@ -188,21 +191,57 @@ QDRANT_URL=https://cluster.qdrant.tech:6333
 ```json
 [
   {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "Цемент",
-    "description": "Вяжущие материалы"
+    "description": "Вяжущие материалы",
+    "created_at": "2024-01-01T12:00:00.000Z",
+    "updated_at": "2024-01-01T12:00:00.000Z"
   },
   {
+    "id": "550e8400-e29b-41d4-a716-446655440001", 
     "name": "Кирпич", 
-    "description": "Керамические изделия"
+    "description": "Керамические изделия",
+    "created_at": "2024-01-01T12:00:00.000Z",
+    "updated_at": "2024-01-01T12:00:00.000Z"
   }
 ]
 ```
 
-### DELETE /api/v1/reference/categories/{name}
-Удаление категории.
+### DELETE /api/v1/reference/categories/{category_id}
+Удаление категории по ID.
+
+**Path параметры**:
+- `category_id` (string): UUID категории
+
+**Пример запроса**:
+```
+DELETE /api/v1/reference/categories/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Ответ**:
+```json
+{
+  "success": true
+}
+```
+
+### DELETE /api/v1/reference/categories/by-name/{name}
+Удаление категории по имени (legacy API).
 
 **Path параметры**:
 - `name` (string): Имя категории
+
+**Пример запроса**:
+```
+DELETE /api/v1/reference/categories/by-name/Цемент
+```
+
+**Ответ**:
+```json
+{
+  "success": true
+}
+```
 
 ### POST /api/v1/reference/units/
 Создание новой единицы измерения.
@@ -218,8 +257,41 @@ QDRANT_URL=https://cluster.qdrant.tech:6333
 ### GET /api/v1/reference/units/
 Получение всех единиц измерения.
 
-### DELETE /api/v1/reference/units/{name}
-Удаление единицы измерения.
+### DELETE /api/v1/reference/units/{unit_id}
+Удаление единицы измерения по ID.
+
+**Path параметры**:
+- `unit_id` (string): UUID единицы измерения
+
+**Пример запроса**:
+```
+DELETE /api/v1/reference/units/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Ответ**:
+```json
+{
+  "success": true
+}
+```
+
+### DELETE /api/v1/reference/units/by-name/{name}
+Удаление единицы измерения по имени (legacy API).
+
+**Path параметры**:
+- `name` (string): Имя единицы
+
+**Пример запроса**:
+```
+DELETE /api/v1/reference/units/by-name/кг
+```
+
+**Ответ**:
+```json
+{
+  "success": true
+}
+```
 
 ---
 

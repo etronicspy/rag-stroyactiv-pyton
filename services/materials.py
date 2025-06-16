@@ -795,14 +795,17 @@ class CategoryService:
             # Ensure collection exists
             await self._ensure_collection_exists()
             
-            category = Category(name=name, description=description)
+            # Generate UUID for Qdrant ID
+            import hashlib
+            import uuid
+            category_id = str(uuid.uuid4())
+            
+            category = Category(id=category_id, name=name, description=description)
             
             # Create a simple embedding for the category (using name + description)
             category_text = f"{name} {description or ''}"
             
             # Generate a simple hash-based vector for category
-            import hashlib
-            import uuid
             hash_obj = hashlib.md5(category_text.encode())
             hash_hex = hash_obj.hexdigest()
             
@@ -812,9 +815,6 @@ class CategoryService:
                 byte_index = i % len(hash_hex)
                 value = int(hash_hex[byte_index], 16) / 15.0 - 0.5
                 vector.append(value)
-            
-            # Generate UUID for Qdrant ID
-            category_id = str(uuid.uuid4())
             
             # Save to Qdrant
             await self.vector_db.upsert(
@@ -832,7 +832,7 @@ class CategoryService:
                 }]
             )
             
-            logger.info(f"Category '{name}' created and saved to Qdrant")
+            logger.info(f"Category '{name}' created and saved to Qdrant with ID {category_id}")
             return category
         except Exception as e:
             logger.error(f"Failed to create category {name}: {e}")
@@ -860,6 +860,7 @@ class CategoryService:
                 payload = result.get("payload", {})
                 if payload.get("type") == "category":
                     category = Category(
+                        id=result.get("id"),
                         name=payload.get("name"),
                         description=payload.get("description"),
                         created_at=datetime.fromisoformat(payload.get("created_at", datetime.utcnow().isoformat())),
@@ -874,8 +875,32 @@ class CategoryService:
             # Return empty list instead of raising error
             return []
     
-    async def delete_category(self, name: str) -> bool:
-        """Delete a category from Qdrant by finding it by name."""
+    async def delete_category(self, category_id: str) -> bool:
+        """Delete a category from Qdrant by ID."""
+        try:
+            if not self.vector_db:
+                logger.warning("Vector DB not available")
+                return False
+            
+            # Delete from Qdrant using the provided ID
+            deleted = await self.vector_db.delete(
+                collection_name=self.collection_name,
+                vector_id=category_id
+            )
+            
+            if deleted:
+                logger.info(f"Category with ID '{category_id}' deleted from Qdrant")
+                return True
+            else:
+                logger.warning(f"Failed to delete category with ID '{category_id}' from Qdrant")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to delete category {category_id}: {e}")
+            return False
+    
+    async def delete_category_by_name(self, name: str) -> bool:
+        """Delete a category from Qdrant by finding it by name (legacy method)."""
         try:
             if not self.vector_db:
                 logger.warning("Vector DB not available")
@@ -900,18 +925,8 @@ class CategoryService:
                 logger.warning(f"Category '{name}' not found in Qdrant")
                 return False
             
-            # Delete from Qdrant using the found ID
-            deleted = await self.vector_db.delete(
-                collection_name=self.collection_name,
-                vector_id=category_id
-            )
-            
-            if deleted:
-                logger.info(f"Category '{name}' deleted from Qdrant")
-                return True
-            else:
-                logger.warning(f"Failed to delete category '{name}' from Qdrant")
-                return False
+            # Delete using the main delete method
+            return await self.delete_category(category_id)
                 
         except Exception as e:
             logger.error(f"Failed to delete category {name}: {e}")
@@ -951,7 +966,12 @@ class UnitService:
             # Ensure collection exists
             await self._ensure_collection_exists()
             
-            unit = Unit(name=name, description=description)
+            # Generate UUID for Qdrant ID
+            import hashlib
+            import uuid
+            unit_id = str(uuid.uuid4())
+            
+            unit = Unit(id=unit_id, name=name, description=description)
             
             # Save to Qdrant
             if self.vector_db:
@@ -959,8 +979,6 @@ class UnitService:
                 unit_text = f"{name} {description or ''}"
                 
                 # Generate a simple hash-based vector for unit
-                import hashlib
-                import uuid
                 hash_obj = hashlib.md5(unit_text.encode())
                 hash_hex = hash_obj.hexdigest()
                 
@@ -970,9 +988,6 @@ class UnitService:
                     byte_index = i % len(hash_hex)
                     value = int(hash_hex[byte_index], 16) / 15.0 - 0.5
                     vector.append(value)
-                
-                # Generate UUID for Qdrant ID
-                unit_id = str(uuid.uuid4())
                 
                 # Save to Qdrant
                 await self.vector_db.upsert(
@@ -989,7 +1004,7 @@ class UnitService:
                         }
                     }]
                 )
-                logger.info(f"Unit '{name}' created and saved to Qdrant")
+                logger.info(f"Unit '{name}' created and saved to Qdrant with ID {unit_id}")
             
             return unit
         except Exception as e:
@@ -1018,6 +1033,7 @@ class UnitService:
                 payload = result.get("payload", {})
                 if payload.get("type") == "unit":
                     unit = Unit(
+                        id=result.get("id"),
                         name=payload.get("name"),
                         description=payload.get("description"),
                         created_at=datetime.fromisoformat(payload.get("created_at", datetime.utcnow().isoformat())),
@@ -1032,8 +1048,32 @@ class UnitService:
             # Return empty list instead of raising error
             return []
     
-    async def delete_unit(self, name: str) -> bool:
-        """Delete a unit from Qdrant by finding it by name."""
+    async def delete_unit(self, unit_id: str) -> bool:
+        """Delete a unit from Qdrant by ID."""
+        try:
+            if not self.vector_db:
+                logger.warning("Vector DB not available")
+                return False
+            
+            # Delete from Qdrant using the provided ID
+            deleted = await self.vector_db.delete(
+                collection_name=self.collection_name,
+                vector_id=unit_id
+            )
+            
+            if deleted:
+                logger.info(f"Unit with ID '{unit_id}' deleted from Qdrant")
+                return True
+            else:
+                logger.warning(f"Failed to delete unit with ID '{unit_id}' from Qdrant")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to delete unit {unit_id}: {e}")
+            return False
+    
+    async def delete_unit_by_name(self, name: str) -> bool:
+        """Delete a unit from Qdrant by finding it by name (legacy method)."""
         try:
             if not self.vector_db:
                 logger.warning("Vector DB not available")
@@ -1058,18 +1098,8 @@ class UnitService:
                 logger.warning(f"Unit '{name}' not found in Qdrant")
                 return False
             
-            # Delete from Qdrant using the found ID
-            deleted = await self.vector_db.delete(
-                collection_name=self.collection_name,
-                vector_id=unit_id
-            )
-            
-            if deleted:
-                logger.info(f"Unit '{name}' deleted from Qdrant")
-                return True
-            else:
-                logger.warning(f"Failed to delete unit '{name}' from Qdrant")
-                return False
+            # Delete using the main delete method
+            return await self.delete_unit(unit_id)
                 
         except Exception as e:
             logger.error(f"Failed to delete unit {name}: {e}")

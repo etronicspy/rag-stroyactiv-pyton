@@ -45,19 +45,34 @@ async def get_categories(
     """
     return await service.get_categories()
 
-@router.delete("/categories/{name}")
+@router.delete("/categories/{category_id}")
 async def delete_category(
+    category_id: str,
+    service: CategoryService = Depends(get_category_service)
+):
+    """
+    Delete a material category by ID.
+    
+    Parameters:
+    - category_id: Category ID to delete
+    - Returns: Success status
+    """
+    success = await service.delete_category(category_id)
+    return {"success": success}
+
+@router.delete("/categories/by-name/{name}")
+async def delete_category_by_name(
     name: str,
     service: CategoryService = Depends(get_category_service)
 ):
     """
-    Delete a material category.
+    Delete a material category by name (legacy API).
     
     Parameters:
     - name: Category name to delete
     - Returns: Success status
     """
-    success = await service.delete_category(name)
+    success = await service.delete_category_by_name(name)
     return {"success": success}
 
 @router.post("/units/", response_model=Unit)
@@ -86,17 +101,32 @@ async def get_units(
     """
     return await service.get_units()
 
-@router.delete("/units/{name}")
+@router.delete("/units/{unit_id}")
 async def delete_unit(
+    unit_id: str,
+    service: UnitService = Depends(get_unit_service)
+):
+    """
+    Delete a measurement unit by ID.
+    
+    Parameters:
+    - unit_id: Unit ID to delete
+    - Returns: Success status
+    """
+    success = await service.delete_unit(unit_id)
+    return {"success": success}
+
+@router.delete("/units/by-name/{name}")
+async def delete_unit_by_name(
     name: str,
     service: UnitService = Depends(get_unit_service)
 ):
     """
-    Delete a measurement unit.
+    Delete a measurement unit by name (legacy API).
     
     Parameters:
     - name: Unit name to delete
     - Returns: Success status
     """
-    success = await service.delete_unit(name)
+    success = await service.delete_unit_by_name(name)
     return {"success": success} 
