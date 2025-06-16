@@ -225,24 +225,6 @@ DELETE /api/v1/reference/categories/550e8400-e29b-41d4-a716-446655440000
 }
 ```
 
-### DELETE /api/v1/reference/categories/by-name/{name}
-Удаление категории по имени (legacy API).
-
-**Path параметры**:
-- `name` (string): Имя категории
-
-**Пример запроса**:
-```
-DELETE /api/v1/reference/categories/by-name/Цемент
-```
-
-**Ответ**:
-```json
-{
-  "success": true
-}
-```
-
 ### POST /api/v1/reference/units/
 Создание новой единицы измерения.
 
@@ -266,24 +248,6 @@ DELETE /api/v1/reference/categories/by-name/Цемент
 **Пример запроса**:
 ```
 DELETE /api/v1/reference/units/550e8400-e29b-41d4-a716-446655440000
-```
-
-**Ответ**:
-```json
-{
-  "success": true
-}
-```
-
-### DELETE /api/v1/reference/units/by-name/{name}
-Удаление единицы измерения по имени (legacy API).
-
-**Path параметры**:
-- `name` (string): Имя единицы
-
-**Пример запроса**:
-```
-DELETE /api/v1/reference/units/by-name/кг
 ```
 
 **Ответ**:

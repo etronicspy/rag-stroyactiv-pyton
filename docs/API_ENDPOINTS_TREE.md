@@ -49,15 +49,11 @@ RAG Construction Materials API
 │   ├── GET /categories/ - Get all categories
 │   ├── DELETE /categories/{category_id} - Delete category by ID
 │   │   └── Path: category_id (category UUID)
-│   ├── DELETE /categories/by-name/{name} - Delete category by name (legacy)
-│   │   └── Path: name (category name)
 │   ├── POST /units/ - Create new unit
 │   │   └── Body: {"name": "string", "description": "string"}
 │   ├── GET /units/ - Get all units
-│   ├── DELETE /units/{unit_id} - Delete unit by ID
-│   │   └── Path: unit_id (unit UUID)
-│   └── DELETE /units/by-name/{name} - Delete unit by name (legacy)
-│       └── Path: name (unit name)
+│   └── DELETE /units/{unit_id} - Delete unit by ID
+│       └── Path: unit_id (unit UUID)
 │
 ├── /api/v1/materials/ - Управление материалами
 │   ├── POST / - Create material

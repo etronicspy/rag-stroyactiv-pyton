@@ -62,11 +62,9 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 - `POST /api/v1/reference/categories/` - Создать категорию
 - `GET /api/v1/reference/categories/` - Получить список категорий
 - `DELETE /api/v1/reference/categories/{category_id}` - Удалить категорию по ID
-- `DELETE /api/v1/reference/categories/by-name/{name}` - Удалить категорию по имени (legacy)
 - `POST /api/v1/reference/units/` - Создать единицу измерения
 - `GET /api/v1/reference/units/` - Получить список единиц измерения
 - `DELETE /api/v1/reference/units/{unit_id}` - Удалить единицу измерения по ID
-- `DELETE /api/v1/reference/units/by-name/{name}` - Удалить единицу измерения по имени (legacy)
 
 ### 📊 Monitoring
 - `GET /api/v1/monitoring/health` - Комплексная проверка здоровья системы

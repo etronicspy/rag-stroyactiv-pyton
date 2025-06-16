@@ -60,20 +60,7 @@ async def delete_category(
     success = await service.delete_category(category_id)
     return {"success": success}
 
-@router.delete("/categories/by-name/{name}")
-async def delete_category_by_name(
-    name: str,
-    service: CategoryService = Depends(get_category_service)
-):
-    """
-    Delete a material category by name (legacy API).
-    
-    Parameters:
-    - name: Category name to delete
-    - Returns: Success status
-    """
-    success = await service.delete_category_by_name(name)
-    return {"success": success}
+
 
 @router.post("/units/", response_model=Unit)
 async def create_unit(
@@ -116,17 +103,4 @@ async def delete_unit(
     success = await service.delete_unit(unit_id)
     return {"success": success}
 
-@router.delete("/units/by-name/{name}")
-async def delete_unit_by_name(
-    name: str,
-    service: UnitService = Depends(get_unit_service)
-):
-    """
-    Delete a measurement unit by name (legacy API).
-    
-    Parameters:
-    - name: Unit name to delete
-    - Returns: Success status
-    """
-    success = await service.delete_unit_by_name(name)
-    return {"success": success} 
+ 

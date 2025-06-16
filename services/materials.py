@@ -899,38 +899,7 @@ class CategoryService:
             logger.error(f"Failed to delete category {category_id}: {e}")
             return False
     
-    async def delete_category_by_name(self, name: str) -> bool:
-        """Delete a category from Qdrant by finding it by name (legacy method)."""
-        try:
-            if not self.vector_db:
-                logger.warning("Vector DB not available")
-                return False
-            
-            # First, get all categories to find the one with matching name
-            results = await self.vector_db.scroll_all(
-                collection_name=self.collection_name,
-                with_payload=True,
-                with_vectors=False
-            )
-            
-            # Find category by name
-            category_id = None
-            for result in results:
-                payload = result.get("payload", {})
-                if payload.get("type") == "category" and payload.get("name") == name:
-                    category_id = result.get("id")
-                    break
-            
-            if not category_id:
-                logger.warning(f"Category '{name}' not found in Qdrant")
-                return False
-            
-            # Delete using the main delete method
-            return await self.delete_category(category_id)
-                
-        except Exception as e:
-            logger.error(f"Failed to delete category {name}: {e}")
-            return False
+
 
 
 class UnitService:
@@ -1072,35 +1041,4 @@ class UnitService:
             logger.error(f"Failed to delete unit {unit_id}: {e}")
             return False
     
-    async def delete_unit_by_name(self, name: str) -> bool:
-        """Delete a unit from Qdrant by finding it by name (legacy method)."""
-        try:
-            if not self.vector_db:
-                logger.warning("Vector DB not available")
-                return False
-            
-            # First, get all units to find the one with matching name
-            results = await self.vector_db.scroll_all(
-                collection_name=self.collection_name,
-                with_payload=True,
-                with_vectors=False
-            )
-            
-            # Find unit by name
-            unit_id = None
-            for result in results:
-                payload = result.get("payload", {})
-                if payload.get("type") == "unit" and payload.get("name") == name:
-                    unit_id = result.get("id")
-                    break
-            
-            if not unit_id:
-                logger.warning(f"Unit '{name}' not found in Qdrant")
-                return False
-            
-            # Delete using the main delete method
-            return await self.delete_unit(unit_id)
-                
-        except Exception as e:
-            logger.error(f"Failed to delete unit {name}: {e}")
-            return False 
+ 

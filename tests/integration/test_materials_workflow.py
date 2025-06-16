@@ -377,7 +377,9 @@ class TestMaterialsWorkflowIntegration:
         
         # Очистка категории
         if category_response.status_code == 200:
-            client_real.delete("/api/v1/reference/categories/by-name/Тестовая категория интеграция")
+            category_id = category_response.json().get("id")
+            if category_id:
+                client_real.delete(f"/api/v1/reference/categories/{category_id}")
     
     @pytest.mark.integration
     def test_materials_units_integration(self, client_real):
@@ -422,7 +424,9 @@ class TestMaterialsWorkflowIntegration:
         
         # Очистка единицы
         if unit_response.status_code == 200:
-            client_real.delete("/api/v1/reference/units/by-name/тестовая_единица")
+            unit_id = unit_response.json().get("id")
+            if unit_id:
+                client_real.delete(f"/api/v1/reference/units/{unit_id}")
 
 
 class TestDatabaseOperationsIntegration:
