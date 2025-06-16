@@ -30,6 +30,7 @@ class HealthChecker:
     def __init__(self):
         self.metrics_collector = get_metrics_collector()
         self.logger = get_logger("health_checker")
+        self._startup_time = time.time()
     
     async def check_basic_health(self) -> Dict[str, Any]:
         """Basic application health check."""
@@ -560,7 +561,42 @@ async def metrics_endpoint():
 @router.get("/performance")
 async def performance_metrics():
     """Get performance metrics for database operations."""
-    return health_checker.metrics_collector.get_performance_tracker().get_database_summary()
+    performance_data = health_checker.metrics_collector.get_performance_tracker().get_database_summary()
+    
+    # Если нет данных после перезапуска, возвращаем структуру с нулевыми значениями
+    if not performance_data:
+        return {
+            "status": "no_data",
+            "message": "Нет данных о производительности после перезапуска сервера. Данные будут накапливаться по мере использования API.",
+            "server_info": {
+                "uptime_seconds": time.time() - getattr(health_checker, '_startup_time', time.time()),
+                "service": settings.PROJECT_NAME,
+                "version": settings.VERSION,
+                "environment": settings.ENVIRONMENT
+            },
+            "monitoring": {
+                "metrics_collection": "active",
+                "performance_tracking": "active",
+                "data_retention": "in_memory_only"
+            },
+            "expected_metrics": {
+                "database_types": ["postgresql", "qdrant", "redis"],
+                "operations": ["search", "insert", "update", "delete", "health_check"],
+                "tracked_stats": ["operation_count", "avg_duration_ms", "success_rate", "error_count"]
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    # Добавляем дополнительную информацию к существующим данным
+    performance_data["server_info"] = {
+        "uptime_seconds": time.time() - getattr(health_checker, '_startup_time', time.time()),
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "environment": settings.ENVIRONMENT
+    }
+    performance_data["timestamp"] = datetime.utcnow().isoformat()
+    
+    return performance_data
 
 
 @router.get("/config")

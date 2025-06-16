@@ -229,10 +229,10 @@ class CompressionMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         
         # Check if we should compress
-        if hasattr(response, 'body'):
+        if hasattr(response, 'body') and response.body is not None:
             content_length = len(response.body)
         else:
-            # For streaming responses, we'll compress anyway if conditions are met
+            # For streaming responses or empty responses, we'll compress anyway if conditions are met
             content_length = self.minimum_size + 1
         
         if not self._should_compress(request, response, content_length):

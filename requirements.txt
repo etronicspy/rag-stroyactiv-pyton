@@ -18,6 +18,7 @@ sqlalchemy==2.0.23
 asyncpg==0.29.0
 alembic==1.13.1
 psycopg2-binary==2.9.9
+greenlet==3.0.1  # Required for SQLAlchemy async operations
 
 # Redis dependencies (for future use)
 redis==5.0.1

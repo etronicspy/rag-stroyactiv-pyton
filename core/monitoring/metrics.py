@@ -165,6 +165,10 @@ class PerformanceTracker:
     def get_database_summary(self) -> Dict[str, Any]:
         """Get summary statistics for all databases."""
         with self._lock:
+            # Если нет метрик, возвращаем пустой словарь
+            if not self._metrics:
+                return {}
+                
             summary = defaultdict(lambda: {
                 'total_operations': 0,
                 'total_errors': 0,

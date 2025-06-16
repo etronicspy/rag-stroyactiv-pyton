@@ -101,35 +101,20 @@ app.default_response_class = UTF8JSONResponse
 security_middleware = SecurityMiddleware(app)
 cors_settings = security_middleware.get_cors_settings()
 
-# ✅ FULL MIDDLEWARE STACK RESTORED - All tested individually and working
-# Order: LIFO (Last In First Out) - reverse order of execution
+# ✅ MIDDLEWARE STACK WITH CORRECT ORDER - Fixed hanging issue
+# Order: LIFO (Last In First Out) - REVERSED execution order!
+# Last added = First executed
 
-# 0. Body Cache middleware (FIRST - для единого чтения body)
-from core.middleware.body_cache import BodyCacheMiddleware
-app.add_middleware(BodyCacheMiddleware,
-    max_body_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,  # Используем тот же лимит
-    methods_to_cache=["POST", "PUT", "PATCH"],  # Методы с body
-)
+# 5. CORS middleware (добавляем первым - выполнится последним, ближе к app)
 
-# 1. Compression middleware (🔥 FULL FUNCTIONALITY RESTORED)
-app.add_middleware(CompressionMiddleware,
-    minimum_size=2048,                    # 2KB minimum
-    maximum_size=5 * 1024 * 1024,         # 5MB maximum
-    compression_level=6,                  # 🔥 RESTORED: Optimal compression (was 3)
-    enable_brotli=True,                   # 🔥 RESTORED: Brotli support (~20% better than gzip)
-    enable_streaming=True,                # 🔥 RESTORED: Streaming for large files
-    exclude_paths=["/health", "/ping", "/metrics"],  # Reduced exclusions
-    enable_performance_logging=True,      # 🔥 RESTORED: Performance metrics
-)
-
-# 2. Security middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
-app.add_middleware(SecurityMiddleware,
-    max_request_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,
-    enable_security_headers=True,
-    enable_input_validation=True,   # 🔥 RESTORED: Полная валидация body через кеш
-    enable_xss_protection=True,     # 🔥 RESTORED: XSS защита для body
-    enable_sql_injection_protection=True,  # 🔥 RESTORED: SQL injection защита для body
-    enable_path_traversal_protection=True,
+# 4. Logging middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
+app.add_middleware(LoggingMiddleware,
+    log_level=settings.LOG_LEVEL,
+    log_request_body=True,      # 🔥 RESTORED: Полное логирование body через кеш
+    log_response_body=True,     # 🔥 RESTORED: Full response body logging
+    max_body_size=64*1024,      # 🔥 RESTORED: 64KB limit (was 1KB)
+    include_headers=True,       # 🔥 RESTORED: Headers logging
+    mask_sensitive_headers=True, # Keep security
 )
 
 # 3. Rate limiting middleware (🔥 FULL FUNCTIONALITY RESTORED)
@@ -145,17 +130,36 @@ if settings.ENABLE_RATE_LIMITING:
     except Exception as e:
         logger.warning(f"Failed to initialize RateLimitMiddleware: {e}")
 
-# 4. Logging middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
-app.add_middleware(LoggingMiddleware,
-    log_level=settings.LOG_LEVEL,
-    log_request_body=True,      # 🔥 RESTORED: Полное логирование body через кеш
-    log_response_body=True,     # 🔥 RESTORED: Full response body logging
-    max_body_size=64*1024,      # 🔥 RESTORED: 64KB limit (was 1KB)
-    include_headers=True,       # 🔥 RESTORED: Headers logging
-    mask_sensitive_headers=True, # Keep security
+# 2. Security middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
+app.add_middleware(SecurityMiddleware,
+    max_request_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,
+    enable_security_headers=True,
+    enable_input_validation=True,   # 🔥 RESTORED: Полная валидация body через кеш
+    enable_xss_protection=True,     # 🔥 RESTORED: XSS защита для body
+    enable_sql_injection_protection=True,  # 🔥 RESTORED: SQL injection защита для body
+    enable_path_traversal_protection=True,
 )
 
-# 5. CORS middleware (last, closest to app)
+# 1. Compression middleware (🔥 FULL FUNCTIONALITY RESTORED)
+app.add_middleware(CompressionMiddleware,
+    minimum_size=2048,                    # 2KB minimum
+    maximum_size=5 * 1024 * 1024,         # 5MB maximum
+    compression_level=6,                  # 🔥 RESTORED: Optimal compression (was 3)
+    enable_brotli=True,                   # 🔥 RESTORED: Brotli support (~20% better than gzip)
+    enable_streaming=True,                # 🔥 RESTORED: Streaming for large files
+    exclude_paths=["/health", "/ping", "/metrics"],  # Reduced exclusions
+    enable_performance_logging=True,      # 🔥 RESTORED: Performance metrics
+)
+
+# 0. Body Cache middleware (🚨 CRITICAL: добавляем ПОСЛЕДНИМ - выполнится ПЕРВЫМ!)
+# Это middleware ДОЛЖЕН выполниться первым для чтения и кеширования body
+from core.middleware.body_cache import BodyCacheMiddleware
+app.add_middleware(BodyCacheMiddleware,
+    max_body_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,  # Используем тот же лимит
+    methods_to_cache=["POST", "PUT", "PATCH"],  # Методы с body
+)
+
+# CORS middleware (добавляем последним - выполнится после всех остальных)
 app.add_middleware(CORSMiddleware, **cors_settings)
 
 # Include routers

@@ -40,15 +40,25 @@ class BodyCacheMiddleware(BaseHTTPMiddleware):
         # Кешируем body только для методов с телом запроса
         if request.method in self.methods_to_cache:
             try:
-                # Читаем body один раз
-                body_bytes = await self._read_body_safely(request)
+                # Проверяем content-length header для оптимизации
+                content_length = int(request.headers.get("content-length", "0"))
+                logger.debug(f"BodyCacheMiddleware: Processing {request.method} {request.url.path}, content-length: {content_length}")
                 
-                # Кешируем в request.state для использования другими middleware
-                request.state.cached_body_bytes = body_bytes
-                request.state.cached_body_str = body_bytes.decode('utf-8') if body_bytes else ""
-                request.state.body_cache_available = True
-                
-                logger.debug(f"Body cached for {request.method} {request.url.path}, size: {len(body_bytes)} bytes")
+                if content_length > 0:
+                    # Читаем body только если есть содержимое
+                    body_bytes = await self._read_body_safely(request)
+                    
+                    # Кешируем в request.state для использования другими middleware
+                    request.state.cached_body_bytes = body_bytes
+                    request.state.cached_body_str = body_bytes.decode('utf-8') if body_bytes else ""
+                    request.state.body_cache_available = True
+                    
+                    logger.debug(f"Body cached for {request.method} {request.url.path}, size: {len(body_bytes)} bytes")
+                else:
+                    # Пустое тело запроса
+                    request.state.cached_body_bytes = b""
+                    request.state.cached_body_str = ""
+                    request.state.body_cache_available = True
                 
             except Exception as e:
                 logger.error(f"Failed to cache body for {request.method} {request.url.path}: {e}")
@@ -70,10 +80,10 @@ class BodyCacheMiddleware(BaseHTTPMiddleware):
         Безопасно читает request body с ограничением размера и таймаутом.
         """
         try:
-            # Читаем body с таймаутом для предотвращения зависаний
+            # Читаем body с коротким таймаутом для предотвращения зависаний
             body_bytes = await asyncio.wait_for(
                 request.body(), 
-                timeout=30.0  # 30 секунд таймаут
+                timeout=5.0  # 5 секунд таймаут для быстрого обнаружения проблем
             )
             
             # Проверяем размер
