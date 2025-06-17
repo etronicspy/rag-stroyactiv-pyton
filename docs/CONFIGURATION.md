@@ -1,299 +1,252 @@
-# Конфигурация проекта
+# ⚙️ Конфигурация проекта
 
-## 🎯 Обзор
+## 📋 Обзор
 
-Вся конфигурация проекта централизована в `core/config.py` и поддерживает гибкое переключение между различными базами данных и провайдерами ИИ.
+Система конфигурации проекта централизована в `core/config.py` и использует Pydantic Settings для управления переменными окружения.
 
-## 📁 Структура конфигурации
+## 🔧 Основные настройки
 
-```
-core/
-├── config.py           # Основная конфигурация
-├── models/             # Модели данных
-└── schemas/            # Pydantic схемы
-```
-
-## ⚙️ Переменные окружения
-
-### Основные настройки
+### Переменные окружения
+Скопируйте `env.example` в `.env.local` и настройте значения:
 
 ```bash
-# Окружение проекта
-PROJECT_NAME="RAG Construction Materials API"
-VERSION="1.0.0"
-ENVIRONMENT="development"  # development, staging, production
-
-# CORS настройки
-BACKEND_CORS_ORIGINS=[]
+cp env.example .env.local
 ```
 
-### База данных (Vector DB)
+### Обязательные переменные
 
-```bash
-# Тип векторной базы данных
-DATABASE_TYPE="qdrant_cloud"  # qdrant_cloud, qdrant_local, weaviate, pinecone
-
-# Qdrant настройки
-QDRANT_URL="https://your-cluster.qdrant.io"
-QDRANT_API_KEY="your-api-key"
-QDRANT_COLLECTION_NAME="materials"
-QDRANT_VECTOR_SIZE=384
-QDRANT_TIMEOUT=30
-
-# Альтернативные векторные БД (опционально)
-WEAVIATE_URL=""
-WEAVIATE_API_KEY=""
-PINECONE_API_KEY=""
-PINECONE_ENVIRONMENT=""
+#### Векторная БД (Qdrant)
+```env
+QDRANT_URL=https://your-cluster.qdrant.tech:6333
+QDRANT_API_KEY=your_qdrant_api_key
+QDRANT_COLLECTION_NAME=materials
+QDRANT_VECTOR_SIZE=1536
 ```
 
-### ИИ провайдер
-
-```bash
-# Тип провайдера ИИ
-AI_PROVIDER="openai"  # openai, azure_openai, huggingface, ollama
-
-# OpenAI настройки
-OPENAI_API_KEY="sk-..."
-OPENAI_MODEL="text-embedding-ada-002"
+#### AI Provider (OpenAI)
+```env
+OPENAI_API_KEY=sk-your_openai_api_key
+OPENAI_MODEL=text-embedding-3-small
 OPENAI_MAX_RETRIES=3
 OPENAI_TIMEOUT=30
-
-# Azure OpenAI (опционально)
-AZURE_OPENAI_API_KEY=""
-AZURE_OPENAI_ENDPOINT=""
-AZURE_OPENAI_MODEL=""
-
-# HuggingFace (опционально)
-HUGGINGFACE_MODEL="sentence-transformers/all-MiniLM-L6-v2"
-HUGGINGFACE_DEVICE="cpu"
-
-# Ollama (опционально)
-OLLAMA_URL=""
-OLLAMA_MODEL=""
 ```
 
+### Дополнительные БД
 
+#### PostgreSQL (через SSH туннель)
+```env
+POSTGRESQL_URL=postgresql+asyncpg://user:pass@localhost:5435/stbr_rag1
+POSTGRESQL_DATABASE=stbr_rag1
+POSTGRESQL_USER=your_user
+POSTGRESQL_PASSWORD=your_password
+POSTGRESQL_HOST=localhost
+POSTGRESQL_PORT=5435
 
-### Производительность
+# SSH туннель
+ENABLE_SSH_TUNNEL=true
+SSH_TUNNEL_REMOTE_HOST=31.130.148.200
+SSH_TUNNEL_REMOTE_USER=root
+SSH_TUNNEL_REMOTE_PORT=5432
+SSH_TUNNEL_LOCAL_PORT=5435
+SSH_TUNNEL_KEY_PATH=~/.ssh/postgres_key
+```
 
-```bash
-# Настройки производительности
+> **⚠️ Важно**: Проект работает только с базой данных `stbr_rag1` (ICU локаль ru-RU-x-icu для поддержки русского языка).
+
+#### Redis (кеширование)
+```env
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=your_redis_password
+REDIS_MAX_CONNECTIONS=50
+REDIS_TIMEOUT=5
+```
+
+## 🎯 Режимы работы
+
+### Development Mode
+```env
+ENVIRONMENT=development
+QDRANT_ONLY_MODE=false
+ENABLE_FALLBACK_DATABASES=true
+LOG_LEVEL=DEBUG
+```
+
+### Production Mode
+```env
+ENVIRONMENT=production
+QDRANT_ONLY_MODE=false
+ENABLE_FALLBACK_DATABASES=false
+LOG_LEVEL=INFO
+```
+
+## 🔄 Fallback настройки
+
+Система поддерживает fallback к mock-адаптерам:
+
+```env
+# Отключить подключения к БД (использовать mock)
+DISABLE_REDIS_CONNECTION=true
+DISABLE_POSTGRESQL_CONNECTION=false
+
+# Включить fallback при ошибках
+ENABLE_FALLBACK_DATABASES=true
+```
+
+## 🛡️ Middleware настройки
+
+### Безопасность
+```env
+MAX_REQUEST_SIZE_MB=50
+ENABLE_SECURITY_HEADERS=true
+ENABLE_INPUT_VALIDATION=true
+```
+
+### Rate Limiting
+```env
+ENABLE_RATE_LIMITING=true
+RATE_LIMIT_RPM=60
+RATE_LIMIT_RPH=1000
+```
+
+### Логирование
+```env
+LOG_LEVEL=INFO
+LOG_REQUEST_BODY=true
+LOG_RESPONSE_BODY=false
+ENABLE_STRUCTURED_LOGGING=false
+```
+
+## 📊 Производительность
+
+```env
 MAX_UPLOAD_SIZE=52428800  # 50MB
 BATCH_SIZE=100
 MAX_CONCURRENT_UPLOADS=5
 ```
 
-### Middleware настройки (Важно для производительности)
+## 🔧 Использование в коде
 
-```bash
-# BodyCacheMiddleware - решение проблемы зависания FastAPI
-BODY_CACHE_TIMEOUT=30  # Таймаут чтения request.body() в секундах
-
-# SecurityMiddleware
-ENABLE_INPUT_VALIDATION=true  # Включить валидацию XSS/SQL injection
-SECURITY_LOG_LEVEL=INFO       # Уровень логирования безопасности
-
-# LoggingMiddleware
-LOG_REQUEST_BODY=true         # Логировать тело запроса (использует кеш)
-LOG_RESPONSE_BODY=false       # Логировать тело ответа
-LOGGING_SENSITIVE_FIELDS=[]   # Поля для маскировки в логах
-
-# RateLimitMiddleware
-RATE_LIMIT_ENABLED=true       # Включить ограничение скорости
-RATE_LIMIT_REQUESTS=100       # Запросов на окно времени
-RATE_LIMIT_WINDOW=60          # Окно времени в секундах
-```
-
-## 🏗️ Фабрики клиентов
-
-### Векторная база данных
-
-```python
-from core.config import get_vector_db_client
-
-# Автоматически создает клиент для настроенной БД
-client = get_vector_db_client()
-```
-
-### ИИ провайдер
-
-```python
-from core.config import get_ai_client
-
-# Автоматически создает клиент для настроенного провайдера
-ai_client = get_ai_client()
-```
-
-
-
-## 🔄 Переключение между провайдерами
-
-### Смена векторной БД
-
-1. **Qdrant Cloud → Qdrant Local:**
-```bash
-DATABASE_TYPE="qdrant_local"
-QDRANT_URL="http://localhost:6333"
-QDRANT_API_KEY=""  # Не требуется для локального
-```
-
-2. **Qdrant → Weaviate:**
-```bash
-DATABASE_TYPE="weaviate"
-WEAVIATE_URL="http://localhost:8080"
-WEAVIATE_API_KEY="your-weaviate-key"
-```
-
-### Смена ИИ провайдера
-
-1. **OpenAI → HuggingFace:**
-```bash
-AI_PROVIDER="huggingface"
-HUGGINGFACE_MODEL="sentence-transformers/all-MiniLM-L6-v2"
-HUGGINGFACE_DEVICE="cpu"
-```
-
-2. **OpenAI → Azure OpenAI:**
-```bash
-AI_PROVIDER="azure_openai"
-AZURE_OPENAI_API_KEY="your-azure-key"
-AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
-AZURE_OPENAI_MODEL="text-embedding-ada-002"
-```
-
-## 🛡️ Безопасность
-
-### Принципы безопасности
-
-1. **Никогда не коммитьте `.env.local`** в репозиторий
-2. **Используйте разные ключи** для разных окружений
-3. **Ротируйте ключи** регулярно
-4. **Ограничивайте права доступа** ключей
-
-### Проверка конфигурации
-
+### Settings
 ```python
 from core.config import settings
 
-# Проверка производственного окружения
-if settings.is_production():
-    # Дополнительные проверки безопасности
-    pass
+# Получение настроек
+db_config = settings.get_vector_db_config()
+ai_config = settings.get_ai_config()
 
-# Проверка тестового окружения
-if settings.is_testing():
-    # Настройки для тестов
+# Проверка окружения
+if settings.is_production():
+    # Production логика
     pass
 ```
 
-## 📊 Мониторинг конфигурации
+### Dependency Injection
+```python
+from core.dependencies.database import get_vector_db_dependency
+
+@app.get("/search")
+async def search(
+    vector_db: IVectorDatabase = Depends(get_vector_db_dependency)
+):
+    return await vector_db.search(...)
+```
+
+## 🔍 Проверка конфигурации
 
 ### Health Check
-
 ```bash
-# Базовая проверка здоровья
-curl http://localhost:8000/api/v1/health
+# Проверка основных сервисов
+curl http://localhost:8000/api/v1/health/
 
-# Детальная проверка конфигурации
-curl http://localhost:8000/api/v1/health/config
+# Детальная проверка всех БД
+curl http://localhost:8000/api/v1/health/detailed
 ```
 
-### Быстрая диагностика
-
-```bash
-# Скрипт для проверки всех подключений
-python check_db_connection.py
-```
-
-## 🔧 Примеры конфигураций
-
-### Разработка (Development)
-
-```bash
-ENVIRONMENT="development"
-DATABASE_TYPE="qdrant_cloud"
-AI_PROVIDER="openai"
-```
-
-### Тестирование (Testing)
-
-```bash
-ENVIRONMENT="testing"
-DATABASE_TYPE="qdrant_cloud"
-AI_PROVIDER="huggingface"  # Не требует ключей
-```
-
-### Производство (Production)
-
-```bash
-ENVIRONMENT="production"
-DATABASE_TYPE="qdrant_cloud"
-AI_PROVIDER="openai"
-```
-
-## 🚀 Миграция между конфигурациями
-
-### Шаги миграции
-
-1. **Бэкап данных** из текущей БД
-2. **Обновление переменных** окружения
-3. **Тестирование подключений** с помощью `check_db_connection.py`
-4. **Перенос данных** в новую БД
-5. **Проверка работоспособности** приложения
-
-### Инструменты для миграции
-
-```bash
-# Создание резервной копии
-python tools/backup_data.py
-
-# Миграция данных
-python tools/migrate_data.py --from qdrant --to weaviate
-
-# Проверка после миграции
-python tools/verify_migration.py
-```
-
-## 📝 Примеры использования
-
-### В сервисах
-
+### Логирование
 ```python
-# services/materials.py
-from core.config import get_vector_db_client, get_ai_client, settings
+import logging
 
-class MaterialsService:
-    def __init__(self):
-        self.vector_client = get_vector_db_client()
-        self.ai_client = get_ai_client()
-        self.config = settings.get_vector_db_config()
+# Включение DEBUG для диагностики
+logging.getLogger("core.config").setLevel(logging.DEBUG)
+logging.getLogger("core.database").setLevel(logging.DEBUG)
 ```
 
-### В тестах
+## 🔄 Переключение БД
 
-```python
-# tests/conftest.py
-from core.config import settings
-
-@pytest.fixture
-def test_settings():
-    # Переопределение настроек для тестов
-    settings.ENVIRONMENT = "testing"
-    settings.DATABASE_TYPE = "qdrant_local"
-    return settings
+### Только Qdrant (development)
+```env
+QDRANT_ONLY_MODE=true
+DISABLE_POSTGRESQL_CONNECTION=true
+DISABLE_REDIS_CONNECTION=true
 ```
 
-## ❓ FAQ
+### Полная архитектура (production)
+```env
+QDRANT_ONLY_MODE=false
+DISABLE_POSTGRESQL_CONNECTION=false
+DISABLE_REDIS_CONNECTION=false
+```
 
-**Q: Как добавить новый провайдер ИИ?**
-A: Добавьте новый тип в `AIProvider` enum и реализуйте в `get_ai_client()`.
+## 🚨 Troubleshooting
 
-**Q: Можно ли использовать несколько векторных БД одновременно?**
-A: Нет, поддерживается одна активная БД, но можно легко переключаться.
+### Ошибки подключения
+```bash
+# Проверка настроек
+echo $QDRANT_URL
+echo $OPENAI_API_KEY
 
-**Q: Как обновить модель эмбеддингов?**
-A: Измените `OPENAI_MODEL` или `HUGGINGFACE_MODEL` в `.env.local`.
+# Проверка health check
+curl http://localhost:8000/api/v1/health/detailed
+```
 
-**Q: Безопасно ли хранить ключи в переменных окружения?**
-A: Да, если файл `.env.local` не попадает в репозиторий и сервер защищен. 
+### SSH туннель
+```bash
+# Проверка SSH ключа
+ssh -i ~/.ssh/postgres_key root@31.130.148.200
+
+# Проверка туннеля
+ENABLE_SSH_TUNNEL=true
+SSH_TUNNEL_TIMEOUT=30
+```
+
+## 📚 Полный пример .env.local
+
+```env
+# === ОСНОВНЫЕ НАСТРОЙКИ ===
+PROJECT_NAME=RAG Construction Materials API
+VERSION=1.0.0
+ENVIRONMENT=development
+
+# === ВЕКТОРНАЯ БД ===
+QDRANT_URL=https://your-cluster.qdrant.tech:6333
+QDRANT_API_KEY=your_qdrant_key
+QDRANT_COLLECTION_NAME=materials
+
+# === AI PROVIDER ===
+OPENAI_API_KEY=sk-your_openai_key
+OPENAI_MODEL=text-embedding-3-small
+
+# === POSTGRESQL ===
+POSTGRESQL_URL=postgresql+asyncpg://user:pass@localhost:5435/stbr_rag1
+ENABLE_SSH_TUNNEL=true
+
+# === REDIS ===
+REDIS_URL=redis://localhost:6379
+
+# === РЕЖИМ РАБОТЫ ===
+QDRANT_ONLY_MODE=false
+ENABLE_FALLBACK_DATABASES=true
+
+# === БЕЗОПАСНОСТЬ ===
+MAX_REQUEST_SIZE_MB=50
+ENABLE_RATE_LIMITING=true
+RATE_LIMIT_RPM=60
+
+# === ЛОГИРОВАНИЕ ===
+LOG_LEVEL=DEBUG
+LOG_REQUEST_BODY=true
+```
+
+---
+
+**Обновлено**: $(date +%Y-%m-%d) 

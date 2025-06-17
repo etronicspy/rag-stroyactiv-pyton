@@ -72,44 +72,61 @@
 - **м²** - плитка, лист, рулон
 - **м** - труба, кабель, провод
 
-## 🛠️ Использование утилиты загрузки
+## 🛠️ Загрузка материалов через API
 
-### Установка зависимостей
+### Загрузка из JSON файла
+
+Для загрузки материалов используйте endpoint:
+
 ```bash
-pip install aiohttp
+POST /api/v1/materials/import
 ```
 
-### Загрузка из командной строки
+#### Пример запроса:
 ```bash
-# Базовое использование
-python utils/load_materials.py tests/data/building_materials.json
-
-# С настройками
-python utils/load_materials.py tests/data/building_materials.json 50 http://localhost:8000
+curl -X POST "http://localhost:8000/api/v1/materials/import" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "materials": [
+      {
+        "name": "Цемент портландский М400",
+        "price": 500.0,
+        "unit": "кг",
+        "use_category": "Цемент",
+        "description": "Высококачественный портландцемент"
+      }
+    ]
+  }'
 ```
 
-### Программное использование
+#### Пример программной загрузки:
 ```python
-from utils.load_materials import MaterialsLoader
+import requests
+import json
 
-loader = MaterialsLoader("http://localhost:8000")
+# Подготовка данных
+materials_data = {
+    "materials": [
+        {
+            "name": "Цемент портландский М400",
+            "price": 500.0,
+            "unit": "кг",
+            "use_category": "Цемент"
+        }
+    ]
+}
 
-# Загрузка из JSON файла
-result = await loader.load_from_json_file(
-    "tests/data/building_materials.json", 
-    batch_size=100
+# Отправка запроса
+response = requests.post(
+    "http://localhost:8000/api/v1/materials/import",
+    json=materials_data
 )
 
-# Использование batch API
-materials = [
-    {
-        "name": "Цемент М500",
-        "category": "Цемент", 
-        "unit": "кг",
-        "description": "Описание"
-    }
-]
-result = await loader.load_using_batch_api(materials, batch_size=50)
+if response.status_code == 200:
+    result = response.json()
+    print(f"Загружено: {result['processed_count']} материалов")
+else:
+    print(f"Ошибка: {response.status_code}")
 ```
 
 ## 📈 Производительность

@@ -1,252 +1,268 @@
-# Database Architecture Documentation
+# 🗄️ Database Architecture
 
-Документация по архитектуре мульти-БД системы после рефакторинга этапа 1.
+## 📋 Обзор
+
+Система использует multi-database архитектуру с поддержкой векторного поиска, реляционных данных и кеширования.
 
 ## 🏗️ Архитектура
 
-Новая архитектура поддерживает несколько типов БД с единым интерфейсом:
-
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   FastAPI       │    │   Services      │    │  Repositories   │
-│   Routes        │    │   Layer         │    │   Layer         │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                ┌─────────────────┴─────────────────┐
-                │         Database Layer            │
-                │                                   │
-                │  ┌─────────────────────────────┐  │
-                │  │      Factories              │  │
-                │  │   (@lru_cache)              │  │
-                │  └─────────────────────────────┘  │
-                │                                   │
-                │  ┌─────────────────────────────┐  │
-                │  │      Interfaces             │  │
-                │  │   (ABC Classes)             │  │
-                │  └─────────────────────────────┘  │
-                │                                   │
-                │  ┌─────────────────────────────┐  │
-                │  │      Adapters               │  │
-                │  │   (Implementations)         │  │
-                │  └─────────────────────────────┘  │
-                └───────────────────────────────────┘
-                                 │
-        ┌────────────────────────┼────────────────────────┐
-        │                        │                        │
-┌───────▼────┐         ┌────────▼────┐         ┌────────▼────┐
-│  Qdrant    │         │ PostgreSQL  │         │   Redis     │
-│ (Vector DB)│         │(Relational) │         │  (Cache)    │
-└────────────┘         └─────────────┘         └─────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    FastAPI API Layer                    │
+├─────────────────────────────────────────────────────────┤
+│                 Services & Repositories                 │
+├─────────────────────────────────────────────────────────┤
+│              Database Adapters (Interfaces)             │
+└────────────┬────────────┬───────────────┬───────────────┘
+             │            │               │
+        ┌────▼────┐  ┌───▼────┐     ┌────▼────┐
+        │ Qdrant  │  │PostgreSQL│     │  Redis  │
+        │(Vector) │  │(Relations)│     │ (Cache) │
+        └─────────┘  └────────┘     └─────────┘
 ```
 
-## 📁 Структура файлов
+## 💾 Базы данных
 
+### Qdrant (Vector Database)
+**Назначение**: Семантический поиск материалов
+- **Тип**: Векторная БД
+- **Размерность**: 1536 (OpenAI embeddings)
+- **Индексирование**: HNSW algorithm
+- **Подключение**: Qdrant Cloud
+
+### PostgreSQL (Relational Database)  
+**Назначение**: Структурированные данные, отношения
+- **Тип**: Реляционная БД
+- **Подключение**: Через SSH туннель
+- **ORM**: SQLAlchemy 2.0 (async)
+- **Миграции**: Alembic
+
+### Redis (Cache Database)
+**Назначение**: Кеширование, сессии
+- **Тип**: In-memory БД
+- **TTL**: Настраиваемые периоды
+- **Паттерны**: Cache-aside
+
+## 📊 Модели данных
+
+### Materials
+```sql
+CREATE TABLE materials (
+    id UUID PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    use_category VARCHAR(200),
+    unit VARCHAR(50),
+    description TEXT,
+    embedding REAL[],
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
 ```
-core/
-├── database/
-│   ├── __init__.py              # Экспорт всех компонентов
-│   ├── interfaces.py            # ABC интерфейсы для всех БД
-│   ├── exceptions.py            # Иерархия исключений БД
-│   ├── factories.py             # Фабрики с @lru_cache
-│   └── adapters/
-│       ├── __init__.py
-│       ├── qdrant_adapter.py    # Реализация для Qdrant
-│       ├── postgresql_adapter.py # Заглушка для PostgreSQL
-│       └── redis_adapter.py     # Заглушка для Redis
-├── repositories/
-│   ├── __init__.py              # Экспорт репозиториев
-│   ├── interfaces.py            # Интерфейсы бизнес-репозиториев
-│   └── base.py                  # Базовый класс репозитория
-└── dependencies/
-    ├── __init__.py              # Экспорт DI функций
-    └── database.py              # DI с @lru_cache
+
+### Raw Products (Price Data)
+```sql
+CREATE TABLE raw_products (
+    id SERIAL PRIMARY KEY,
+    supplier_id INTEGER,
+    pricelistid INTEGER,
+    name VARCHAR(500),
+    unit_price NUMERIC(10,2),
+    is_processed BOOLEAN DEFAULT FALSE
+);
 ```
 
-## 🔧 Основные компоненты
+### Reference Data
+```sql
+CREATE TABLE categories (
+    id UUID PRIMARY KEY,
+    name VARCHAR(200) UNIQUE NOT NULL,
+    description TEXT
+);
 
-### 1. Интерфейсы БД (core/database/interfaces.py)
+CREATE TABLE units (
+    id UUID PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL,
+    symbol VARCHAR(10)
+);
+```
 
-#### IVectorDatabase
-Обязательные методы согласно правилам:
-- `search(collection_name, query_vector, limit, filter_conditions)`
-- `upsert(collection_name, vectors)`
-- `delete(collection_name, vector_id)`
-- `batch_upsert(collection_name, vectors, batch_size)`
-- `get_by_id(collection_name, vector_id)`
+## 🔧 Adapters
 
-#### IRelationalDatabase
-- `execute_query(query, params)`
-- `execute_command(command, params)` 
-- `begin_transaction()`, `commit_transaction()`, `rollback_transaction()`
-- `health_check()`
-
-#### ICacheDatabase
-- `get(key)`, `set(key, value, expire_seconds)`, `delete(key)`
-- `exists(key)`, `health_check()`
-
-### 2. Фабрики клиентов (core/database/factories.py)
-
-#### DatabaseFactory
+### Vector Database Interface
 ```python
-# Runtime переключение БД
-vector_db = DatabaseFactory.create_vector_database(
-    db_type="qdrant_cloud",  # Override типа БД
-    config_override={"url": "custom://url"}  # Override конфигурации
+class IVectorDatabase(ABC):
+    async def search(self, collection_name, query_vector, limit)
+    async def upsert(self, collection_name, vectors)
+    async def delete(self, collection_name, vector_id)
+    async def health_check(self)
+```
+
+### Relational Database Interface
+```python
+class IRelationalDatabase(ABC):
+    async def execute_query(self, query, params)
+    async def execute_command(self, command, params)
+    async def health_check(self)
+```
+
+### Cache Database Interface
+```python
+class ICacheDatabase(ABC):
+    async def get(self, key)
+    async def set(self, key, value, ttl)
+    async def delete(self, key)
+    async def health_check(self)
+```
+
+## 🔄 Repository Pattern
+
+### Base Repository
+```python
+class BaseRepository:
+    def __init__(self, vector_db, relational_db=None, cache_db=None):
+        self.vector_db = vector_db
+        self.relational_db = relational_db
+        self.cache_db = cache_db
+    
+    async def health_check(self):
+        # Проверка всех доступных БД
+```
+
+### Hybrid Repository
+```python
+class HybridMaterialsRepository(BaseRepository):
+    async def search_materials(self, query: str):
+        # 1. Vector search (primary)
+        # 2. SQL search (fallback)
+        # 3. Combined results
+```
+
+## 🎯 Search Strategy
+
+### Fallback Chain
+1. **Vector Search**: Семантический поиск в Qdrant
+2. **SQL LIKE Search**: Текстовый поиск при 0 результатов
+3. **Mock Response**: При недоступности БД
+
+### Caching Strategy
+1. **Search Results**: TTL 5 минут
+2. **Material Data**: TTL 60 минут  
+3. **Reference Data**: TTL 24 часа
+
+## 🚀 Dependency Injection
+
+```python
+from core.dependencies.database import (
+    get_vector_db_dependency,
+    get_relational_db_dependency,
+    get_cache_db_dependency
 )
-
-# Кеширование с @lru_cache
-cache_info = DatabaseFactory.get_cache_info()
-DatabaseFactory.clear_cache()  # Для тестирования
-```
-
-#### AIClientFactory
-```python
-# Поддержка разных AI провайдеров
-ai_client = AIClientFactory.create_ai_client(
-    provider="openai",  # openai, azure_openai, huggingface, ollama
-    config_override={"api_key": "custom_key"}
-)
-```
-
-### 3. Dependency Injection (core/dependencies/database.py)
-
-```python
-from fastapi import Depends
-from core.dependencies import get_vector_db_dependency, get_ai_client_dependency
 
 @app.post("/search")
-async def search_materials(
-    vector_db: IVectorDatabase = Depends(get_vector_db_dependency),
-    ai_client = Depends(get_ai_client_dependency)
+async def search(
+    vector_db = Depends(get_vector_db_dependency),
+    cache_db = Depends(get_cache_db_dependency)
 ):
-    # Использование dependency injection с кешированием
-    results = await vector_db.search(...)
+    # Использование injected dependencies
 ```
 
-## 🎯 Ключевые особенности
+## 🔧 Configuration
 
-### 1. Runtime переключение БД
-```python
-# В коде можно переключать БД без перезапуска
-DatabaseFactory.clear_cache()  # Очистить кеш
-vector_db = DatabaseFactory.create_vector_database(
-    db_type="weaviate",  # Переключиться на Weaviate
-    config_override={"url": "http://weaviate-server"}
-)
+### Production Setup
+```env
+# Vector DB
+QDRANT_URL=https://cluster.qdrant.tech:6333
+QDRANT_API_KEY=your_key
+
+# PostgreSQL via SSH
+POSTGRESQL_URL=postgresql://user:pass@localhost:5435/db
+ENABLE_SSH_TUNNEL=true
+
+# Redis
+REDIS_URL=redis://localhost:6379
 ```
 
-### 2. Кеширование подключений
-- `@lru_cache` на всех фабричных методах
-- Кеширование по параметрам вызова
-- Мониторинг кеша: hits/misses/currsize
-
-### 3. Обработка ошибок
-```python
-try:
-    result = await vector_db.search(...)
-except ConnectionError as e:
-    logger.error(f"DB connection failed: {e.database_type}")
-except QueryError as e:
-    logger.error(f"Query failed: {e.query}")
-except DatabaseError as e:
-    logger.error(f"General DB error: {e.message}")
+### Development Setup
+```env
+# Упрощенная конфигурация
+QDRANT_ONLY_MODE=false
+ENABLE_FALLBACK_DATABASES=true
+DISABLE_REDIS_CONNECTION=false
 ```
 
-### 4. Health Checks
-```python
-# Проверка здоровья всех БД
-health = await vector_db.health_check()
-# {
-#   "status": "healthy",
-#   "database_type": "Qdrant", 
-#   "collections_count": 5,
-#   "timestamp": "2024-01-01T12:00:00Z"
-# }
-```
+## 🏥 Health Checks
 
-## 📝 Правила разработки
-
-### Соответствие .cursorrules:
-
-1. **Код на английском, документация русский+английский** ✅
-2. **@lru_cache для DI клиентов** ✅
-3. **Обязательные методы векторных БД**: search, upsert, delete, batch_upsert, get_by_id ✅
-4. **Type hints и docstrings везде** ✅
-5. **Async/await везде** ✅
-6. **ABC интерфейсы для всех БД** ✅
-7. **Логирование операций БД** ✅
-
-## 🚀 Статус реализации
-
-### ✅ Реализовано (Этап 1):
-- Интерфейсы всех типов БД
-- Фабрики с кешированием  
-- Dependency injection
-- Qdrant адаптер (полная реализация)
-- Структурированные исключения
-- Базовый репозиторий с логированием
-
-### 🔄 В разработке:
-- **Этап 2**: Рефакторинг существующих сервисов
-- **Этап 3**: PostgreSQL адаптер и миграции
-- **Этап 4**: Redis адаптер и кеширование
-- **Этап 5**: Гибридный поиск (vector + SQL)
-
-### 📋 TODO:
-- [ ] Тесты для всех адаптеров
-- [ ] Метрики производительности  
-- [ ] Retry логика для всех БД
-- [ ] Connection pooling
-- [ ] Конфигурация через environment variables
-
-## 🧪 Тестирование
-
+### Database Status
 ```bash
-# Тесты новой архитектуры
-pytest tests/test_database_architecture.py -v
-
-# Интеграционные тесты с реальной Qdrant
-pytest tests/test_database_architecture.py::TestQdrantIntegration -v -m integration
-
-# Все тесты
-pytest -v
+curl http://localhost:8000/api/v1/health/databases
 ```
 
-## 📚 Примеры использования
-
-### Создание векторного репозитория:
-```python
-from core.database import get_vector_database
-from core.repositories.base import BaseRepository
-
-class MaterialsRepository(BaseRepository):
-    def __init__(self):
-        vector_db = get_vector_database()
-        super().__init__(vector_db=vector_db)
-    
-    async def search_materials(self, query: str) -> List[Material]:
-        embedding = await self.get_embedding(query)
-        results = await self.vector_db.search(
-            collection_name="materials",
-            query_vector=embedding,
-            limit=10
-        )
-        return self.convert_to_materials(results)
+**Response:**
+```json
+{
+    "vector_database": {
+        "type": "Qdrant",
+        "status": "healthy",
+        "response_time_ms": 45.2
+    },
+    "relational_database": {
+        "type": "PostgreSQL", 
+        "status": "healthy"
+    },
+    "cache_database": {
+        "type": "Redis",
+        "status": "healthy"
+    }
+}
 ```
 
-### Переключение БД в runtime:
-```python
-# В FastAPI startup event
-@app.on_event("startup")
-async def startup_event():
-    if settings.ENVIRONMENT == "testing":
-        DatabaseFactory.clear_cache()
-        # Переключиться на тестовую БД
-        vector_db = DatabaseFactory.create_vector_database(
-            config_override={"url": "http://test-qdrant:6333"}
-        )
+## ⚡ Performance
+
+### Optimization Techniques
+- **Connection Pooling**: Для PostgreSQL и Redis
+- **Batch Operations**: Массовые операции с векторами
+- **Index Usage**: GIN индексы для полнотекстового поиска
+- **Cache Warming**: Предзагрузка популярных запросов
+
+### Metrics
+- Search latency: <100ms (cached), <500ms (uncached)
+- Insert throughput: 1000+ materials/second
+- Cache hit rate: >80% for search operations
+
+## 🔄 Migration
+
+### Alembic Commands
+```bash
+# Применить миграции
+alembic upgrade head
+
+# Создать новую миграцию
+alembic revision --autogenerate -m "Add new table"
+
+# Откат миграции
+alembic downgrade -1
 ```
 
-Эта архитектура обеспечивает гибкость, масштабируемость и простоту тестирования согласно всем правилам рефакторинга. 
+## 🚨 Troubleshooting
+
+### Connection Issues
+```bash
+# Проверка подключений
+curl http://localhost:8000/api/v1/health/detailed
+
+# SSH туннель статус  
+ssh -i ~/.ssh/key user@host "echo connected"
+```
+
+### Performance Issues
+```bash
+# PostgreSQL query analysis
+EXPLAIN ANALYZE SELECT * FROM materials WHERE name ILIKE '%цемент%';
+
+# Redis memory usage
+redis-cli info memory
+```
+
+---
+
+**Обновлено**: $(date +%Y-%m-%d) 
