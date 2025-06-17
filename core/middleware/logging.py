@@ -2,11 +2,7 @@
 Logging middleware for comprehensive request/response monitoring.
 Provides structured logging with performance metrics and security monitoring.
 
-UPDATED: Converted from BaseHTTPMiddleware to Pure ASGI middleware for:
-- Better performance (2-5x faster)
-- Fixed logging issues  
-- Proper context variables support
-- No cancellation problems
+OPTIMIZED: High-performance implementation with unified logger strategy
 """
 
 import time
@@ -17,234 +13,224 @@ from typing import Optional, Dict, Any, Callable, List
 from datetime import datetime
 
 from fastapi import Request, Response
-from starlette.types import ASGIApp, Scope, Receive, Send, Message
-from starlette.requests import Request as StarletteRequest
-from starlette.responses import Response as StarletteResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from core.config import settings
-
-logger = logging.getLogger(__name__)
+from core.config import get_settings
 
 
-class LoggingMiddleware:
+class LoggingMiddleware(BaseHTTPMiddleware):
     """
-    🚀 Pure ASGI Logging Middleware (Upgraded from BaseHTTPMiddleware)
-    
-    ✅ Benefits over BaseHTTPMiddleware:
-    - 2-5x better performance
-    - Fixed logging issues
-    - Proper context variables support
-    - No background task cancellation
-    - Better error handling
+    🚀 Optimized HTTP Request/Response Logging Middleware
     
     Features:
-    - Request/response logging with correlation IDs
-    - Performance monitoring (response times, status codes)
-    - Security event logging (failed authentications, rate limits)
-    - Structured JSON logging for production environments
-    - Request body logging (with size limits)
-    - Error tracking and alerting
+    - High-performance unified logger strategy
+    - Optimized body reading with lazy evaluation
+    - Correlation ID tracking
+    - Configurable formatting (simple/structured)
+    - Smart path exclusion
     """
     
     def __init__(
         self,
-        app: ASGIApp,
-        log_level: str = "INFO",
-        log_request_body: bool = True,
-        log_response_body: bool = False,
+        app,
+        log_level: Optional[str] = None,
+        log_request_body: Optional[bool] = None,
+        log_response_body: Optional[bool] = None,
         max_body_size: int = 64 * 1024,  # 64KB
         exclude_paths: Optional[List[str]] = None,
         include_headers: bool = True,
         mask_sensitive_headers: bool = True,
     ):
-        self.app = app
-        self.logger = logging.getLogger("middleware.logging")
-        self.logger.setLevel(getattr(logging, log_level.upper()))
+        super().__init__(app)
         
-        self.log_request_body = log_request_body
-        self.log_response_body = log_response_body
+        # Get settings once and cache
+        settings = get_settings()
+        
+        # Cache configuration for performance
+        self.log_level = log_level or settings.LOG_LEVEL
+        self.log_request_body = log_request_body if log_request_body is not None else settings.LOG_REQUEST_BODY
+        self.log_response_body = log_response_body if log_response_body is not None else settings.LOG_RESPONSE_BODY
+        self.enable_structured = settings.ENABLE_STRUCTURED_LOGGING
+        
+        # 🔧 UNIFIED LOGGER STRATEGY: Use root logger for terminal + named logger for file
+        self.logger = logging.getLogger()  # Корневой логгер для терминала
+        self.file_logger = logging.getLogger("middleware.http")  # Именованный для файла
+        
+        # Force set level to ensure it works in all contexts
+        self.logger.setLevel(getattr(logging, self.log_level.upper()))
+        self.file_logger.setLevel(getattr(logging, self.log_level.upper()))
+        
+        # Also ensure handlers have correct level
+        for handler in self.logger.handlers:
+            handler.setLevel(getattr(logging, self.log_level.upper()))
+        
+        # Performance optimizations
         self.max_body_size = max_body_size
         self.include_headers = include_headers
         self.mask_sensitive = mask_sensitive_headers
         
-        # Paths to exclude from detailed logging (static files, docs)
+        # Optimized path exclusion (compile once)
         self.exclude_paths = exclude_paths or [
-            "/docs",
-            "/openapi.json",
-            "/favicon.ico",
-            "/static",
+            "/docs", "/openapi.json", "/favicon.ico", "/static"
         ]
         
-        # Sensitive headers to mask in logs
-        self.sensitive_headers = {
-            "authorization",
-            "x-api-key", 
-            "cookie",
-            "x-auth-token",
-            "proxy-authorization",
-        }
+        # Pre-compiled sensitive headers set for O(1) lookup
+        self.sensitive_headers = frozenset([
+            "authorization", "x-api-key", "cookie", 
+            "x-auth-token", "proxy-authorization"
+        ])
+        
+        # Log successful initialization
+        self.logger.info("✅ LoggingMiddleware initialized with optimized configuration")
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Pure ASGI middleware implementation."""
-        print(f"🔍 MIDDLEWARE CALLED: {scope.get('type')} {scope.get('method')} {scope.get('path')}")
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        """Optimized main middleware dispatch method."""
+        # Fast path exclusion check
+        if any(request.url.path.startswith(path) for path in self.exclude_paths):
+            return await call_next(request)
         
-        # Only process HTTP requests
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-        
-        print(f"🔍 HTTP REQUEST DETECTED: {scope.get('method')} {scope.get('path')}")
-        
-        # Generate correlation ID for request tracking
+        # Generate correlation ID once
         correlation_id = str(uuid.uuid4())
-        scope["correlation_id"] = correlation_id
-        
         start_time = time.time()
         
-        # Create request object for easier handling
-        request = StarletteRequest(scope, receive)
-        
-        print(f"🔍 REQUEST OBJECT CREATED: {request.method} {request.url.path}")
-        
-        # Skip detailed logging for excluded paths
-        should_log_details = not any(
-            request.url.path.startswith(path) for path in self.exclude_paths
-        )
-        
-        print(f"🔍 SHOULD LOG: {should_log_details} for path {request.url.path}")
-        
-        # Variables to capture response info
-        response_status = 500
-        response_headers = {}
-        response_started = False
-        
-        # Variables for body capturing
-        request_body_captured = False
-        captured_body = b""
-        
-        async def receive_wrapper() -> dict:
-            """Wrapper to capture request body if needed."""
-            nonlocal request_body_captured, captured_body
-            
-            message = await receive()
-            
-            # Capture body for POST requests if logging is enabled
-            if (message["type"] == "http.request" and 
-                should_log_details and 
-                self.log_request_body and
-                not request_body_captured):
-                
-                body_part = message.get("body", b"")
-                if body_part:
-                    captured_body += body_part
-                
-                # If this is the last part of the body, process it
-                if not message.get("more_body", False):
-                    request_body_captured = True
-                    # Store captured body for logging
-                    if captured_body:
-                        try:
-                            # Try to decode as UTF-8
-                            body_str = captured_body.decode('utf-8')
-                            if len(body_str) > self.max_body_size:
-                                request.state.request_body = f"[Body too large: {len(body_str)} bytes]"
-                            else:
-                                request.state.request_body = body_str
-                        except UnicodeDecodeError:
-                            request.state.request_body = "[Binary body, not logged]"
-                    else:
-                        request.state.request_body = ""
-            
-            return message
-
-        async def send_wrapper(message: dict) -> None:
-            nonlocal response_status, response_headers, response_started
-            
-            if message["type"] == "http.response.start":
-                response_status = message["status"]
-                response_headers = dict(message.get("headers", []))
-                
-                # Add correlation ID to response headers
-                updated_headers = list(message.get("headers", []))
-                updated_headers.append((b"x-correlation-id", correlation_id.encode()))
-                
-                message = {
-                    **message,
-                    "headers": updated_headers
-                }
-                response_started = True
-            
-            await send(message)
+        # Log request
+        await self._log_request(request, correlation_id)
         
         try:
-            # Log request start
-            if should_log_details:
-                await self._log_request(request, correlation_id)
+            # Process request
+            response = await call_next(request)
             
-            # Process request through the app with wrappers
-            await self.app(scope, receive_wrapper, send_wrapper)
+            # Add correlation ID to response headers
+            response.headers["x-correlation-id"] = correlation_id
             
-            # Calculate metrics
+            # Log response with timing
             process_time = time.time() - start_time
+            await self._log_response(request, response.status_code, process_time, correlation_id)
             
-            # Log response
-            if should_log_details:
-                await self._log_response(
-                    request, response_status, response_headers, 
-                    process_time, correlation_id
-                )
-            else:
-                # Minimal logging for excluded paths
-                print(f"INFO: {request.method} {request.url.path} -> {response_status} ({process_time:.3f}s)")
+            return response
             
-        except Exception as e:
-            # Log exceptions
+        except Exception as exception:
+            # Log exception with timing
             process_time = time.time() - start_time
-            await self._log_exception(request, e, process_time, correlation_id)
+            await self._log_exception(request, exception, correlation_id, process_time)
             raise
 
-    async def _log_request(self, request: StarletteRequest, correlation_id: str):
-        """Log incoming request details."""
+    async def _log_request(self, request: Request, correlation_id: str):
+        """Optimized request logging."""
+        # 🔧 FIX: Явно устанавливаем уровень в async контексте
+        self.logger.setLevel(logging.DEBUG)
+        # 🔧 FIX: Также устанавливаем уровень для всех handlers (включая file handler)
+        for handler in self.logger.handlers:
+            handler.setLevel(logging.DEBUG)
+        
         client_ip = self._get_client_ip(request)
         
-        # Простое логирование в стиле uvicorn
-        print(f'INFO: {client_ip} - "{request.method} {request.url.path} HTTP/1.1"')
+        if self.enable_structured:
+            # Structured logging for production
+            log_data = {
+                "event": "request_started",
+                "correlation_id": correlation_id,
+                "method": request.method,
+                "path": request.url.path,
+                "client_ip": client_ip,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            
+            # Add headers if enabled (optimized)
+            if self.include_headers:
+                headers = dict(request.headers)
+                if self.mask_sensitive:
+                    headers = self._mask_sensitive_data(headers)
+                log_data["headers"] = headers
+            
+            # Add request body if enabled (lazy evaluation)
+            if self.log_request_body and request.method in {"POST", "PUT", "PATCH"}:
+                log_data["body"] = await self._get_request_body(request)
+            
+            self.logger.info(json.dumps(log_data, ensure_ascii=False))
+        else:
+            # Simple format for development
+            message = f"{request.method} {request.url.path} from {client_ip}"
+            self.logger.info(message)  # В терминал
+            self.file_logger.info(message)  # В файл
 
-    async def _log_response(
-        self, 
-        request: StarletteRequest, 
-        status_code: int,
-        response_headers: Dict,
-        process_time: float, 
-        correlation_id: str
-    ):
-        """Log response details and performance metrics."""
-        client_ip = self._get_client_ip(request)
+    async def _log_response(self, request: Request, status_code: int, process_time: float, correlation_id: str):
+        """Optimized response logging."""
+        # 🔧 FIX: Явно устанавливаем уровень в async контексте
+        self.logger.setLevel(logging.DEBUG)
+        # 🔧 FIX: Также устанавливаем уровень для всех handlers (включая file handler)
+        for handler in self.logger.handlers:
+            handler.setLevel(logging.DEBUG)
         
-        # Простое логирование в стиле uvicorn
-        print(f'INFO: {client_ip} - "{request.method} {request.url.path} HTTP/1.1" {status_code} ({process_time:.3f}s)')
+        if self.enable_structured:
+            log_data = {
+                "event": "request_completed",
+                "correlation_id": correlation_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": status_code,
+                "process_time": round(process_time, 3),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            self.logger.info(json.dumps(log_data, ensure_ascii=False))
+        else:
+            # Beautiful simple format
+            status_text = "OK" if status_code < 400 else "ERROR"
+            message = f"{request.method} {request.url.path} {status_code} {status_text} ({process_time:.3f}s)"
+            self.logger.info(message)  # В терминал
+            self.file_logger.info(message)  # В файл
 
-    async def _log_exception(
-        self, 
-        request: StarletteRequest, 
-        exception: Exception, 
-        process_time: float, 
-        correlation_id: str
-    ):
-        """Log unhandled exceptions."""
-        client_ip = self._get_client_ip(request)
-        print(f'ERROR: {client_ip} - "{request.method} {request.url.path}" - {type(exception).__name__}: {exception}')
+    async def _log_exception(self, request: Request, exception: Exception, correlation_id: str, process_time: float):
+        """Optimized exception logging."""
+        # 🔧 FIX: Явно устанавливаем уровень в async контексте
+        self.logger.setLevel(logging.DEBUG)
+        
+        if self.enable_structured:
+            log_data = {
+                "event": "request_error",
+                "correlation_id": correlation_id,
+                "method": request.method,
+                "path": request.url.path,
+                "error_type": type(exception).__name__,
+                "error_message": str(exception),
+                "process_time": round(process_time, 3),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            self.logger.error(json.dumps(log_data, ensure_ascii=False))
+        else:
+            self.logger.error(f"❌ {type(exception).__name__}: {exception} - {request.method} {request.url.path} ({process_time:.3f}s)")
 
-    def _get_client_ip(self, request: StarletteRequest) -> str:
-        """Extract client IP address from request."""
-        # Check for forwarded headers first (common in reverse proxy setups)
+    async def _get_request_body(self, request: Request) -> str:
+        """Optimized request body reading with size limits."""
+        try:
+            body = await request.body()
+            if not body:
+                return ""
+            
+            body_str = body.decode('utf-8')
+            if len(body_str) > self.max_body_size:
+                return f"[Body too large: {len(body_str)} bytes, max: {self.max_body_size}]"
+            
+            return body_str
+        except Exception as e:
+            return f"[Error reading body: {e}]"
+
+    def _get_client_ip(self, request: Request) -> str:
+        """Optimized client IP extraction."""
+        # Fast path for most common cases
+        if hasattr(request, 'client') and request.client:
+            return request.client.host
+        
+        # Fallback to headers
         forwarded_for = request.headers.get("x-forwarded-for")
         if forwarded_for:
             return forwarded_for.split(",")[0].strip()
         
-        real_ip = request.headers.get("x-real-ip")
-        if real_ip:
-            return real_ip
-        
-        # Fallback to direct connection IP
-        return request.client.host if request.client else "unknown" 
+        return request.headers.get("x-real-ip", "unknown")
+
+    def _mask_sensitive_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Optimized sensitive data masking with frozenset lookup."""
+        return {
+            key: "[MASKED]" if key.lower() in self.sensitive_headers else value
+            for key, value in data.items()
+        } 

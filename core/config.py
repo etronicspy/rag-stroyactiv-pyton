@@ -18,6 +18,14 @@ class AIProvider(str, Enum):
     HUGGINGFACE = "huggingface"
     OLLAMA = "ollama"
 
+class LogLevel(str, Enum):
+    """Supported logging levels"""
+    DEBUG = "DEBUG"
+    INFO = "INFO"  
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
 class DatabaseConfig:
     """Database configuration factory for all database types"""
     
@@ -269,12 +277,20 @@ class Settings(BaseSettings):
     RATE_LIMIT_BURST: int = Field(default=10, description="Burst requests limit")
     
     # Logging settings
-    LOG_LEVEL: str = Field(default="INFO", description="Logging level")
+    LOG_LEVEL: LogLevel = Field(default=LogLevel.INFO, description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
     LOG_FILE: Optional[str] = Field(default=None, description="Log file path")
     LOG_REQUEST_BODY: bool = Field(default=True, description="Log request bodies")
     LOG_RESPONSE_BODY: bool = Field(default=False, description="Log response bodies")
     ENABLE_STRUCTURED_LOGGING: bool = Field(default=False, description="Enable JSON structured logging")
     ENABLE_REQUEST_LOGGING: bool = Field(default=True, description="Enable request logging middleware")
+    
+    # Advanced logging settings
+    LOG_FORMAT: str = Field(default="simple", description="Log format: simple, detailed, json")
+    LOG_COLORS: bool = Field(default=True, description="Enable colored logging output")
+    LOG_CORRELATION_ID: bool = Field(default=True, description="Include correlation IDs in logs")
+    LOG_PERFORMANCE: bool = Field(default=True, description="Log performance metrics")
+    LOG_SQL_QUERIES: bool = Field(default=False, description="Log SQL queries (DEBUG level)")
+    LOG_THIRD_PARTY_LEVEL: LogLevel = Field(default=LogLevel.WARNING, description="Third-party libraries log level")
     
     model_config = ConfigDict(
         case_sensitive=True,
@@ -335,6 +351,26 @@ class Settings(BaseSettings):
         if v.lower() not in allowed_envs:
             raise ValueError(f'ENVIRONMENT must be one of: {", ".join(allowed_envs)}')
         return v.lower()
+    
+    @validator('LOG_LEVEL', pre=True)
+    def validate_log_level(cls, v):
+        """Validate and normalize log level"""
+        if isinstance(v, str):
+            v = v.upper()
+            if v not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
+                raise ValueError('LOG_LEVEL must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL')
+            return LogLevel(v)
+        return v
+    
+    @validator('LOG_THIRD_PARTY_LEVEL', pre=True)
+    def validate_third_party_log_level(cls, v):
+        """Validate and normalize third-party log level"""
+        if isinstance(v, str):
+            v = v.upper()
+            if v not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
+                raise ValueError('LOG_THIRD_PARTY_LEVEL must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL')
+            return LogLevel(v)
+        return v
     
     @validator('MAX_UPLOAD_SIZE')
     def validate_max_upload_size(cls, v):

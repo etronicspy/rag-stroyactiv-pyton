@@ -1,20 +1,23 @@
-import logging
+import asyncio
 import time
+import logging
 from contextlib import asynccontextmanager
+from typing import Dict, Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from core.config import settings
+from core.config import get_settings
 from core.database.init_db import initialize_database_on_startup
 from core.database.pool_manager import initialize_pool_manager, shutdown_pool_manager, PoolConfig
+from core.middleware.logging import LoggingMiddleware
+from core.middleware.security import SecurityMiddleware
+from core.middleware.compression import CompressionMiddleware
+from core.middleware.rate_limiting import RateLimitMiddleware
 from core.middleware import (
-    RateLimitMiddleware, 
-    LoggingMiddleware, 
-    SecurityMiddleware,
     ConditionalMiddleware,
-    CompressionMiddleware,
     MiddlewareOptimizer
 )
 from core.middleware.rate_limiting_optimized import OptimizedRateLimitMiddleware
@@ -22,20 +25,26 @@ from core.monitoring import setup_structured_logging, get_metrics_collector
 from api.routes import reference, health, materials, prices, search, advanced_search, tunnel
 from services.ssh_tunnel_service import initialize_tunnel_service, shutdown_tunnel_service
 
-logger = logging.getLogger(__name__)
+# Initialize settings
+settings = get_settings()
 
+# Setup logging BEFORE creating the app and middleware
+setup_structured_logging(
+    log_level=settings.LOG_LEVEL,
+    enable_structured=settings.ENABLE_STRUCTURED_LOGGING,
+    log_file=settings.LOG_FILE,
+    enable_colors=settings.LOG_COLORS,
+    third_party_level=settings.LOG_THIRD_PARTY_LEVEL
+)
+
+# Initialize logger after setup
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown tasks."""
     # Startup
     logger.info("🚀 Starting Construction Materials API...")
-    
-    # Setup monitoring and logging
-    setup_structured_logging(
-        log_level=settings.LOG_LEVEL,
-        enable_structured=settings.ENABLE_STRUCTURED_LOGGING
-    )
     
     # Initialize metrics collector
     metrics_collector = get_metrics_collector()
@@ -217,14 +226,11 @@ cors_settings = security_middleware.get_cors_settings()
 
 # 5. CORS middleware (добавляем первым - выполнится последним, ближе к app)
 
-# 4. Logging middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
+# 4. Logging middleware (🔥 ПРОСТОЕ РЕШЕНИЕ - используем BaseHTTPMiddleware)
 app.add_middleware(LoggingMiddleware,
-    log_level=settings.LOG_LEVEL,
-    log_request_body=True,      # 🔥 RESTORED: Полное логирование body через кеш
-    log_response_body=True,     # 🔥 RESTORED: Full response body logging
-    max_body_size=64*1024,      # 🔥 RESTORED: 64KB limit (was 1KB)
-    include_headers=True,       # 🔥 RESTORED: Headers logging
-    mask_sensitive_headers=True, # Keep security
+    max_body_size=64*1024,      # Технические параметры
+    include_headers=True,       
+    mask_sensitive_headers=True,
 )
 
 # 3. Rate limiting middleware (🔥 FULL FUNCTIONALITY RESTORED)
