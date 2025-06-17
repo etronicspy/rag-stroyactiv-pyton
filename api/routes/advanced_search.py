@@ -18,7 +18,7 @@ from core.schemas.materials import Material
 from services.materials import MaterialsService
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/search", tags=["Advanced Search"])
+router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
 # Simplified models for advanced search
 class AdvancedSearchRequest(BaseModel):

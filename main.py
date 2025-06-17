@@ -19,7 +19,7 @@ from core.middleware import (
 )
 from core.middleware.rate_limiting_optimized import OptimizedRateLimitMiddleware
 from core.monitoring import setup_structured_logging, get_metrics_collector
-from api.routes import reference, health, materials, prices, search, monitoring, advanced_search, tunnel
+from api.routes import reference, health, materials, prices, search, advanced_search, tunnel
 from services.ssh_tunnel_service import initialize_tunnel_service, shutdown_tunnel_service
 
 logger = logging.getLogger(__name__)
@@ -102,7 +102,102 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    lifespan=lifespan
+    description="""
+    🏗️ **RAG Construction Materials API** - Система управления и семантического поиска строительных материалов
+
+    ## 🚀 Возможности API
+
+    ### 🔍 **Интеллектуальный поиск**
+    - **Семантический поиск** с AI-эмбеддингами (OpenAI)
+    - **Гибридный поиск** (векторный + SQL + нечеткий)
+    - **Автодополнение** и предложения
+    - **Фильтрация** по категориям и единицам измерения
+
+    ### 📦 **Управление материалами**
+    - CRUD операции с материалами
+    - **Пакетная загрузка** и импорт из JSON
+    - **Автоматическая векторизация** описаний
+    - **Категоризация** и стандартизация единиц
+
+    ### 💰 **Обработка прайс-листов**
+    - **Загрузка CSV/Excel** прайс-листов
+    - **Автоматическая обработка** и индексация
+    - **Трекинг** статуса обработки продуктов
+    - **Управление** несколькими поставщиками
+
+    ### 🏥 **Мониторинг и диагностика**
+    - **Полная диагностика** всех систем
+    - **Статус баз данных** (Qdrant, PostgreSQL, Redis)
+    - **Мониторинг пулов** подключений
+    - **SSH туннель** для PostgreSQL
+
+    ### 🔧 **Техническая архитектура**
+    - **Multi-database**: Qdrant Cloud + PostgreSQL + Redis
+    - **Fallback стратегия** при недоступности БД  
+    - **Rate limiting** и безопасность
+    - **Автоматическое масштабирование** пулов подключений
+
+    ## 📚 **Документация**
+    - **Interactive Docs**: `/docs` (Swagger UI)
+    - **ReDoc**: `/redoc` 
+    - **OpenAPI Schema**: `/openapi.json`
+
+    ## 🎯 **Версионирование**
+    - Текущая версия: **v1**
+    - Базовый путь: `/api/v1/`
+    - Стабильный API без устаревших эндпоинтов
+
+    ---
+    **Разработано с ❤️ для эффективного управления строительными материалами**
+    """,
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    contact={
+        "name": "RAG Construction Materials API",
+        "url": "https://github.com/your-repo/rag-construction-materials",
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    servers=[
+        {
+            "url": "http://localhost:8000",
+            "description": "Development server"
+        },
+        {
+            "url": "https://api.construction-materials.com",
+            "description": "Production server"
+        }
+    ],
+    tags_metadata=[
+        {
+            "name": "health",
+            "description": "🏥 **Health & Monitoring** - Проверка состояния системы, диагностика баз данных и мониторинг"
+        },
+        {
+            "name": "materials",
+            "description": "📦 **Materials Management** - CRUD операции с материалами, пакетная загрузка, импорт и векторизация"
+        },
+        {
+            "name": "search",
+            "description": "🔍 **Search & Discovery** - Семантический поиск, автодополнение, фильтрация по категориям"
+        },
+        {
+            "name": "prices",
+            "description": "💰 **Price Lists** - Загрузка и обработка прайс-листов, управление поставщиками"
+        },
+        {
+            "name": "reference",
+            "description": "📚 **Reference Data** - Управление справочниками категорий и единиц измерения"
+        },
+        {
+            "name": "tunnel",
+            "description": "🔌 **SSH Tunnel** - Управление SSH туннелем для безопасного подключения к PostgreSQL"
+        }
+    ]
 )
 
 # Custom JSON response class to ensure UTF-8 encoding
@@ -179,7 +274,6 @@ app.add_middleware(CORSMiddleware, **cors_settings)
 
 # Include routers
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
-app.include_router(monitoring.router, prefix="/api/v1/monitoring", tags=["monitoring"])
 app.include_router(reference.router, prefix="/api/v1/reference", tags=["reference"])
 app.include_router(materials.router, prefix="/api/v1/materials", tags=["materials"])
 app.include_router(prices.router, prefix="/api/v1/prices", tags=["prices"])

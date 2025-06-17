@@ -65,12 +65,12 @@ class TestHealthEndpoints:
         assert db_service_exists, f"DB service not found in configuration: {list(configuration.keys())}"
     
     @pytest.mark.unit
-    def test_detailed_health_check(self, client_mock):
-        """Тест детального health check"""
-        response = client_mock.get("/api/v1/health/detailed")
+    def test_full_health_check(self, client_mock):
+        """Тест полного health check"""
+        response = client_mock.get("/api/v1/health/full")
         assert response.status_code == 200
         data = response.json()
-        # Проверяем что детальный health check возвращает структурированные данные
+        # Проверяем что полный health check возвращает структурированные данные
         assert "overall_status" in data or "status" in data or "databases" in data
 
 

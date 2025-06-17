@@ -248,7 +248,7 @@ alembic downgrade -1
 ### Connection Issues
 ```bash
 # Проверка подключений
-curl http://localhost:8000/api/v1/health/detailed
+curl http://localhost:8000/api/v1/health/full
 
 # SSH туннель статус  
 ssh -i ~/.ssh/key user@host "echo connected"

@@ -158,8 +158,8 @@ async def search(
 # Проверка основных сервисов
 curl http://localhost:8000/api/v1/health/
 
-# Детальная проверка всех БД
-curl http://localhost:8000/api/v1/health/detailed
+# Полная диагностика всех систем
+curl http://localhost:8000/api/v1/health/full
 ```
 
 ### Логирование
@@ -196,7 +196,7 @@ echo $QDRANT_URL
 echo $OPENAI_API_KEY
 
 # Проверка health check
-curl http://localhost:8000/api/v1/health/detailed
+curl http://localhost:8000/api/v1/health/full
 ```
 
 ### SSH туннель

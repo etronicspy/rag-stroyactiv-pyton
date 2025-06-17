@@ -49,16 +49,27 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 ### 🏥 Health & Monitoring
 ```
-GET  /api/v1/health/              # Базовая проверка
-GET  /api/v1/health/detailed      # Детальная диагностика
-GET  /api/v1/health/databases     # Статус всех БД
-GET  /api/v1/monitoring/health    # Комплексный мониторинг
+GET  /api/v1/health/              # Базовая проверка здоровья
+GET  /api/v1/health/full          # Полная диагностика всех систем
+GET  /api/v1/health/databases     # Статус всех баз данных
+```
+
+### 🔌 SSH Tunnel Management
+```
+GET  /api/v1/tunnel/status        # Состояние SSH туннеля
+GET  /api/v1/tunnel/health        # Проверка работы туннеля
+GET  /api/v1/tunnel/metrics       # Детальные метрики туннеля
+GET  /api/v1/tunnel/config        # Конфигурация туннеля
+POST /api/v1/tunnel/start         # Запустить туннель
+POST /api/v1/tunnel/stop          # Остановить туннель
+POST /api/v1/tunnel/restart       # Перезапустить туннель
 ```
 
 ### 📦 Materials
 ```
 GET    /api/v1/materials/                    # Список материалов
 POST   /api/v1/materials/                    # Создать материал
+GET    /api/v1/materials/health              # Проверка сервиса материалов
 GET    /api/v1/materials/{id}                # Получить по ID
 PUT    /api/v1/materials/{id}                # Обновить материал
 DELETE /api/v1/materials/{id}                # Удалить материал
@@ -69,11 +80,12 @@ POST   /api/v1/materials/search              # Поиск материалов
 
 ### 💰 Prices
 ```
-POST   /api/v1/prices/process                      # Обработка прайс-листа
-GET    /api/v1/prices/{supplier_id}/latest         # Последний прайс-лист
-GET    /api/v1/prices/{supplier_id}/all            # Все прайс-листы
-DELETE /api/v1/prices/{supplier_id}                # Удалить прайс-листы
-PATCH  /api/v1/prices/{supplier_id}/product/{id}/process  # Отметить обработанным
+POST   /api/v1/prices/process                                    # Обработка прайс-листа
+GET    /api/v1/prices/{supplier_id}/latest                       # Последний прайс-лист
+GET    /api/v1/prices/{supplier_id}/all                          # Все прайс-листы
+GET    /api/v1/prices/{supplier_id}/pricelist/{pricelistid}      # Продукты по ID прайс-листа
+DELETE /api/v1/prices/{supplier_id}                              # Удалить прайс-листы
+PATCH  /api/v1/prices/{supplier_id}/product/{product_id}/process # Отметить обработанным
 ```
 
 ### 🔍 Search
@@ -184,7 +196,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ### Проблемы с БД
 ```bash
 # Проверка статуса
-curl http://localhost:8000/api/v1/health/detailed
+curl http://localhost:8000/api/v1/health/full
 
 # Включение fallback режима
 ENABLE_FALLBACK_DATABASES=true

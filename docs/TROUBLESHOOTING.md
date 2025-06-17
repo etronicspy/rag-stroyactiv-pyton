@@ -35,7 +35,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 curl http://localhost:8000/api/v1/health/
 
 # Детальная диагностика всех БД
-curl http://localhost:8000/api/v1/health/detailed
+curl http://localhost:8000/api/v1/health/full
 
 # Только статус БД
 curl http://localhost:8000/api/v1/health/databases
@@ -207,7 +207,7 @@ MAX_REQUEST_SIZE_MB=100
 ## 🚨 Критические ошибки
 
 ### 503 Service Unavailable
-1. Проверьте health check: `/api/v1/health/detailed`
+1. Проверьте health check: `/api/v1/health/full`
 2. Проверьте логи приложения
 3. Включите fallback: `ENABLE_FALLBACK_DATABASES=true`
 
@@ -251,8 +251,8 @@ curl -s http://localhost:8000/api/v1/health/ | jq
 echo "=== Database Health ==="
 curl -s http://localhost:8000/api/v1/health/databases | jq
 
-echo "=== Detailed Health ==="
-curl -s http://localhost:8000/api/v1/health/detailed | jq
+echo "=== Full Health ==="
+curl -s http://localhost:8000/api/v1/health/full | jq
 ```
 
 ## 📞 Получение помощи
@@ -266,7 +266,7 @@ python --version
 pip list | grep -E "(fastapi|qdrant|redis|psycopg|sqlalchemy)"
 
 # Статус API
-curl -s http://localhost:8000/api/v1/health/detailed | jq '.'
+curl -s http://localhost:8000/api/v1/health/full | jq '.'
 
 # Логи приложения (последние 50 строк)
 tail -50 app.log

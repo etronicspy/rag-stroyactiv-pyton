@@ -18,9 +18,8 @@ from core.config import get_settings, DatabaseType, AIProvider, get_vector_db_cl
 from core.monitoring import get_metrics_collector
 from core.monitoring.logger import get_logger
 from core.database.factories import DatabaseFactory
-from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
 from core.database.exceptions import ConnectionError as DatabaseConnectionError
-from services.ssh_tunnel_service import get_tunnel_service
+from core.database.pool_manager import get_pool_manager
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -506,16 +505,20 @@ async def basic_health_check():
     return await health_checker.check_basic_health()
 
 
-@router.get("/detailed")
-async def detailed_health_check():
+@router.get("/full")
+async def full_health_check():
     """
-    🔍 **Detailed Health Check** - Комплексная диагностика системы
+    🔍 **Full Health Check** - Полная диагностика всех систем
     
-    Выполняет полную проверку всех компонентов системы включая:
+    Выполняет комплексную проверку всех компонентов системы, объединяя функции 
+    детальной диагностики и мониторинга пулов подключений:
+    
+    **Проверки включают:**
     - 🗄️ Векторные базы данных (Qdrant/Weaviate/Pinecone)
-    - 🐘 PostgreSQL (опционально)
+    - 🐘 PostgreSQL (опционально через SSH туннель)
     - 🔴 Redis (опционально)  
     - 🤖 AI сервисы (OpenAI/HuggingFace)
+    - 🔄 Пулы подключений
     - 📊 Система метрик и мониторинга
     
     **Особенности:**
@@ -523,10 +526,13 @@ async def detailed_health_check():
     - ⏱️ Измерение времени отклика
     - 📋 Детальная диагностика ошибок
     - 🎚️ Градация статусов (healthy/degraded/unhealthy)
+    - 🔄 Проверка всех пулов подключений к БД
+    - 📊 Статистика производительности
+    - 🎯 Мультистатусные ответы для частичной деградации
     
     **Response Status Codes:**
     - **200 OK**: Все системы работают нормально
-    - **207 Multi-Status**: Некоторые системы работают с ограничениями
+    - **207 Multi-Status**: Некоторые системы работают с ограничениями  
     - **503 Service Unavailable**: Критические системы недоступны
     
     **Example Response:**
@@ -554,7 +560,7 @@ async def detailed_health_check():
                 }
             },
             "postgresql": {
-                "type": "postgresql",
+                "type": "postgresql", 
                 "status": "healthy",
                 "response_time_ms": 23.1,
                 "details": {
@@ -566,7 +572,7 @@ async def detailed_health_check():
             },
             "redis": {
                 "type": "redis",
-                "status": "healthy",
+                "status": "healthy", 
                 "response_time_ms": 12.4,
                 "details": {
                     "ping": true,
@@ -574,6 +580,20 @@ async def detailed_health_check():
                     "memory_usage": "12.5MB",
                     "connected_clients": 3
                 }
+            }
+        },
+        "connection_pools": {
+            "qdrant_pool": {
+                "status": "healthy",
+                "response_time_ms": 45
+            },
+            "postgresql_pool": {
+                "status": "healthy",
+                "response_time_ms": 12
+            },
+            "redis_pool": {
+                "status": "healthy", 
+                "response_time_ms": 8
             }
         },
         "ai_service": {
@@ -596,14 +616,22 @@ async def detailed_health_check():
     ```
     
     **Use Cases:**
-    - Детальная диагностика проблем
-    - Мониторинг производительности
+    - Полная диагностика проблем
+    - Мониторинг производительности 
     - Анализ работы компонентов
     - Отладка интеграций
+    - 🏗️ Мониторинг инфраструктуры в production
+    - 🔧 Диагностика проблем подключений
+    - 📈 Отслеживание производительности БД
+    - 🚨 Настройка алертов и уведомлений
+    - ⚖️ Load balancer health checks
+    - 🐳 Kubernetes liveness/readiness probes
+    - 📊 Интеграция с системами мониторинга (Prometheus, Grafana)
     """
+    settings = get_settings()
     start_time = time.time()
     
-    # Run all health checks concurrently
+    # Run detailed health checks concurrently
     health_checks = await asyncio.gather(
         health_checker.check_basic_health(),
         health_checker.check_vector_database(),
@@ -614,6 +642,42 @@ async def detailed_health_check():
     )
     
     basic_health, vector_db, postgresql, redis, ai_service = health_checks
+    
+    # Check connection pools
+    pool_manager = get_pool_manager()
+    pool_checks = {}
+    
+    try:
+        # Check all registered pools
+        for pool_name in pool_manager.pools.keys():
+            pool = pool_manager.pools[pool_name]
+            try:
+                pool_start_time = time.time()
+                is_healthy = await asyncio.wait_for(pool.health_check(), timeout=5.0)
+                response_time = round((time.time() - pool_start_time) * 1000, 2)
+                
+                pool_checks[pool_name] = {
+                    "status": "healthy" if is_healthy else "unhealthy",
+                    "response_time_ms": response_time
+                }
+                
+            except asyncio.TimeoutError:
+                pool_checks[pool_name] = {
+                    "status": "timeout",
+                    "error": "Health check timed out",
+                    "response_time_ms": 5000  # Timeout threshold
+                }
+                
+            except Exception as e:
+                pool_checks[pool_name] = {
+                    "status": "error",
+                    "error": str(e),
+                    "response_time_ms": None
+                }
+    
+    except Exception as e:
+        logger.error(f"Pool health check failed: {e}")
+        pool_checks["error"] = str(e)
     
     # Collect results
     health_status = {
@@ -626,6 +690,7 @@ async def detailed_health_check():
             "postgresql": postgresql if not isinstance(postgresql, Exception) else {"status": "error", "error": str(postgresql)},
             "redis": redis if not isinstance(redis, Exception) else {"status": "error", "error": str(redis)}
         },
+        "connection_pools": pool_checks,
         "ai_service": ai_service if not isinstance(ai_service, Exception) else {"status": "error", "error": str(ai_service)},
         "metrics": health_checker.metrics_collector.get_health_metrics()
     }
@@ -633,7 +698,7 @@ async def detailed_health_check():
     # Determine overall status
     service_statuses = []
     
-    # Check vector database
+    # Check vector database (critical)
     if isinstance(vector_db, dict) and vector_db.get('status') in ['error', 'unhealthy']:
         service_statuses.append('unhealthy')
     
@@ -645,9 +710,26 @@ async def detailed_health_check():
     if isinstance(redis, dict) and redis.get('status') == 'error':
         service_statuses.append('degraded')
         
-    # Check AI service
+    # Check AI service (critical)
     if isinstance(ai_service, dict) and ai_service.get('status') in ['error', 'unhealthy']:
         service_statuses.append('unhealthy')
+    
+    # Check connection pools
+    pool_unhealthy = any(
+        pool_info.get('status') in ['error', 'unhealthy'] 
+        for pool_info in pool_checks.values() 
+        if isinstance(pool_info, dict)
+    )
+    pool_degraded = any(
+        pool_info.get('status') == 'timeout' 
+        for pool_info in pool_checks.values() 
+        if isinstance(pool_info, dict)
+    )
+    
+    if pool_unhealthy:
+        service_statuses.append('unhealthy')
+    elif pool_degraded:
+        service_statuses.append('degraded')
     
     # Set overall status
     if 'unhealthy' in service_statuses:
@@ -655,7 +737,14 @@ async def detailed_health_check():
     elif 'degraded' in service_statuses:
         health_status['overall_status'] = 'degraded'
     
-    return health_status
+    # Return appropriate HTTP status
+    status_code = 200
+    if health_status['overall_status'] == 'degraded':
+        status_code = 207  # Multi-status
+    elif health_status['overall_status'] in ['unhealthy', 'error']:
+        status_code = 503  # Service unavailable
+    
+    return JSONResponse(content=health_status, status_code=status_code)
 
 
 @router.get("/databases")
@@ -756,55 +845,3 @@ async def database_health_check():
     }
 
 
-@router.get("/postgresql")
-async def postgresql_health():
-    """PostgreSQL health check with SSH tunnel integration."""
-    try:
-        settings = get_settings()
-        adapter = PostgreSQLAdapter(settings)
-        
-        # Try to connect
-        connection_result = await adapter.connect()
-        if not connection_result:
-            return {
-                "status": "unhealthy",
-                "service": "PostgreSQL",
-                "message": "Connection failed",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        
-        # Get detailed health status
-        health_result = await adapter.health_check()
-        
-        # Add tunnel service information
-        tunnel_service = get_tunnel_service()
-        tunnel_info = {
-            "service_available": tunnel_service is not None,
-            "tunnel_active": tunnel_service.is_tunnel_active() if tunnel_service else False
-        }
-        
-        await adapter.disconnect()
-        
-        return {
-            "status": health_result.get("status", "unknown"),
-            "service": "PostgreSQL",
-            "database": health_result.get("database"),
-            "user": health_result.get("user"), 
-            "connection_type": health_result.get("connection_type"),
-            "tunnel_status": health_result.get("tunnel_status"),
-            "tunnel_service": tunnel_info,
-            "version": health_result.get("version"),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"PostgreSQL health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "service": "PostgreSQL",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-
- 

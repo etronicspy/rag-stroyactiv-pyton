@@ -14,7 +14,7 @@ from core.dependencies.tunnel import (
     ActiveTunnelService
 )
 
-router = APIRouter(prefix="/tunnel", tags=["SSH Tunnel"])
+router = APIRouter(prefix="/tunnel", tags=["tunnel"])
 
 
 class TunnelStatusResponse(BaseModel):

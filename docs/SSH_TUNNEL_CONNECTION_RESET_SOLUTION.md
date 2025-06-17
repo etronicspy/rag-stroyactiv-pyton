@@ -57,7 +57,7 @@ SSH_TUNNEL_KEY_PATH=~/.ssh/postgres_key
 
 ```bash
 # Проверка SSH туннеля
-curl http://localhost:8000/api/v1/health/detailed
+curl http://localhost:8000/api/v1/health/full
 
 # Ожидаемый ответ
 {
