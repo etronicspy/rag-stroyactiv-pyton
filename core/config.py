@@ -195,6 +195,20 @@ class Settings(BaseSettings):
     REDIS_MAX_CONNECTIONS: int = 10
     REDIS_TIMEOUT: int = 30
     
+    # === SSH TUNNEL SERVICE CONFIGURATION ===
+    # Автоматический запуск SSH туннеля как сервиса
+    ENABLE_SSH_TUNNEL: bool = Field(default=False, description="Enable SSH tunnel service")
+    SSH_TUNNEL_LOCAL_PORT: int = Field(default=5435, description="Local port for SSH tunnel")
+    SSH_TUNNEL_REMOTE_HOST: str = Field(default="31.130.148.200", description="Remote host for SSH tunnel")
+    SSH_TUNNEL_REMOTE_USER: str = Field(default="root", description="Remote user for SSH tunnel")
+    SSH_TUNNEL_REMOTE_PORT: int = Field(default=5432, description="Remote port for SSH tunnel")
+    SSH_TUNNEL_KEY_PATH: str = Field(default="~/.ssh/postgres_key", description="SSH private key path")
+    SSH_TUNNEL_TIMEOUT: int = Field(default=30, description="SSH tunnel connection timeout")
+    SSH_TUNNEL_RETRY_ATTEMPTS: int = Field(default=3, description="SSH tunnel retry attempts")
+    SSH_TUNNEL_RETRY_DELAY: int = Field(default=5, description="SSH tunnel retry delay in seconds")
+    SSH_TUNNEL_HEARTBEAT_INTERVAL: int = Field(default=60, description="SSH tunnel heartbeat check interval")
+    SSH_TUNNEL_AUTO_RESTART: bool = Field(default=True, description="Auto restart SSH tunnel on failure")
+    
     # === AI CONFIGURATION ===
     AI_PROVIDER: AIProvider = Field(default=AIProvider.OPENAI)
     
@@ -397,7 +411,7 @@ class Settings(BaseSettings):
         """Check if running in test environment"""
         return self.ENVIRONMENT.lower() in ["test", "testing"]
 
-# === SETTINGS FACTORY ===
+# === SETTINGS FACTORIES ===
 def get_settings() -> Settings:
     """
     Factory function to get settings instance.

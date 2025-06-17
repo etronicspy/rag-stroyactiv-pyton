@@ -19,7 +19,8 @@ from core.middleware import (
 )
 from core.middleware.rate_limiting_optimized import OptimizedRateLimitMiddleware
 from core.monitoring import setup_structured_logging, get_metrics_collector
-from api.routes import reference, health, materials, prices, search, monitoring, advanced_search
+from api.routes import reference, health, materials, prices, search, monitoring, advanced_search, tunnel
+from services.ssh_tunnel_service import initialize_tunnel_service, shutdown_tunnel_service
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,13 @@ async def lifespan(app: FastAPI):
         pool_manager = await initialize_pool_manager(pool_config)
         logger.info("✅ Dynamic pool manager initialized")
         
+        # Initialize SSH tunnel service
+        tunnel_service = await initialize_tunnel_service()
+        if tunnel_service:
+            logger.info("✅ SSH tunnel service initialized")
+        else:
+            logger.info("ℹ️ SSH tunnel service is disabled or not available")
+        
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
         # Continue startup even if DB init fails
@@ -71,6 +79,13 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("🛑 Shutting down Construction Materials API...")
+    
+    # Shutdown SSH tunnel service
+    try:
+        await shutdown_tunnel_service()
+        logger.info("✅ SSH tunnel service shutdown completed")
+    except Exception as e:
+        logger.error(f"❌ SSH tunnel service shutdown failed: {e}")
     
     # Shutdown pool manager
     try:
@@ -170,6 +185,7 @@ app.include_router(materials.router, prefix="/api/v1/materials", tags=["material
 app.include_router(prices.router, prefix="/api/v1/prices", tags=["prices"])
 app.include_router(search.router, prefix="/api/v1/search", tags=["search"])
 app.include_router(advanced_search.router)
+app.include_router(tunnel.router, prefix="/api/v1", tags=["tunnel"])
 
 # Test endpoints (только для development)
 if settings.ENVIRONMENT == "development":
