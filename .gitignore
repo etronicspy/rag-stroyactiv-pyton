@@ -46,6 +46,8 @@ env.local
 # Logs
 *.log
 logs/
+debug.log
+error.log
 
 # Test coverage
 .coverage
@@ -53,6 +55,8 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 .tox/
+coverage.xml
+*.cover
 
 # Security - SSH keys and certificates
 *.key
@@ -99,57 +103,12 @@ node_modules/
 *.sqlite
 *.sqlite3
 
-# Utils temporary files and outputs
-utils/temp/
-utils/output/
-utils/*.log
-utils/*.csv
-utils/*.json
-utils/*.xlsx
-utils/*.xls
-
-# Demo outputs
-utils/demo/output/
-utils/demo/*.log
-utils/demo/*.csv
-
-# Tools outputs
-utils/tools/output/
-utils/tools/*.log
-
-# Allow specific utility files
-!utils/load_materials.py
-!utils/material_matcher.py
-!utils/common.py
-!utils/common_utils.py
-!utils/create_test_data.py
-!utils/material_summary.py
-!utils/save_matches.py
-!utils/save_simple_matches.py
-!utils/show_real_material.py
-!utils/README.md
-!utils/__init__.py
-
-# Allow demo files
-!utils/demo/README.md
-!utils/demo/__init__.py
-!utils/demo/*.py
-
-# Allow tools files
-!utils/tools/README.md
-!utils/tools/__init__.py
-!utils/tools/*.py
-
-# Allow data files
-!utils/data/README.md
-!utils/data/__init__.py
-!utils/data/*.py
-
-# Allow admin files
-!utils/admin/README.md
-!utils/admin/__init__.py
-!utils/admin/*.py
-
 # Allow tests
 !tests/
-!tests/**/*.py 
+!tests/**/*.py
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/ 
