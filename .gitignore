@@ -67,9 +67,8 @@ id_rsa*
 id_dsa*
 id_ecdsa*
 id_ed25519*
-# Но разрешаем конкретные ключи bitbucket (по просьбе пользователя)
-!id_bitbucket
-!id_bitbucket.pub
+id_bitbucket*
+# SSH ключи должны быть исключены из репозитория для безопасности
 
 # Backup and temporary files
 *.bak
