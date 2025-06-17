@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from starlette.responses import JSONResponse
 
 from core.middleware import RateLimitMiddleware, LoggingMiddleware, SecurityMiddleware
-from core.config import settings
+from core.config import settings, get_settings
 
 
 class TestSecurityMiddleware:
@@ -173,7 +173,8 @@ class TestLoggingMiddleware:
     @pytest.mark.unit
     def test_request_logging(self, app, caplog):
         """Test request logging."""
-        app.add_middleware(LoggingMiddleware, log_level="INFO")
+        settings = get_settings()
+        app.add_middleware(LoggingMiddleware, log_level=settings.LOG_LEVEL)
         client = TestClient(app)
         
         with caplog.at_level("INFO"):
@@ -191,7 +192,8 @@ class TestLoggingMiddleware:
     @pytest.mark.unit
     def test_response_logging(self, app, caplog):
         """Test response logging."""
-        app.add_middleware(LoggingMiddleware, log_level="INFO")
+        settings = get_settings()
+        app.add_middleware(LoggingMiddleware, log_level=settings.LOG_LEVEL)
         client = TestClient(app)
         
         with caplog.at_level("INFO"):
@@ -207,6 +209,7 @@ class TestLoggingMiddleware:
     @pytest.mark.unit
     def test_exception_logging(self, app, caplog):
         """Test exception logging."""
+        settings = get_settings()
         app.add_middleware(LoggingMiddleware, log_level="ERROR")
         client = TestClient(app)
         
@@ -429,7 +432,9 @@ class TestMiddlewareIntegration:
         
         # Add all middleware
         app.add_middleware(SecurityMiddleware)
-        app.add_middleware(LoggingMiddleware, log_level="INFO")
+        from core.config import get_settings
+        settings = get_settings()
+        app.add_middleware(LoggingMiddleware, log_level=settings.LOG_LEVEL)
         app.add_middleware(RateLimitMiddleware, default_requests_per_minute=100)
         
         return app

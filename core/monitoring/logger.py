@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Union
 from functools import wraps
 from contextlib import contextmanager
+import os
 
 from core.config import get_settings
 
@@ -180,53 +181,139 @@ class DatabaseLogger:
 
 
 def setup_structured_logging(
-    log_level: str = "INFO",
-    enable_structured: bool = False,
-    log_file: Optional[str] = None
+    log_level: Optional[str] = None,
+    enable_structured: Optional[bool] = None,
+    log_file: Optional[str] = None,
+    enable_colors: Optional[bool] = None,
+    third_party_level: Optional[str] = None
 ) -> None:
     """
-    Setup application-wide logging configuration.
+    Setup application-wide logging configuration with optimized performance.
+    
+    All parameters are optional and will be read from environment variables if not provided.
     
     Args:
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
-        enable_structured: Enable JSON structured logging
-        log_file: Optional log file path
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) - from LOG_LEVEL env var
+        enable_structured: Enable JSON structured logging - from ENABLE_STRUCTURED_LOGGING env var
+        log_file: Optional log file path - from LOG_FILE env var
+        enable_colors: Enable colored terminal output - from LOG_COLORS env var
+        third_party_level: Log level for third-party libraries - from LOG_THIRD_PARTY_LEVEL env var
     """
+    # Import settings here to avoid circular imports
+    from core.config import get_settings
     settings = get_settings()
+    
+    # Use environment variables if parameters not provided
+    if log_level is None:
+        log_level = settings.LOG_LEVEL
+    if enable_structured is None:
+        enable_structured = settings.ENABLE_STRUCTURED_LOGGING
+    if log_file is None:
+        log_file = settings.LOG_FILE
+    if enable_colors is None:
+        enable_colors = settings.LOG_COLORS
+    if third_party_level is None:
+        third_party_level = settings.LOG_THIRD_PARTY_LEVEL
+    
+    # Handle LogLevel enum or string
+    if hasattr(log_level, 'value'):
+        log_level = log_level.value
+    if hasattr(third_party_level, 'value'):
+        third_party_level = third_party_level.value
     
     # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper()))
     
-    # Clear existing handlers
+    # Clear existing handlers to avoid duplication
     root_logger.handlers.clear()
     
-    # Console handler
+    # Console handler with optimized configuration
     console_handler = logging.StreamHandler()
+    console_handler.setLevel(getattr(logging, log_level.upper()))
     
     if enable_structured:
+        # Structured JSON logging for production
         console_handler.setFormatter(StructuredFormatter())
     else:
-        console_handler.setFormatter(
-            logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
+        # Beautiful colored format for development (like uvicorn)
+        if enable_colors:
+            try:
+                import colorama
+                colorama.init()
+                
+                class ColoredFormatter(logging.Formatter):
+                    """Colored formatter for beautiful terminal output."""
+                    
+                    COLORS = {
+                        'DEBUG': '\033[36m',     # Cyan
+                        'INFO': '\033[32m',      # Green  
+                        'WARNING': '\033[33m',   # Yellow
+                        'ERROR': '\033[31m',     # Red
+                        'CRITICAL': '\033[35m',  # Magenta
+                        'RESET': '\033[0m'       # Reset
+                    }
+                    
+                    def format(self, record):
+                        color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
+                        reset = self.COLORS['RESET']
+                        record.levelname = f"{color}{record.levelname:<8s}{reset}"
+                        return super().format(record)
+                
+                console_handler.setFormatter(ColoredFormatter('%(levelname)s %(message)s'))
+                
+            except ImportError:
+                # Fallback to simple format if colorama not available
+                console_handler.setFormatter(
+                    logging.Formatter('%(levelname)-8s %(message)s')
+                )
+        else:
+            # Simple format without colors
+            console_handler.setFormatter(
+                logging.Formatter('%(levelname)-8s %(message)s')
             )
-        )
     
     root_logger.addHandler(console_handler)
     
-    # File handler if specified
+    # File handler with consistent formatting
     if log_file:
+        # Create log directory if it doesn't exist
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+        
         file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(StructuredFormatter() if enable_structured else 
-                                 logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        file_handler.setLevel(getattr(logging, log_level.upper()))
+        
+        # Always use structured format for file logging
+        if enable_structured:
+            file_handler.setFormatter(StructuredFormatter())
+        else:
+            file_handler.setFormatter(
+                logging.Formatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S'
+                )
+            )
         root_logger.addHandler(file_handler)
     
-    # Set specific logger levels
-    logging.getLogger("uvicorn").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("openai").setLevel(logging.WARNING)
+    # Configure third-party loggers to reduce noise
+    third_party_log_level = getattr(logging, third_party_level.upper())
+    logging.getLogger("uvicorn").setLevel(third_party_log_level)
+    logging.getLogger("httpx").setLevel(third_party_log_level)
+    logging.getLogger("openai").setLevel(third_party_log_level)
+    logging.getLogger("paramiko").setLevel(third_party_log_level)
+    
+    # 🔧 UNIFIED STRATEGY: Configure only the loggers we actually use
+    # Configure middleware.http logger (used by LoggingMiddleware)
+    middleware_logger = logging.getLogger("middleware.http")
+    middleware_logger.setLevel(getattr(logging, log_level.upper()))
+    middleware_logger.propagate = True
+    
+    # Configure core namespace logger for other core components
+    core_logger = logging.getLogger("core")
+    core_logger.setLevel(getattr(logging, log_level.upper()))
+    core_logger.propagate = True
 
 
 def get_logger(name: str) -> logging.Logger:
