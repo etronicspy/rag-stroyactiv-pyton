@@ -13,7 +13,7 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from core.database.adapters.postgresql_adapter import PostgreSQLDatabase
+from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
 from core.database.adapters.qdrant_adapter import QdrantVectorDatabase
 from core.repositories.hybrid_materials import HybridMaterialsRepository
 from core.database.factories import DatabaseFactory, AIClientFactory

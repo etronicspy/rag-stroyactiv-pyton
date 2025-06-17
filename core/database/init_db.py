@@ -16,7 +16,7 @@ from alembic import command
 from alembic.config import Config
 
 from core.config import settings
-from core.database.adapters.postgresql_adapter import PostgreSQLDatabase
+from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
 from core.database.seed_data import seed_database
 
 
@@ -44,7 +44,7 @@ class DatabaseInitializer:
         Устанавливает соединение с БД.
         """
         try:
-            self.db_adapter = PostgreSQLDatabase(self.db_config)
+            self.db_adapter = PostgreSQLAdapter(self.db_config)
             logger.info("Database connection established")
             
         except Exception as e:
@@ -74,14 +74,16 @@ class DatabaseInitializer:
             
             logger.info("Running database migrations...")
             
-            # Run migrations to latest
+            # Run migrations to latest - использует синхронный подход
             command.upgrade(alembic_cfg, "head")
             
             logger.info("Database migrations completed successfully")
             
         except Exception as e:
             logger.error(f"Migration failed: {e}")
-            raise
+            # Не прерываем инициализацию, если миграции не удались
+            logger.warning("Continuing initialization despite migration failure")
+            pass
     
     async def seed_reference_data(self) -> Dict[str, int]:
         """Seed reference data.

@@ -8,7 +8,7 @@ from datetime import datetime
 import asyncio
 
 from core.database.interfaces import IRelationalDatabase, ICacheDatabase
-from core.database.mocks import MockRedisClient, MockPostgreSQLDatabase
+from core.database.mocks import MockRedisClient, MockPostgreSQLAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class MockRelationalAdapter(IRelationalDatabase):
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        self.mock_db = MockPostgreSQLDatabase()
+        self.mock_db = MockPostgreSQLAdapter()
         self.connected = False
         logger.info("🔧 MockRelationalAdapter initialized")
     

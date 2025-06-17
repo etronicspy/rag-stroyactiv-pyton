@@ -14,7 +14,7 @@ from core.database.adapters.redis_adapter import RedisDatabase
 from core.repositories.cached_materials import CachedMaterialsRepository
 from core.repositories.hybrid_materials import HybridMaterialsRepository
 from core.database.adapters.qdrant_adapter import QdrantDatabase
-from core.database.adapters.postgresql_adapter import PostgreSQLDatabase
+from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
 from core.schemas.materials import MaterialCreate, MaterialResponse, MaterialSearchRequest
 from core.schemas.search import SearchResponse
 from core.config import settings

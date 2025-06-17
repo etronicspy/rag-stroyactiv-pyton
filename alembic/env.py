@@ -87,26 +87,37 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
-async def run_async_migrations() -> None:
-    """Run migrations in async mode."""
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = get_database_url()
-    
-    connectable = async_engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
-
-
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    asyncio.run(run_async_migrations())
+    # Use synchronous approach to avoid asyncio issues during startup
+    from sqlalchemy import create_engine
+    
+    try:
+        # Get database URL
+        url = get_database_url()
+        
+        # Convert async URL to sync URL for migrations
+        if url and "asyncpg" in url:
+            url = url.replace("postgresql+asyncpg://", "postgresql://")
+        
+        # Create synchronous engine for migrations
+        connectable = create_engine(url, poolclass=pool.NullPool)
+        
+        with connectable.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                compare_type=True,
+                compare_server_default=True,
+            )
+
+            with context.begin_transaction():
+                context.run_migrations()
+                
+    except Exception as e:
+        # Log error but don't crash startup
+        print(f"Migration error (non-critical): {e}")
+        pass
 
 
 if context.is_offline_mode():

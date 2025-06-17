@@ -4,14 +4,14 @@
 """
 
 from .qdrant_adapter import QdrantVectorDatabase
-from .postgresql_adapter import PostgreSQLDatabase
+from .postgresql_adapter import PostgreSQLAdapter
 from .redis_adapter import RedisDatabase
 from .weaviate_adapter import WeaviateVectorDatabase
 from .pinecone_adapter import PineconeVectorDatabase
 
 __all__ = [
     "QdrantVectorDatabase",
-    "PostgreSQLDatabase", 
+    "PostgreSQLAdapter", 
     "RedisDatabase",
     "WeaviateVectorDatabase",
     "PineconeVectorDatabase"

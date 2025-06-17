@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 import uuid
 from contextlib import asynccontextmanager
+import asyncio
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -16,10 +17,12 @@ from sqlalchemy.dialects.postgresql import UUID, ARRAY, REAL
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import select, insert, update, delete
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 
 from core.database.interfaces import IRelationalDatabase
 from core.database.exceptions import ConnectionError, QueryError, DatabaseError, TransactionError
+from core.config import Settings
+from services.ssh_tunnel_service import get_tunnel_service
 
 
 logger = logging.getLogger(__name__)
@@ -113,68 +116,118 @@ class RawProductModel(Base):
     )
 
 
-class PostgreSQLDatabase(IRelationalDatabase):
-    """PostgreSQL relational database adapter with SQLAlchemy 2.0.
+class PostgreSQLAdapter(IRelationalDatabase):
+    """PostgreSQL adapter with SSH tunnel integration."""
     
-    Адаптер для работы с PostgreSQL с поддержкой async/await, гибридного поиска и векторных операций.
-    """
-    
-    def __init__(self, config: Dict[str, Any]):
-        """Initialize PostgreSQL client with async SQLAlchemy.
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.engine = None
+        self.session_factory = None
+        self._connection_string = None
+        self._tunnel_service = None
         
-        Args:
-            config: PostgreSQL configuration dictionary
-                - connection_string: Database connection string
-                - pool_size: Connection pool size (default: 10)
-                - max_overflow: Max overflow connections (default: 20)
-                - pool_timeout: Pool timeout in seconds (default: 30)
-                - echo: Enable SQL logging (default: False)
-            
-        Raises:
-            ConnectionError: If connection fails
-        """
-        self.config = config
-        self.connection_string = config.get("connection_string")
-        
-        if not self.connection_string:
-            raise ConnectionError(
-                database_type="PostgreSQL",
-                message="PostgreSQL connection string is required",
-                details="Missing 'connection_string' in config"
-            )
-        
-        # Engine configuration
-        engine_kwargs = {
-            "pool_size": config.get("pool_size", 10),
-            "max_overflow": config.get("max_overflow", 20),
-            "pool_timeout": config.get("pool_timeout", 30),
-            "echo": config.get("echo", False),
-            "future": True,  # SQLAlchemy 2.0 style
-        }
-        
+    async def connect(self) -> bool:
+        """Connect to PostgreSQL with automatic SSH tunnel detection."""
         try:
-            # Create async engine
+            # Check if SSH tunnel is available and active
+            self._tunnel_service = get_tunnel_service()
+            if self._tunnel_service and self._tunnel_service.is_tunnel_active():
+                logger.info("Using active SSH tunnel for PostgreSQL connection")
+                # Use tunnel local port for connection
+                tunnel_config = self._tunnel_service.config
+                connection_string = (
+                    f"postgresql+asyncpg://{self.settings.POSTGRESQL_USER}:"
+                    f"{self.settings.POSTGRESQL_PASSWORD}@localhost:"
+                    f"{tunnel_config.local_port}/{self.settings.POSTGRESQL_DATABASE}"
+                )
+            else:
+                logger.info("No active SSH tunnel found, using direct PostgreSQL connection")
+                # Use direct connection
+                connection_string = (
+                    f"postgresql+asyncpg://{self.settings.POSTGRESQL_USER}:"
+                    f"{self.settings.POSTGRESQL_PASSWORD}@{self.settings.POSTGRESQL_HOST}:"
+                    f"{self.settings.POSTGRESQL_PORT}/{self.settings.POSTGRESQL_DATABASE}"
+                )
+            
+            self._connection_string = connection_string
+            
+            # Create engine with connection pooling
             self.engine = create_async_engine(
-                self.connection_string,
-                **engine_kwargs
+                connection_string,
+                pool_size=getattr(self.settings, 'POSTGRESQL_POOL_SIZE', 10),
+                max_overflow=getattr(self.settings, 'POSTGRESQL_MAX_OVERFLOW', 20),
+                pool_timeout=getattr(self.settings, 'POSTGRESQL_POOL_TIMEOUT', 30),
+                pool_recycle=getattr(self.settings, 'POSTGRESQL_POOL_RECYCLE', 3600),
+                echo=self.settings.LOG_LEVEL == "DEBUG",
+                future=True
             )
             
             # Create session factory
-            self.async_session = async_sessionmaker(
-                self.engine,
+            self.session_factory = async_sessionmaker(
+                bind=self.engine,
                 class_=AsyncSession,
                 expire_on_commit=False
             )
             
-            logger.info(f"PostgreSQL adapter initialized with pool_size={engine_kwargs['pool_size']}")
+            # Test connection
+            async with self.engine.begin() as conn:
+                await conn.execute(text("SELECT 1"))
+            
+            logger.info("PostgreSQL connection established successfully")
+            return True
             
         except Exception as e:
-            logger.error(f"Failed to initialize PostgreSQL adapter: {e}")
-            raise ConnectionError(
-                database_type="PostgreSQL",
-                message="Failed to initialize PostgreSQL connection",
-                details=str(e)
-            )
+            logger.error(f"Failed to connect to PostgreSQL: {e}")
+            await self.disconnect()
+            raise ConnectionError("postgresql", f"PostgreSQL connection failed: {e}")
+    
+    async def disconnect(self) -> None:
+        """Disconnect from PostgreSQL."""
+        if self.engine:
+            await self.engine.dispose()
+            self.engine = None
+            self.session_factory = None
+            logger.info("PostgreSQL connection closed")
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """Perform comprehensive health check."""
+        if not self.engine:
+            return {
+                "status": "error",
+                "message": "No database connection",
+                "tunnel_status": "unknown"
+            }
+        
+        try:
+            # Check database connection
+            async with self.engine.begin() as conn:
+                result = await conn.execute(text("SELECT version(), current_database(), current_user"))
+                version_info = result.fetchone()
+            
+            # Check tunnel status
+            tunnel_status = "not_used"
+            if self._tunnel_service:
+                if self._tunnel_service.is_tunnel_active():
+                    tunnel_status = "active"
+                else:
+                    tunnel_status = "inactive"
+            
+            return {
+                "status": "healthy",
+                "database": version_info[1] if version_info else None,
+                "user": version_info[2] if version_info else None,
+                "version": version_info[0] if version_info else None,
+                "tunnel_status": tunnel_status,
+                "connection_type": "tunneled" if tunnel_status == "active" else "direct"
+            }
+            
+        except Exception as e:
+            logger.error(f"PostgreSQL health check failed: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+                "tunnel_status": "unknown"
+            }
     
     async def create_tables(self) -> None:
         """Create all database tables.
@@ -236,7 +289,7 @@ class PostgreSQLDatabase(IRelationalDatabase):
             ConnectionError: If session creation fails
         """
         try:
-            async with self.async_session() as session:
+            async with self.session_factory() as session:
                 yield session
         except SQLAlchemyError as e:
             logger.error(f"Database session error: {e}")
@@ -317,7 +370,7 @@ class PostgreSQLDatabase(IRelationalDatabase):
         """
         session = None
         try:
-            session = self.async_session()
+            session = self.session_factory()
             # Транзакция начинается автоматически при создании сессии
             yield session
             await session.commit()
@@ -531,54 +584,6 @@ class PostgreSQLDatabase(IRelationalDatabase):
                 message="Failed to get materials",
                 details=str(e)
             )
-    
-    async def health_check(self) -> Dict[str, Any]:
-        """Check database health status.
-        
-        Returns:
-            Health status information
-        """
-        try:
-            async with self.get_session() as session:
-                # Test basic connectivity
-                await session.execute(text("SELECT 1"))
-                
-                # Get database stats
-                stats_query = text("""
-                    SELECT 
-                        (SELECT COUNT(*) FROM materials) as materials_count,
-                        (SELECT COUNT(*) FROM raw_products) as raw_products_count,
-                        pg_database_size(current_database()) as db_size_bytes
-                """)
-                
-                result = await session.execute(stats_query)
-                stats = result.fetchone()
-                
-                return {
-                    "status": "healthy",
-                    "database_type": "PostgreSQL",
-                    "connection_pool": {
-                        "size": self.engine.pool.size(),
-                        "checked_in": self.engine.pool.checkedin(),
-                        "checked_out": self.engine.pool.checkedout(),
-                        "overflow": self.engine.pool.overflow(),
-                    },
-                    "statistics": {
-                        "materials_count": stats[0] if stats else 0,
-                        "raw_products_count": stats[1] if stats else 0,
-                        "database_size_mb": round((stats[2] if stats else 0) / 1024 / 1024, 2)
-                    },
-                    "timestamp": datetime.utcnow().isoformat()
-                }
-                
-        except Exception as e:
-            logger.error(f"PostgreSQL health check failed: {e}")
-            return {
-                "status": "unhealthy",
-                "database_type": "PostgreSQL",
-                "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
-            }
     
     async def close(self) -> None:
         """Close database connections.

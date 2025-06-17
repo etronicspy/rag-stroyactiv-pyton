@@ -18,6 +18,9 @@ from core.config import get_settings, DatabaseType, AIProvider, get_vector_db_cl
 from core.monitoring import get_metrics_collector
 from core.monitoring.logger import get_logger
 from core.database.factories import DatabaseFactory
+from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
+from core.database.exceptions import ConnectionError as DatabaseConnectionError
+from services.ssh_tunnel_service import get_tunnel_service
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -215,7 +218,7 @@ class HealthChecker:
                 })
                 return health_info
             
-            async with db_client() as session:
+            async with db_client.get_session() as session:
                 # Test basic connectivity
                 result = await session.execute(text("SELECT 1 as health_check"))
                 health_check = result.scalar()
@@ -751,6 +754,57 @@ async def database_health_check():
             "redis": redis if not isinstance(redis, Exception) else {"status": "error", "error": str(redis)}
         }
     }
+
+
+@router.get("/postgresql")
+async def postgresql_health():
+    """PostgreSQL health check with SSH tunnel integration."""
+    try:
+        settings = get_settings()
+        adapter = PostgreSQLAdapter(settings)
+        
+        # Try to connect
+        connection_result = await adapter.connect()
+        if not connection_result:
+            return {
+                "status": "unhealthy",
+                "service": "PostgreSQL",
+                "message": "Connection failed",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+        # Get detailed health status
+        health_result = await adapter.health_check()
+        
+        # Add tunnel service information
+        tunnel_service = get_tunnel_service()
+        tunnel_info = {
+            "service_available": tunnel_service is not None,
+            "tunnel_active": tunnel_service.is_tunnel_active() if tunnel_service else False
+        }
+        
+        await adapter.disconnect()
+        
+        return {
+            "status": health_result.get("status", "unknown"),
+            "service": "PostgreSQL",
+            "database": health_result.get("database"),
+            "user": health_result.get("user"), 
+            "connection_type": health_result.get("connection_type"),
+            "tunnel_status": health_result.get("tunnel_status"),
+            "tunnel_service": tunnel_info,
+            "version": health_result.get("version"),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"PostgreSQL health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "service": "PostgreSQL",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 
  

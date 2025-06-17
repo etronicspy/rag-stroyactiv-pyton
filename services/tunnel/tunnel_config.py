@@ -27,6 +27,7 @@ class TunnelConfig(BaseModel):
     
     # SSH settings
     key_path: str = Field(default="~/.ssh/postgres_key", description="SSH private key path")
+    key_passphrase: Optional[str] = Field(default=None, description="SSH private key passphrase")
     
     # Connection timeouts and retries
     timeout: int = Field(default=30, description="SSH tunnel connection timeout")
@@ -163,6 +164,7 @@ class TunnelConfig(BaseModel):
             remote_user=settings.SSH_TUNNEL_REMOTE_USER,
             remote_port=settings.SSH_TUNNEL_REMOTE_PORT,
             key_path=settings.SSH_TUNNEL_KEY_PATH,
+            key_passphrase=getattr(settings, 'SSH_TUNNEL_KEY_PASSPHRASE', None),
             timeout=settings.SSH_TUNNEL_TIMEOUT,
             retry_attempts=settings.SSH_TUNNEL_RETRY_ATTEMPTS,
             retry_delay=settings.SSH_TUNNEL_RETRY_DELAY,

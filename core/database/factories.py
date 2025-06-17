@@ -15,7 +15,7 @@ from core.database.mocks import (
     create_mock_redis_client, 
     create_mock_postgresql_database,
     MockRedisClient,
-    MockPostgreSQLDatabase
+    MockPostgreSQLAdapter
 )
 from core.database.adapters.mock_adapters import (
     create_mock_relational_adapter,
@@ -112,15 +112,19 @@ class DatabaseFactory:
             return create_mock_relational_adapter()
         
         try:
-            config = config_override or {
-                "connection_string": connection_string or "postgresql://localhost/materials"
-            }
+            if config_override:
+                config = config_override
+            elif connection_string:
+                config = {"connection_string": connection_string}
+            else:
+                # Use settings configuration
+                config = settings.get_relational_db_config()
             
             logger.info("Creating relational database client (PostgreSQL)")
             
             # Import here to avoid circular imports
-            from core.database.adapters.postgresql_adapter import PostgreSQLDatabase
-            return PostgreSQLDatabase(config)
+            from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
+            return PostgreSQLAdapter(config)
             
         except Exception as e:
             logger.error(f"Failed to create relational database client: {e}")

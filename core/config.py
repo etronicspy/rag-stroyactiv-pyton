@@ -183,7 +183,7 @@ class Settings(BaseSettings):
     POSTGRESQL_PASSWORD: Optional[str] = None
     POSTGRESQL_HOST: Optional[str] = "localhost"
     POSTGRESQL_PORT: int = 5432
-    POSTGRESQL_DATABASE: Optional[str] = "materials"
+    POSTGRESQL_DATABASE: Optional[str] = "stbr_rag1"
     POSTGRESQL_POOL_SIZE: int = 10
     POSTGRESQL_MAX_OVERFLOW: int = 20
     
@@ -203,11 +203,21 @@ class Settings(BaseSettings):
     SSH_TUNNEL_REMOTE_USER: str = Field(default="root", description="Remote user for SSH tunnel")
     SSH_TUNNEL_REMOTE_PORT: int = Field(default=5432, description="Remote port for SSH tunnel")
     SSH_TUNNEL_KEY_PATH: str = Field(default="~/.ssh/postgres_key", description="SSH private key path")
+    
+    # SSH Key Authentication
+    SSH_TUNNEL_KEY_PASSPHRASE: Optional[str] = Field(default=None, description="SSH key passphrase (if key is encrypted)")
+    
+    # Connection Settings
     SSH_TUNNEL_TIMEOUT: int = Field(default=30, description="SSH tunnel connection timeout")
     SSH_TUNNEL_RETRY_ATTEMPTS: int = Field(default=3, description="SSH tunnel retry attempts")
     SSH_TUNNEL_RETRY_DELAY: int = Field(default=5, description="SSH tunnel retry delay in seconds")
     SSH_TUNNEL_HEARTBEAT_INTERVAL: int = Field(default=60, description="SSH tunnel heartbeat check interval")
     SSH_TUNNEL_AUTO_RESTART: bool = Field(default=True, description="Auto restart SSH tunnel on failure")
+    
+    # Advanced SSH Options
+    SSH_TUNNEL_COMPRESSION: bool = Field(default=True, description="Enable SSH compression")
+    SSH_TUNNEL_KEEP_ALIVE: int = Field(default=60, description="SSH keep alive interval in seconds")
+    SSH_TUNNEL_STRICT_HOST_KEY_CHECKING: bool = Field(default=False, description="Enable strict host key checking")
     
     # === AI CONFIGURATION ===
     AI_PROVIDER: AIProvider = Field(default=AIProvider.OPENAI)
@@ -297,6 +307,18 @@ class Settings(BaseSettings):
         """Validate PostgreSQL URL if provided"""
         if v and not v.startswith('postgresql'):
             raise ValueError('POSTGRESQL_URL must start with "postgresql://" or "postgresql+asyncpg://"')
+        
+        # СТРОГОЕ ПРАВИЛО: только база данных stbr_rag1
+        if v and '/stbr_rag1' not in v:
+            raise ValueError('POSTGRESQL_URL must connect to stbr_rag1 database only! ICU locale (ru-RU-x-icu) required for Russian language support.')
+        
+        return v
+    
+    @validator('POSTGRESQL_DATABASE')
+    def validate_postgresql_database(cls, v):
+        """Validate PostgreSQL database name - only stbr_rag1 allowed"""
+        if v and v != 'stbr_rag1':
+            raise ValueError(f'Only "stbr_rag1" database is allowed. Got: "{v}". ICU locale (ru-RU-x-icu) is required for Russian language support.')
         return v
     
     @validator('REDIS_URL', pre=True) 
@@ -402,6 +424,26 @@ class Settings(BaseSettings):
             return AIConfig.get_huggingface_config(model=self.HUGGINGFACE_MODEL)
         
         raise ValueError(f"Unsupported AI provider: {self.AI_PROVIDER}")
+    
+    def get_ssh_tunnel_config(self) -> Dict[str, Any]:
+        """Get SSH tunnel configuration"""
+        return {
+            "enabled": self.ENABLE_SSH_TUNNEL,
+            "local_port": self.SSH_TUNNEL_LOCAL_PORT,
+            "remote_host": self.SSH_TUNNEL_REMOTE_HOST,
+            "remote_user": self.SSH_TUNNEL_REMOTE_USER,
+            "remote_port": self.SSH_TUNNEL_REMOTE_PORT,
+            "key_path": self.SSH_TUNNEL_KEY_PATH,
+            "key_passphrase": self.SSH_TUNNEL_KEY_PASSPHRASE,
+            "timeout": self.SSH_TUNNEL_TIMEOUT,
+            "retry_attempts": self.SSH_TUNNEL_RETRY_ATTEMPTS,
+            "retry_delay": self.SSH_TUNNEL_RETRY_DELAY,
+            "heartbeat_interval": self.SSH_TUNNEL_HEARTBEAT_INTERVAL,
+            "auto_restart": self.SSH_TUNNEL_AUTO_RESTART,
+            "compression": self.SSH_TUNNEL_COMPRESSION,
+            "keep_alive": self.SSH_TUNNEL_KEEP_ALIVE,
+            "strict_host_key_checking": self.SSH_TUNNEL_STRICT_HOST_KEY_CHECKING
+        }
     
     def is_production(self) -> bool:
         """Check if running in production environment"""

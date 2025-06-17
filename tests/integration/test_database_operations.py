@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Dict, Any, List
 
-from core.database.adapters.postgresql_adapter import PostgreSQLDatabase, MaterialModel
+from core.database.adapters.postgresql_adapter import PostgreSQLAdapter, MaterialModel
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import ConnectionError, DatabaseError, QueryError
 from core.database.factories import DatabaseFactory
@@ -58,7 +58,7 @@ class TestPostgreSQLIntegration:
         """PostgreSQL adapter instance for testing."""
         with patch('core.database.adapters.postgresql_adapter.create_async_engine', return_value=mock_engine):
             with patch('core.database.adapters.postgresql_adapter.async_sessionmaker'):
-                adapter = PostgreSQLDatabase(db_config)
+                adapter = PostgreSQLAdapter(db_config)
                 return adapter
     
     @pytest.mark.integration
@@ -66,7 +66,7 @@ class TestPostgreSQLIntegration:
         """Test successful PostgreSQL initialization."""
         with patch('core.database.adapters.postgresql_adapter.create_async_engine', return_value=mock_engine):
             with patch('core.database.adapters.postgresql_adapter.async_sessionmaker'):
-                adapter = PostgreSQLDatabase(db_config)
+                adapter = PostgreSQLAdapter(db_config)
                 
                 assert adapter.config == db_config
                 assert adapter.connection_string == db_config["connection_string"]
@@ -78,7 +78,7 @@ class TestPostgreSQLIntegration:
         config = {"pool_size": 5}
         
         with pytest.raises(ConnectionError) as exc_info:
-            PostgreSQLDatabase(config)
+            PostgreSQLAdapter(config)
         
         assert "PostgreSQL connection string is required" in str(exc_info.value)
     
@@ -388,7 +388,7 @@ class TestDatabaseArchitectureIntegration:
         
         # PostgreSQL with missing connection string
         with pytest.raises(ConnectionError):
-            PostgreSQLDatabase({})
+            PostgreSQLAdapter({})
         
         # Redis with missing URL
         with pytest.raises(ConnectionError):
@@ -668,7 +668,7 @@ class TestDatabaseMigrations:
         """Create database initializer with mock config."""
         return DatabaseInitializer(mock_db_config)
     
-    @patch('core.database.init_db.PostgreSQLDatabase')
+    @patch('core.database.init_db.PostgreSQLAdapter')
     async def test_connect_database(self, mock_postgres, db_initializer):
         """Test database connection."""
         mock_db_instance = Mock()
@@ -691,7 +691,7 @@ class TestDatabaseMigrations:
         mock_config.assert_called_once()
         mock_command.upgrade.assert_called_once_with(mock_alembic_cfg, "head")
     
-    @patch('core.database.init_db.PostgreSQLDatabase')
+    @patch('core.database.init_db.PostgreSQLAdapter')
     async def test_seed_reference_data(self, mock_postgres, db_initializer):
         """Test seeding reference data."""
         mock_db_instance = Mock()
@@ -709,7 +709,7 @@ class TestDatabaseMigrations:
             mock_seed.assert_called_once_with(mock_session)
             assert result == {"categories": 5, "units": 18}
     
-    @patch('core.database.init_db.PostgreSQLDatabase')
+    @patch('core.database.init_db.PostgreSQLAdapter')
     async def test_initialize_database_success(self, mock_postgres, db_initializer):
         """Test successful database initialization."""
         mock_db_instance = Mock()

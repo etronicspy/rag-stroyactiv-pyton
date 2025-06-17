@@ -111,12 +111,12 @@ class MockPostgreSQLSession:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
 
-class MockPostgreSQLDatabase:
+class MockPostgreSQLAdapter:
     """Mock PostgreSQL database adapter"""
     
     def __init__(self, *args, **kwargs):
         self.connected = False
-        logger.info("🔧 MockPostgreSQLDatabase initialized (PostgreSQL fallback)")
+        logger.info("🔧 MockPostgreSQLAdapter initialized (PostgreSQL fallback)")
     
     async def connect(self):
         """Mock connection"""
@@ -191,9 +191,9 @@ def create_mock_redis_client(*args, **kwargs) -> MockRedisClient:
     """Factory function for mock Redis client"""
     return MockRedisClient(*args, **kwargs)
 
-def create_mock_postgresql_database(*args, **kwargs) -> MockPostgreSQLDatabase:
+def create_mock_postgresql_database(*args, **kwargs) -> MockPostgreSQLAdapter:
     """Factory function for mock PostgreSQL database"""
-    return MockPostgreSQLDatabase(*args, **kwargs)
+    return MockPostgreSQLAdapter(*args, **kwargs)
 
 def create_mock_ai_client(*args, **kwargs) -> MockAIClient:
     """Factory function for mock AI client"""

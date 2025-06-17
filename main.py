@@ -42,7 +42,14 @@ async def lifespan(app: FastAPI):
     metrics_collector._start_time = time.time()
     
     try:
-        # Initialize database on startup
+        # Initialize SSH tunnel service FIRST (must be before database)
+        tunnel_service = await initialize_tunnel_service()
+        if tunnel_service:
+            logger.info("✅ SSH tunnel service initialized")
+        else:
+            logger.info("ℹ️ SSH tunnel service is disabled or not available")
+        
+        # Initialize database on startup (after tunnel is ready)
         init_results = await initialize_database_on_startup(
             run_migrations=settings.AUTO_MIGRATE,
             seed_data=settings.AUTO_SEED,
@@ -63,13 +70,6 @@ async def lifespan(app: FastAPI):
         
         pool_manager = await initialize_pool_manager(pool_config)
         logger.info("✅ Dynamic pool manager initialized")
-        
-        # Initialize SSH tunnel service
-        tunnel_service = await initialize_tunnel_service()
-        if tunnel_service:
-            logger.info("✅ SSH tunnel service initialized")
-        else:
-            logger.info("ℹ️ SSH tunnel service is disabled or not available")
         
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
