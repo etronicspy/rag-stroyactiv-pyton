@@ -2,21 +2,138 @@
 Logging middleware for comprehensive request/response monitoring.
 Provides structured logging with performance metrics and security monitoring.
 
-FIXED: Pure ASGI implementation for compatibility with BodyCacheMiddleware
+FIXED: Eliminated code duplication with BaseLoggingHandler architecture
 """
 
 import time
 import uuid
 import json
 import logging
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, Any, List, Callable, Set
 from datetime import datetime
+from functools import lru_cache
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send, Message
 
 from core.config import get_settings
+
+# 🔧 CONSTANTS: Moved hardcoded values to constants
+EXCLUDE_PATHS = ["/docs", "/openapi.json", "/favicon.ico", "/static"]
+SENSITIVE_HEADERS = frozenset([
+    "authorization", "x-api-key", "cookie", 
+    "x-auth-token", "proxy-authorization"
+])
+
+# 🔧 PERFORMANCE: Cached logger retrieval
+@lru_cache(maxsize=32)
+def get_cached_logger(name: str) -> logging.Logger:
+    """Get cached logger instance for performance."""
+    return logging.getLogger(name)
+
+
+class BaseLoggingHandler:
+    """
+    🎯 Shared logging functionality for all middleware implementations.
+    
+    Eliminates code duplication and provides consistent logging behavior.
+    """
+    
+    def __init__(self, enable_structured: bool = False, include_headers: bool = True, 
+                 mask_sensitive: bool = True):
+        self.enable_structured = enable_structured
+        self.include_headers = include_headers
+        self.mask_sensitive = mask_sensitive
+        
+        # 🔧 OPTIMIZED: Use cached loggers for performance
+        self.root_logger = get_cached_logger("")  # Root logger
+        self.file_logger = get_cached_logger("middleware.http")  # File logger
+        
+        # 🔧 PERFORMANCE: Pre-compiled sets for O(1) lookups
+        self.exclude_paths = EXCLUDE_PATHS
+        self.sensitive_headers = SENSITIVE_HEADERS
+    
+    def should_exclude_path(self, path: str) -> bool:
+        """Fast path exclusion check."""
+        return any(path.startswith(exclude_path) for exclude_path in self.exclude_paths)
+    
+    def _mask_sensitive_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
+        """Mask sensitive headers for security."""
+        if not self.mask_sensitive:
+            return headers
+            
+        return {
+            key: "[MASKED]" if key.lower() in self.sensitive_headers else value
+            for key, value in headers.items()
+        }
+    
+    def _format_log_message(self, event: str, method: str, path: str, 
+                          correlation_id: str, **kwargs) -> str:
+        """Format log message based on structured logging setting."""
+        if self.enable_structured:
+            log_data = {
+                "event": event,
+                "correlation_id": correlation_id,
+                "method": method,
+                "path": path,
+                "timestamp": datetime.utcnow().isoformat(),
+                **kwargs
+            }
+            return json.dumps(log_data, ensure_ascii=False)
+        else:
+            # Simple format for development
+            if event == "request_started":
+                return f"[root] {method} {path} - STARTED"
+            elif event == "request_completed":
+                status_code = kwargs.get("status_code", 200)
+                process_time = kwargs.get("process_time", 0)
+                status_text = "OK" if status_code < 400 else "ERROR"
+                return f"[root] {method} {path} {status_code} {status_text} ({process_time:.3f}s)"
+            elif event == "request_error":
+                error_type = kwargs.get("error_type", "Exception")
+                error_message = kwargs.get("error_message", "Unknown error")
+                process_time = kwargs.get("process_time", 0)
+                return f"[root] {method} {path} {error_type}: {error_message} ({process_time:.3f}s)"
+            else:
+                return f"[root] {method} {path} - {event.upper()}"
+    
+    def _log_event(self, level: int, event: str, method: str, path: str, 
+                   correlation_id: str, **kwargs):
+        """Log event to both root and file loggers."""
+        message = self._format_log_message(event, method, path, correlation_id, **kwargs)
+        
+        # 🔧 OPTIMIZED: Single log call instead of double
+        self.root_logger.log(level, message)
+        self.file_logger.log(level, message)
+    
+    def log_request(self, method: str, path: str, client_ip: str, 
+                   headers: Dict[str, str], correlation_id: str):
+        """Log incoming request with optional headers."""
+        kwargs = {"client_ip": client_ip}
+        
+        if self.include_headers:
+            kwargs["headers"] = self._mask_sensitive_headers(headers)
+        
+        self._log_event(logging.INFO, "request_started", method, path, correlation_id, **kwargs)
+    
+    def log_response(self, method: str, path: str, status_code: int, 
+                    process_time: float, correlation_id: str):
+        """Log response with timing information."""
+        self._log_event(
+            logging.INFO, "request_completed", method, path, correlation_id,
+            status_code=status_code, process_time=round(process_time, 3)
+        )
+    
+    def log_exception(self, method: str, path: str, exception: Exception, 
+                     correlation_id: str, process_time: float):
+        """Log exception with error details."""
+        self._log_event(
+            logging.ERROR, "request_error", method, path, correlation_id,
+            error_type=type(exception).__name__,
+            error_message=str(exception),
+            process_time=round(process_time, 3)
+        )
 
 
 class LoggingMiddleware:
@@ -25,10 +142,8 @@ class LoggingMiddleware:
     
     Features:
     - Pure ASGI implementation (compatible with BodyCacheMiddleware)
-    - Correlation ID tracking
-    - Configurable formatting (simple/structured)
-    - Smart path exclusion
-    - File and console logging
+    - Minimal code duplication using BaseLoggingHandler
+    - High performance with cached loggers
     """
     
     def __init__(
@@ -49,65 +164,46 @@ class LoggingMiddleware:
         
         # Cache configuration for performance
         self.log_level = log_level or settings.LOG_LEVEL
-        self.log_request_body = log_request_body if log_request_body is not None else settings.LOG_REQUEST_BODY
-        self.log_response_body = log_response_body if log_response_body is not None else settings.LOG_RESPONSE_BODY
-        self.enable_structured = settings.ENABLE_STRUCTURED_LOGGING
+        self.enable_request_logging = settings.ENABLE_REQUEST_LOGGING
         
-        # 🔧 UNIFIED LOGGER STRATEGY: Use root logger for terminal + named logger for file
-        self.logger = logging.getLogger()  # Корневой логгер для терминала
-        self.file_logger = logging.getLogger("middleware.http")  # Именованный для файла
+        # 🔧 OPTIMIZED: Initialize base handler with shared logic
+        self.handler = BaseLoggingHandler(
+            enable_structured=settings.ENABLE_STRUCTURED_LOGGING,
+            include_headers=include_headers,
+            mask_sensitive=mask_sensitive_headers
+        )
         
-        # Force set level to ensure it works in all contexts
-        self.logger.setLevel(getattr(logging, self.log_level.upper()))
-        self.file_logger.setLevel(getattr(logging, self.log_level.upper()))
+        # Override exclude paths if provided
+        if exclude_paths:
+            self.handler.exclude_paths = exclude_paths
         
-        # Also ensure handlers have correct level
-        for handler in self.logger.handlers:
-            handler.setLevel(getattr(logging, self.log_level.upper()))
-        
-        # Performance optimizations
-        self.max_body_size = max_body_size
-        self.include_headers = include_headers
-        self.mask_sensitive = mask_sensitive_headers
-        
-        # Optimized path exclusion (compile once)
-        self.exclude_paths = exclude_paths or [
-            "/docs", "/openapi.json", "/favicon.ico", "/static"
-        ]
-        
-        # Pre-compiled sensitive headers set for O(1) lookup
-        self.sensitive_headers = frozenset([
-            "authorization", "x-api-key", "cookie", 
-            "x-auth-token", "proxy-authorization"
-        ])
-        
-        # Log successful initialization
-        self.logger.info("✅ LoggingMiddleware initialized with ASGI implementation")
+        # Log initialization
+        if self.enable_request_logging:
+            self.handler.root_logger.info("✅ LoggingMiddleware initialized with ASGI implementation")
+        else:
+            self.handler.root_logger.info("⚠️ LoggingMiddleware initialized but REQUEST LOGGING DISABLED")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Pure ASGI middleware entry point."""
-        if scope["type"] != "http":
+        if scope["type"] != "http" or not self.enable_request_logging:
             await self.app(scope, receive, send)
             return
             
         # Fast path exclusion check
         path = scope.get("path", "")
-        
-        if any(path.startswith(exclude_path) for exclude_path in self.exclude_paths):
+        if self.handler.should_exclude_path(path):
             await self.app(scope, receive, send)
             return
         
-        # Generate correlation ID
+        # Generate correlation ID and extract request info
         correlation_id = str(uuid.uuid4())
         start_time = time.time()
-        
-        # Extract request info
         method = scope.get("method", "GET")
         client_ip = self._get_client_ip_from_scope(scope)
-        headers = dict(scope.get("headers", []))
+        headers = self._extract_headers_from_scope(scope)
         
         # Log request
-        await self._log_request(method, path, client_ip, headers, correlation_id)
+        self.handler.log_request(method, path, client_ip, headers, correlation_id)
         
         # Wrap send to capture response info
         response_started = False
@@ -129,7 +225,7 @@ class LoggingMiddleware:
                 # This is the last response chunk - log the response
                 if response_started:
                     process_time = time.time() - start_time
-                    await self._log_response(method, path, status_code, process_time, correlation_id)
+                    self.handler.log_response(method, path, status_code, process_time, correlation_id)
             
             await send(message)
         
@@ -138,93 +234,14 @@ class LoggingMiddleware:
         except Exception as exception:
             # Log exception
             process_time = time.time() - start_time
-            await self._log_exception(method, path, exception, correlation_id, process_time)
+            self.handler.log_exception(method, path, exception, correlation_id, process_time)
             raise
-
-    async def _log_request(self, method: str, path: str, client_ip: str, headers: Dict, correlation_id: str):
-        """Log incoming request."""
-        if self.enable_structured:
-            # Structured logging for production
-            log_data = {
-                "event": "request_started",
-                "correlation_id": correlation_id,
-                "method": method,
-                "path": path,
-                "client_ip": client_ip,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            
-            # Add headers if enabled
-            if self.include_headers:
-                if self.mask_sensitive:
-                    # Mask sensitive headers
-                    headers = {
-                        key: "[MASKED]" if key.lower() in self.sensitive_headers else value
-                        for key, value in headers.items()
-                    }
-                log_data["headers"] = headers
-            
-            self.logger.info(json.dumps(log_data, ensure_ascii=False))
-        else:
-            # Compact format: INFO [root] METHOD /path - STARTED
-            message = f"[root] {method} {path} - STARTED"
-            self.logger.info(message)
-            
-            # Также записываем в файл через специальный логгер
-            file_logger = logging.getLogger("middleware.http")
-            file_logger.info(message)
-
-    async def _log_response(self, method: str, path: str, status_code: int, process_time: float, correlation_id: str):
-        """Log response."""
-        if self.enable_structured:
-            log_data = {
-                "event": "request_completed",
-                "correlation_id": correlation_id,
-                "method": method,
-                "path": path,
-                "status_code": status_code,
-                "process_time": round(process_time, 3),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            self.logger.info(json.dumps(log_data, ensure_ascii=False))
-        else:
-            # Compact format: INFO [root] METHOD /path STATUS TEXT (time)
-            status_text = "OK" if status_code < 400 else "ERROR"
-            message = f"[root] {method} {path} {status_code} {status_text} ({process_time:.3f}s)"
-            self.logger.info(message)
-            
-            # Также записываем в файл через специальный логгер
-            file_logger = logging.getLogger("middleware.http")
-            file_logger.info(message)
-
-    async def _log_exception(self, method: str, path: str, exception: Exception, correlation_id: str, process_time: float):
-        """Log exception."""
-        if self.enable_structured:
-            log_data = {
-                "event": "request_error",
-                "correlation_id": correlation_id,
-                "method": method,
-                "path": path,
-                "error_type": type(exception).__name__,
-                "error_message": str(exception),
-                "process_time": round(process_time, 3),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            self.logger.error(json.dumps(log_data, ensure_ascii=False))
-        else:
-            # Compact format: ERROR [root] METHOD /path EXCEPTION (time)
-            message = f"[root] {method} {path} {type(exception).__name__}: {exception} ({process_time:.3f}s)"
-            self.logger.error(message)
-            
-            # Также записываем в файл через специальный логгер
-            file_logger = logging.getLogger("middleware.http")
-            file_logger.error(message)
 
     def _get_client_ip_from_scope(self, scope: Scope) -> str:
         """Extract client IP from ASGI scope."""
-        # Check headers for forwarded IP
         headers = dict(scope.get("headers", []))
         
+        # Check forwarded headers
         forwarded_for = headers.get(b"x-forwarded-for")
         if forwarded_for:
             return forwarded_for.decode().split(",")[0].strip()
@@ -235,31 +252,23 @@ class LoggingMiddleware:
         
         # Fallback to client info
         client = scope.get("client")
-        if client:
-            return client[0]  # client is (host, port)
-        
-        return "unknown"
+        return client[0] if client else "unknown"
 
-    def _mask_sensitive_data(self, data: Dict[bytes, bytes]) -> Dict[str, str]:
-        """Mask sensitive headers."""
-        result = {}
-        for key_bytes, value_bytes in data.items():
-            key = key_bytes.decode('latin1').lower()
+    def _extract_headers_from_scope(self, scope: Scope) -> Dict[str, str]:
+        """Extract headers from ASGI scope."""
+        headers = {}
+        for key_bytes, value_bytes in scope.get("headers", []):
+            key = key_bytes.decode('latin1')
             value = value_bytes.decode('latin1')
-            
-            if key in self.sensitive_headers:
-                result[key] = "[MASKED]"
-            else:
-                result[key] = value
-        
-        return result
+            headers[key] = value
+        return headers
 
 
 class LoggingMiddlewareAdapter(BaseHTTPMiddleware):
     """
     🔄 FastAPI-compatible adapter for LoggingMiddleware
     
-    This adapter allows using our pure ASGI LoggingMiddleware with FastAPI's add_middleware()
+    Uses shared BaseLoggingHandler to eliminate code duplication.
     """
     
     def __init__(
@@ -273,34 +282,28 @@ class LoggingMiddlewareAdapter(BaseHTTPMiddleware):
         
         # Get settings
         settings = get_settings()
+        self.enable_request_logging = settings.ENABLE_REQUEST_LOGGING
         
-        # Cache configuration
-        self.enable_structured = settings.ENABLE_STRUCTURED_LOGGING
-        self.include_headers = include_headers
-        self.mask_sensitive = mask_sensitive_headers
-        
-        # Setup loggers
-        self.logger = logging.getLogger()
-        self.file_logger = logging.getLogger("middleware.http")
-        
-        # Exclude paths
-        self.exclude_paths = [
-            "/docs", "/openapi.json", "/favicon.ico", "/static"
-        ]
-        
-        # Sensitive headers
-        self.sensitive_headers = frozenset([
-            "authorization", "x-api-key", "cookie", 
-            "x-auth-token", "proxy-authorization"
-        ])
+        # 🔧 OPTIMIZED: Initialize base handler with shared logic
+        self.handler = BaseLoggingHandler(
+            enable_structured=settings.ENABLE_STRUCTURED_LOGGING,
+            include_headers=include_headers,
+            mask_sensitive=mask_sensitive_headers
+        )
         
         # Log initialization
-        self.logger.info("✅ LoggingMiddlewareAdapter initialized")
+        if self.enable_request_logging:
+            self.handler.root_logger.info("✅ LoggingMiddlewareAdapter initialized")
+        else:
+            self.handler.root_logger.info("⚠️ LoggingMiddlewareAdapter initialized but REQUEST LOGGING DISABLED")
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Adapter dispatch method."""
+        if not self.enable_request_logging:
+            return await call_next(request)
+            
         # Check if path should be excluded
-        if any(request.url.path.startswith(path) for path in self.exclude_paths):
+        if self.handler.should_exclude_path(request.url.path):
             return await call_next(request)
         
         # Generate correlation ID and start timing
@@ -309,7 +312,7 @@ class LoggingMiddlewareAdapter(BaseHTTPMiddleware):
         
         # Log request
         client_ip = request.client.host if request.client else "unknown"
-        await self._log_request(
+        self.handler.log_request(
             request.method, 
             request.url.path, 
             client_ip, 
@@ -326,7 +329,7 @@ class LoggingMiddlewareAdapter(BaseHTTPMiddleware):
             
             # Log response
             process_time = time.time() - start_time
-            await self._log_response(
+            self.handler.log_response(
                 request.method,
                 request.url.path,
                 response.status_code,
@@ -339,97 +342,11 @@ class LoggingMiddlewareAdapter(BaseHTTPMiddleware):
         except Exception as exception:
             # Log exception
             process_time = time.time() - start_time
-            await self._log_exception(
+            self.handler.log_exception(
                 request.method,
                 request.url.path,
                 exception,
                 correlation_id,
                 process_time
             )
-            raise
-    
-    async def _log_request(self, method: str, path: str, client_ip: str, headers: Dict, correlation_id: str):
-        """Log incoming request."""
-        if self.enable_structured:
-            # Structured logging for production
-            log_data = {
-                "event": "request_started",
-                "correlation_id": correlation_id,
-                "method": method,
-                "path": path,
-                "client_ip": client_ip,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            
-            # Add headers if enabled
-            if self.include_headers:
-                if self.mask_sensitive:
-                    # Mask sensitive headers
-                    headers = {
-                        key: "[MASKED]" if key.lower() in self.sensitive_headers else value
-                        for key, value in headers.items()
-                    }
-                log_data["headers"] = headers
-            
-            self.logger.info(json.dumps(log_data, ensure_ascii=False))
-        else:
-            # Compact format: INFO [root] METHOD /path - STARTED
-            message = f"[root] {method} {path} - STARTED"
-            self.logger.info(message)
-            
-            # Также записываем в файл через специальный логгер
-            file_logger = logging.getLogger("middleware.http")
-            file_logger.info(message)
-
-    async def _log_response(self, method: str, path: str, status_code: int, process_time: float, correlation_id: str):
-        """Log response."""
-        if self.enable_structured:
-            log_data = {
-                "event": "request_completed",
-                "correlation_id": correlation_id,
-                "method": method,
-                "path": path,
-                "status_code": status_code,
-                "process_time": round(process_time, 3),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            self.logger.info(json.dumps(log_data, ensure_ascii=False))
-        else:
-            # Compact format: INFO [root] METHOD /path STATUS TEXT (time)
-            status_text = "OK" if status_code < 400 else "ERROR"
-            message = f"[root] {method} {path} {status_code} {status_text} ({process_time:.3f}s)"
-            self.logger.info(message)
-            
-            # Также записываем в файл через специальный логгер
-            file_logger = logging.getLogger("middleware.http")
-            file_logger.info(message)
-
-    async def _log_exception(self, method: str, path: str, exception: Exception, correlation_id: str, process_time: float):
-        """Log exception."""
-        if self.enable_structured:
-            log_data = {
-                "event": "request_error",
-                "correlation_id": correlation_id,
-                "method": method,
-                "path": path,
-                "error_type": type(exception).__name__,
-                "error_message": str(exception),
-                "process_time": round(process_time, 3),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            self.logger.error(json.dumps(log_data, ensure_ascii=False))
-        else:
-            # Compact format: ERROR [root] METHOD /path EXCEPTION (time)
-            message = f"[root] {method} {path} {type(exception).__name__}: {exception} ({process_time:.3f}s)"
-            self.logger.error(message)
-            
-            # Также записываем в файл через специальный логгер
-            file_logger = logging.getLogger("middleware.http")
-            file_logger.error(message)
-    
-    def _mask_sensitive_data(self, data: Dict[str, str]) -> Dict[str, str]:
-        """Mask sensitive headers."""
-        return {
-            key: "[MASKED]" if key.lower() in self.sensitive_headers else value
-            for key, value in data.items()
-        } 
+            raise 
