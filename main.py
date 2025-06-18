@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -216,6 +216,58 @@ class UTF8JSONResponse(JSONResponse):
 # Set default response class
 app.default_response_class = UTF8JSONResponse
 
+# 🔥 LOGGING MIDDLEWARE - Добавляем СРАЗУ после создания app!
+import time
+import uuid
+import logging
+
+# Получаем корневой логгер (который записывает в файл)
+app_logger = logging.getLogger()
+
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    """HTTP logging middleware."""
+    # Generate correlation ID and start timing
+    correlation_id = str(uuid.uuid4())
+    start_time = time.time()
+    
+    try:
+        # Process request
+        response = await call_next(request)
+        
+        # Add correlation ID to response headers
+        response.headers["x-correlation-id"] = correlation_id
+        
+        # Log response
+        process_time = time.time() - start_time
+        status_text = "OK" if response.status_code < 400 else "ERROR"
+        message = f"INFO  [root] {request.method} {request.url.path} {response.status_code} {status_text} ({process_time:.3f}s)"
+        
+        # Записываем напрямую в файл
+        with open("logs/app.log", "a", encoding="utf-8") as f:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"{timestamp} - {message}\n")
+        
+        # Также выводим в консоль
+        print(f"🌐 {message}")
+        
+        return response
+        
+    except Exception as exception:
+        # Log exception
+        process_time = time.time() - start_time
+        message = f"ERROR [root] {request.method} {request.url.path} {type(exception).__name__}: {exception} ({process_time:.3f}s)"
+        
+        # Записываем напрямую в файл
+        with open("logs/app.log", "a", encoding="utf-8") as f:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"{timestamp} - {message}\n")
+        
+        # Также выводим в консоль
+        print(f"🌐 {message}")
+        
+        raise
+
 # Initialize security middleware to get CORS settings
 security_middleware = SecurityMiddleware(app)
 cors_settings = security_middleware.get_cors_settings()
@@ -224,59 +276,50 @@ cors_settings = security_middleware.get_cors_settings()
 # Order: LIFO (Last In First Out) - REVERSED execution order!
 # Last added = First executed
 
-# 5. CORS middleware (добавляем первым - выполнится последним, ближе к app)
+# 4. Rate limiting middleware (🔥 FULL FUNCTIONALITY RESTORED)
+# if settings.ENABLE_RATE_LIMITING:
+#     try:
+#         app.add_middleware(RateLimitMiddleware,
+#             default_requests_per_minute=settings.RATE_LIMIT_RPM,  # Fixed: use correct parameter name
+#             default_requests_per_hour=1000,                       # Default hourly limit
+#             enable_burst_protection=True,                         # Enable burst protection
+#             rate_limit_headers=True,                              # Include rate limit headers
+#         )
+#         logger.info("✅ RateLimitMiddleware initialized with full functionality")
+#     except Exception as e:
+#         logger.warning(f"Failed to initialize RateLimitMiddleware: {e}")
 
-# 4. Logging middleware (🔥 ПРОСТОЕ РЕШЕНИЕ - используем BaseHTTPMiddleware)
-app.add_middleware(LoggingMiddleware,
-    max_body_size=64*1024,      # Технические параметры
-    include_headers=True,       
-    mask_sensitive_headers=True,
-)
+# 3. Security middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
+# app.add_middleware(SecurityMiddleware,
+#     max_request_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,
+#     enable_security_headers=True,
+#     enable_input_validation=True,   # 🔥 RESTORED: Полная валидация body через кеш
+#     enable_xss_protection=True,     # 🔥 RESTORED: XSS защита для body
+#     enable_sql_injection_protection=True,  # 🔥 RESTORED: SQL injection защита для body
+#     enable_path_traversal_protection=True,
+# )
 
-# 3. Rate limiting middleware (🔥 FULL FUNCTIONALITY RESTORED)
-if settings.ENABLE_RATE_LIMITING:
-    try:
-        app.add_middleware(RateLimitMiddleware,
-            default_requests_per_minute=settings.RATE_LIMIT_RPM,  # Fixed: use correct parameter name
-            default_requests_per_hour=1000,                       # Default hourly limit
-            enable_burst_protection=True,                         # Enable burst protection
-            rate_limit_headers=True,                              # Include rate limit headers
-        )
-        logger.info("✅ RateLimitMiddleware initialized with full functionality")
-    except Exception as e:
-        logger.warning(f"Failed to initialize RateLimitMiddleware: {e}")
+# 2. Compression middleware (🔥 FULL FUNCTIONALITY RESTORED)
+# app.add_middleware(CompressionMiddleware,
+#     minimum_size=2048,                    # 2KB minimum
+#     maximum_size=5 * 1024 * 1024,         # 5MB maximum
+#     compression_level=6,                  # 🔥 RESTORED: Optimal compression (was 3)
+#     enable_brotli=True,                   # 🔥 RESTORED: Brotli support (~20% better than gzip)
+#     enable_streaming=True,                # 🔥 RESTORED: Streaming for large files
+#     exclude_paths=["/health", "/ping", "/metrics"],  # Reduced exclusions
+#     enable_performance_logging=True,      # 🔥 RESTORED: Performance metrics
+# )
 
-# 2. Security middleware (🔥 FULL FUNCTIONALITY RESTORED - использует кешированный body)
-app.add_middleware(SecurityMiddleware,
-    max_request_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,
-    enable_security_headers=True,
-    enable_input_validation=True,   # 🔥 RESTORED: Полная валидация body через кеш
-    enable_xss_protection=True,     # 🔥 RESTORED: XSS защита для body
-    enable_sql_injection_protection=True,  # 🔥 RESTORED: SQL injection защита для body
-    enable_path_traversal_protection=True,
-)
-
-# 1. Compression middleware (🔥 FULL FUNCTIONALITY RESTORED)
-app.add_middleware(CompressionMiddleware,
-    minimum_size=2048,                    # 2KB minimum
-    maximum_size=5 * 1024 * 1024,         # 5MB maximum
-    compression_level=6,                  # 🔥 RESTORED: Optimal compression (was 3)
-    enable_brotli=True,                   # 🔥 RESTORED: Brotli support (~20% better than gzip)
-    enable_streaming=True,                # 🔥 RESTORED: Streaming for large files
-    exclude_paths=["/health", "/ping", "/metrics"],  # Reduced exclusions
-    enable_performance_logging=True,      # 🔥 RESTORED: Performance metrics
-)
-
-# 0. Body Cache middleware (🔥 FIXED: добавляем ПОСЛЕДНИМ - выполнится ПЕРВЫМ!)
+# 1. Body Cache middleware (🔥 FIXED: добавляем ПОСЛЕДНИМ - выполнится ПЕРВЫМ!)
 # Это middleware ДОЛЖЕН выполниться первым для чтения и кеширования body
-from core.middleware.body_cache import BodyCacheMiddleware
-app.add_middleware(BodyCacheMiddleware,
-    max_body_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,  # Используем тот же лимит
-    methods_to_cache=["POST", "PUT", "PATCH"],  # Методы с body
-)
+# from core.middleware.body_cache import BodyCacheMiddleware
+# app.add_middleware(BodyCacheMiddleware,
+#     max_body_size=settings.MAX_REQUEST_SIZE_MB * 1024 * 1024,  # Используем тот же лимит
+#     methods_to_cache=["POST", "PUT", "PATCH"],  # Методы с body
+# )
 
 # CORS middleware (добавляем последним - выполнится после всех остальных)
-app.add_middleware(CORSMiddleware, **cors_settings)
+# app.add_middleware(CORSMiddleware, **cors_settings)
 
 # Include routers
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
@@ -297,4 +340,6 @@ async def root():
         "message": f"Welcome to {settings.PROJECT_NAME}",
         "version": settings.VERSION,
         "docs_url": "/docs"
-    } 
+    }
+
+# HTTP Logging middleware теперь определен выше, сразу после создания app 
