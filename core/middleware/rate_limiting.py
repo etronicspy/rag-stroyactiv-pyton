@@ -6,7 +6,7 @@ Implements sliding window rate limiting with different tiers.
 import asyncio
 import time
 from typing import Optional, Dict, Any, Callable, Tuple
-import logging
+from core.monitoring.logger import get_logger
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException, Request, Response
@@ -15,7 +15,7 @@ import redis.asyncio as aioredis
 
 from core.config import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

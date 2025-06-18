@@ -6,7 +6,7 @@ Multi-level caching system for optimized data access.
 
 import asyncio
 import time
-import logging
+from core.monitoring.logger import get_logger
 from typing import Any, Optional, Dict, List, Union, Callable, TypeVar
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -16,7 +16,7 @@ import json
 import weakref
 from abc import ABC, abstractmethod
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 T = TypeVar('T')
 

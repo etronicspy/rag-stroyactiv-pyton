@@ -6,14 +6,14 @@ Dynamic Connection Pool Manager for optimal database performance.
 
 import asyncio
 import time
-import logging
+from core.monitoring.logger import get_logger
 import threading
 from typing import Dict, Any, Optional, Protocol, List
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import psutil
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

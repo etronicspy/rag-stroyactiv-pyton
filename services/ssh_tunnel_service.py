@@ -6,7 +6,7 @@ monitoring, and automatic reconnection.
 """
 
 import asyncio
-import logging
+from core.monitoring.logger import get_logger
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 
@@ -16,7 +16,7 @@ from .tunnel.tunnel_config import TunnelConfig
 from .tunnel.tunnel_manager import TunnelManager
 from .tunnel.exceptions import SSHTunnelError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SSHTunnelService:

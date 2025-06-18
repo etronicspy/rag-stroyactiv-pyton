@@ -15,14 +15,14 @@ STATUS: BROTLI IS WORKING CORRECTLY
 
 import pytest
 import sys
-import logging
+from core.monitoring.logger import get_logger
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from core.middleware.compression import CompressionMiddleware
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TestBrotliDiagnostics:

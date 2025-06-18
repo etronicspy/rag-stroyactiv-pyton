@@ -8,12 +8,12 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 import os
 import uuid
-import logging
+from core.monitoring.logger import get_logger
 import numpy as np
 from core.config import settings, get_vector_db_client, get_ai_client
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class PriceProcessor:
     def __init__(self):

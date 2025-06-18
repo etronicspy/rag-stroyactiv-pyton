@@ -5,7 +5,7 @@
 
 import json
 import hashlib
-import logging
+from core.monitoring.logger import get_logger
 from typing import Any, Dict, List, Optional, Tuple, Union
 from datetime import datetime, timedelta
 import asyncio
@@ -25,7 +25,7 @@ class MaterialSearchRequest:
             setattr(self, key, value)
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CachedMaterialsRepository:

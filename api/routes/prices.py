@@ -9,13 +9,13 @@ from services.price_processor import PriceProcessor
 from core.config import get_vector_db_client
 import tempfile
 import os
-import logging
+from core.monitoring.logger import get_logger
 import traceback
 import time
 from datetime import datetime
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def get_qdrant_client():
     """Get Qdrant client instance using centralized configuration"""

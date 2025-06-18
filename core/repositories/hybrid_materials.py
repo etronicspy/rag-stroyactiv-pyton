@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict, Any, Optional, Tuple
-import logging
+from core.monitoring.logger import get_logger
 from datetime import datetime
 import asyncio
 import uuid
@@ -18,7 +18,7 @@ from core.monitoring.logger import DatabaseLogger, log_database_operation
 from core.monitoring.metrics import get_metrics_collector
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):

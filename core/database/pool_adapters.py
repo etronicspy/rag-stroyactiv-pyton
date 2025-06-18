@@ -5,13 +5,13 @@ Pool adapters for integrating existing database pools with dynamic pool manager.
 """
 
 import asyncio
-import logging
+from core.monitoring.logger import get_logger
 from typing import Dict, Any, Optional
 from datetime import datetime
 
 from core.database.pool_manager import PoolProtocol
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RedisPoolAdapter(PoolProtocol):

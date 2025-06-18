@@ -1,6 +1,6 @@
 import asyncio
 import time
-import logging
+from core.monitoring.logger import get_logger
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 
@@ -15,6 +15,7 @@ from core.monitoring import setup_structured_logging, get_metrics_collector
 from docs.api_description import get_fastapi_config
 from api.routes import reference, health, materials, prices, search, advanced_search, tunnel
 from services.ssh_tunnel_service import initialize_tunnel_service, shutdown_tunnel_service
+from core.monitoring.context import with_correlation_context, CorrelationContext
 
 # Initialize settings
 settings = get_settings()
@@ -29,75 +30,74 @@ setup_structured_logging(
 )
 
 # Initialize logger after setup
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+async def startup_with_correlation():
+    """Startup routine with correlation context."""
+    with CorrelationContext.with_correlation_id() as startup_correlation_id:
+        logger.info(f"🚀 Starting Construction Materials API... (startup_id: {startup_correlation_id})")
+        
+        # Initialize SSH tunnel service
+        try:
+            await initialize_tunnel_service()
+            logger.info("✅ SSH tunnel service initialized")
+        except Exception as e:
+            logger.info("ℹ️ SSH tunnel service is disabled or not available")
+        
+        # Initialize databases
+        try:
+            init_results = await initialize_database_on_startup()
+            logger.info(f"✅ Database initialization: {init_results}")
+        except Exception as e:
+            logger.error(f"❌ Database initialization failed: {e}")
+            raise
+        
+        # Initialize pool manager
+        try:
+            pool_config = PoolConfig()
+            await initialize_pool_manager(pool_config)
+            logger.info("✅ Dynamic pool manager initialized")
+        except Exception as e:
+            logger.error(f"❌ Database initialization failed: {e}")
+            raise
+
+async def shutdown_with_correlation():
+    """Shutdown routine with correlation context."""  
+    with CorrelationContext.with_correlation_id() as shutdown_correlation_id:
+        logger.info(f"🛑 Shutting down Construction Materials API... (shutdown_id: {shutdown_correlation_id})")
+        
+        # Shutdown SSH tunnel service
+        try:
+            await shutdown_tunnel_service()
+            logger.info("✅ SSH tunnel service shutdown completed")
+        except Exception as e:
+            logger.error(f"❌ SSH tunnel service shutdown failed: {e}")
+        
+        # Shutdown pool manager
+        try:
+            await shutdown_pool_manager()
+            logger.info("✅ Pool manager shutdown completed")
+        except Exception as e:
+            logger.error(f"❌ Pool manager shutdown failed: {e}")
+        
+        # Get final metrics
+        metrics_collector = get_metrics_collector()
+        final_metrics = metrics_collector.get_summary()
+        logger.info(f"📊 Final application metrics: {final_metrics}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager for startup/shutdown tasks."""
-    # Startup
-    logger.info("🚀 Starting Construction Materials API...")
-    
-    # Initialize metrics collector
-    metrics_collector = get_metrics_collector()
-    metrics_collector._start_time = time.time()
-    
-    try:
-        # Initialize SSH tunnel service FIRST (must be before database)
-        tunnel_service = await initialize_tunnel_service()
-        if tunnel_service:
-            logger.info("✅ SSH tunnel service initialized")
-        else:
-            logger.info("ℹ️ SSH tunnel service is disabled or not available")
-        
-        # Initialize database on startup (after tunnel is ready)
-        init_results = await initialize_database_on_startup(
-            run_migrations=settings.AUTO_MIGRATE,
-            seed_data=settings.AUTO_SEED,
-            verify_health=True
-        )
-        logger.info(f"✅ Database initialization: {init_results}")
-        
-        # Initialize dynamic pool manager
-        pool_config = PoolConfig(
-            min_size=2,
-            max_size=50,
-            target_utilization=0.75,
-            scale_up_threshold=0.85,
-            scale_down_threshold=0.4,
-            monitoring_interval=30.0,
-            auto_scaling_enabled=True
-        )
-        
-        pool_manager = await initialize_pool_manager(pool_config)
-        logger.info("✅ Dynamic pool manager initialized")
-        
-    except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
-        # Continue startup even if DB init fails
-    
+    """Application lifespan with correlation context."""
+    await startup_with_correlation()
     yield
-    
-    # Shutdown
-    logger.info("🛑 Shutting down Construction Materials API...")
-    
-    # Shutdown SSH tunnel service
-    try:
-        await shutdown_tunnel_service()
-        logger.info("✅ SSH tunnel service shutdown completed")
-    except Exception as e:
-        logger.error(f"❌ SSH tunnel service shutdown failed: {e}")
-    
-    # Shutdown pool manager
-    try:
-        await shutdown_pool_manager()
-        logger.info("✅ Pool manager shutdown completed")
-    except Exception as e:
-        logger.error(f"❌ Pool manager shutdown failed: {e}")
-    
-    # Log final metrics
-    final_metrics = metrics_collector.get_metrics_summary()
-    logger.info(f"📊 Final application metrics: {final_metrics}")
+    await shutdown_with_correlation()
 
+def setup_middleware_with_correlation(app: FastAPI):
+    """Setup middleware with correlation context."""
+    with CorrelationContext.with_correlation_id() as middleware_correlation_id:
+        logger.info(f"🔧 Setting up middleware stack... (middleware_id: {middleware_correlation_id})")
+        setup_middleware(app)
+        logger.info("✅ Middleware stack setup completed")
 
 # 🔧 REFACTORED: Use centralized API configuration
 app = FastAPI(
@@ -114,7 +114,7 @@ app.default_response_class = UTF8JSONResponse
 
 # 🔧 REFACTORED: Use middleware factory for clean setup
 logger.info("🔧 Setting up middleware stack...")
-setup_middleware(app, settings)
+setup_middleware_with_correlation(app)
 logger.info("✅ Middleware stack setup completed")
 
 # Include routers

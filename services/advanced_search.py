@@ -19,7 +19,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple, Set
 from difflib import SequenceMatcher
-import logging
+from core.monitoring.logger import get_logger
 
 from core.schemas.materials import (
     AdvancedSearchQuery, MaterialFilterOptions, SortOption, PaginationOptions,
@@ -30,7 +30,7 @@ from core.repositories.cached_materials import CachedMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import DatabaseError, ValidationError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AdvancedSearchService:

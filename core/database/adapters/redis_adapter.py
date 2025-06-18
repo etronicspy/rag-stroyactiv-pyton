@@ -5,7 +5,7 @@
 
 import json
 import pickle
-import logging
+from core.monitoring.logger import get_logger
 import zlib
 from typing import Any, Dict, List, Optional, Union, Set
 from datetime import datetime, timedelta
@@ -22,13 +22,13 @@ try:
     MSGPACK_AVAILABLE = True
 except ImportError:
     MSGPACK_AVAILABLE = False
-    logging.getLogger(__name__).warning("msgpack not available, falling back to JSON+pickle serialization")
+    get_logger(__name__).warning("msgpack not available, falling back to JSON+pickle serialization")
 
 from core.database.interfaces import ICacheDatabase
 from core.database.exceptions import ConnectionError, DatabaseError, QueryError
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RedisDatabase(ICacheDatabase):

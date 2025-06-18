@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict, Any, Optional, Union
-import logging
+from core.monitoring.logger import get_logger
 from datetime import datetime
 import uuid
 from contextlib import asynccontextmanager
@@ -25,7 +25,7 @@ from core.config import Settings
 from services.ssh_tunnel_service import get_tunnel_service
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # SQLAlchemy Base
 Base = declarative_base()

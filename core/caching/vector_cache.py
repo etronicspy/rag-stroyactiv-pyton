@@ -8,14 +8,14 @@ Stage 1.3: Vector Search Optimization
 import asyncio
 import hashlib
 import time
-import logging
+from core.monitoring.logger import get_logger
 from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
 import json
 
 from core.database.adapters.redis_adapter import RedisDatabase
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

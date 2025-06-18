@@ -5,7 +5,7 @@ Includes request size limits, security headers, and input validation.
 
 import re
 import time
-import logging
+from core.monitoring.logger import get_logger
 from typing import Dict, List, Optional, Callable, Any
 from urllib.parse import unquote
 
@@ -15,7 +15,7 @@ from starlette.responses import JSONResponse
 
 from core.config import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SecurityMiddleware(BaseHTTPMiddleware):

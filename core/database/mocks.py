@@ -2,12 +2,12 @@
 Mock implementations for missing databases
 Заглушки для отсутствующих баз данных
 """
-import logging
+from core.monitoring.logger import get_logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 import asyncio
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class MockRedisClient:
     """Mock Redis client for when Redis is not available"""

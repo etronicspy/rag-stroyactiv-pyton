@@ -167,12 +167,12 @@ def setup_middleware(app: FastAPI, settings: Settings) -> None:
             app.add_middleware(middleware_class, **middleware_config)
             # Log successful initialization
             import logging
-            logger = logging.getLogger(__name__)
+            logger = get_logger(__name__)
             logger.info(f"✅ {middleware_class.__name__} initialized")
         except Exception as e:
             # Log initialization failure but continue
             import logging
-            logger = logging.getLogger(__name__)
+            logger = get_logger(__name__)
             logger.warning(f"Failed to initialize {middleware_class.__name__}: {e}")
 
 

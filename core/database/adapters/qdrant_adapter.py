@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict, Any, Optional
-import logging
+from core.monitoring.logger import get_logger
 import asyncio
 from datetime import datetime
 
@@ -15,7 +15,7 @@ from core.database.interfaces import IVectorDatabase
 from core.database.exceptions import ConnectionError, QueryError, DatabaseError
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class QdrantVectorDatabase(IVectorDatabase):

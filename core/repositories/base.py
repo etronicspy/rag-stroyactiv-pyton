@@ -5,7 +5,7 @@
 
 from abc import ABC
 from typing import Dict, Any, Optional
-import logging
+from core.monitoring.logger import get_logger
 from datetime import datetime
 
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
@@ -36,7 +36,7 @@ class BaseRepository(ABC):
         self.relational_db = relational_db
         self.cache_db = cache_db
         self.ai_client = ai_client
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = get_logger(self.__class__.__name__)
     
     async def _handle_database_error(self, operation: str, error: Exception) -> None:
         """Handle database errors with proper logging.

@@ -6,7 +6,7 @@ import pytest
 import asyncio
 import os
 import time
-import logging
+from core.monitoring.logger import get_logger
 from typing import Dict, Any, List
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
@@ -15,7 +15,7 @@ from qdrant_client import QdrantClient
 
 # Настраиваем логирование для тестов
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Константы для тестирования
 TEST_SETTINGS = {

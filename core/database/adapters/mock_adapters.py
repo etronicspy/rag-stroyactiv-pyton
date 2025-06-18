@@ -2,7 +2,7 @@
 Mock adapters implementing database interfaces
 Адаптеры-заглушки, реализующие интерфейсы БД
 """
-import logging
+from core.monitoring.logger import get_logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 import asyncio
@@ -10,7 +10,7 @@ import asyncio
 from core.database.interfaces import IRelationalDatabase, ICacheDatabase
 from core.database.mocks import MockRedisClient, MockPostgreSQLAdapter
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class MockRelationalAdapter(IRelationalDatabase):
     """Mock adapter implementing IRelationalDatabase interface"""

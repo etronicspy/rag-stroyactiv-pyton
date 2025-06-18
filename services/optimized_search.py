@@ -7,7 +7,7 @@ Optimized Search Service with Parallel Hybrid Search and Advanced Caching.
 import asyncio
 import json
 import time
-import logging
+from core.monitoring.logger import get_logger
 from typing import List, Dict, Any, Optional, Tuple, Set, Union
 from dataclasses import dataclass
 from functools import lru_cache
@@ -22,7 +22,7 @@ from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import DatabaseError, ValidationError
 from services.advanced_search import AdvancedSearchService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

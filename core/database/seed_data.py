@@ -5,11 +5,11 @@
 """
 
 from typing import List, Dict, Any, Optional
-import logging
+from core.monitoring.logger import get_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Seed data for categories

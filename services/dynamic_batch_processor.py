@@ -7,14 +7,14 @@ Dynamic Batch Processor for optimized data processing.
 import asyncio
 import psutil
 import time
-import logging
+from core.monitoring.logger import get_logger
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic, Union
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections import deque
 import math
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 T = TypeVar('T')
 R = TypeVar('R')

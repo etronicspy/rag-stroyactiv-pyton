@@ -3,7 +3,7 @@ Conditional middleware wrapper for optimized performance.
 Allows middleware to be applied only to specific routes or conditions.
 """
 
-import logging
+from core.monitoring.logger import get_logger
 import time
 from typing import Callable, Optional, List, Union, Pattern
 import re
@@ -13,7 +13,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ConditionalMiddleware(BaseHTTPMiddleware):

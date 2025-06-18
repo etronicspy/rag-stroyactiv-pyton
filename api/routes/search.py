@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Query, HTTPException
 from typing import List
-import logging
+from core.monitoring.logger import get_logger
 
 from core.schemas.materials import Material
 from services.materials import MaterialsService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter()
 
 @router.get("/", response_model=List[Material])

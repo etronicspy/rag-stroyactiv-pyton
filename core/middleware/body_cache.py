@@ -6,12 +6,12 @@ Body Cache Middleware для единого чтения request body.
 """
 
 import json
-import logging
+from core.monitoring.logger import get_logger
 from typing import Optional
 
 from starlette.types import ASGIApp, Receive, Scope, Send, Message
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BodyCacheMiddleware:

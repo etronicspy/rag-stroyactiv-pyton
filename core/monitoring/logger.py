@@ -16,6 +16,7 @@ from functools import wraps, lru_cache
 from contextlib import contextmanager
 
 from core.config import get_settings
+from core.monitoring.context import CorrelationLoggingAdapter
 
 # 🔧 CONSTANTS: Moved hardcoded values to module level
 LOGGER_NAMES_TO_CONFIGURE = ["middleware", "services", "api", "database"]
@@ -24,18 +25,32 @@ MIDDLEWARE_LOGGER_NAME = "middleware.http"
 CORE_LOGGER_NAME = "core"
 
 # 🔧 PERFORMANCE: Cached logger instances
-@lru_cache(maxsize=64)
-def get_logger(name: str) -> logging.Logger:
+_logger_cache = {}
+
+def get_logger(name: str, enable_correlation: bool = True) -> logging.Logger:
     """
-    Get cached logger instance with consistent configuration.
+    Get logger with optional correlation ID support.
     
     Args:
         name: Logger name
+        enable_correlation: Whether to enable automatic correlation ID
         
     Returns:
-        Configured logger instance
+        Logger instance with correlation support
     """
-    return logging.getLogger(name)
+    if name in _logger_cache:
+        return _logger_cache[name]
+    
+    logger = logging.getLogger(name)
+    
+    # 🎯 ЭТАП 3.2: Wrap with correlation adapter if enabled
+    if enable_correlation:
+        correlation_logger = CorrelationLoggingAdapter(logger, {})
+        _logger_cache[name] = correlation_logger
+        return correlation_logger
+    
+    _logger_cache[name] = logger
+    return logger
 
 
 class StructuredFormatter(logging.Formatter):

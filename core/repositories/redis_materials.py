@@ -4,7 +4,7 @@
 """
 
 import json
-import logging
+from core.monitoring.logger import get_logger
 from typing import List, Optional, Dict, Any
 from datetime import timedelta
 
@@ -13,7 +13,7 @@ from core.schemas.materials import Material, MaterialCreate, MaterialUpdate
 from core.database.interfaces import ICacheDatabase
 from core.database.exceptions import DatabaseError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RedisMaterialsRepository(IMaterialsRepository):

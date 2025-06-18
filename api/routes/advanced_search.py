@@ -9,7 +9,7 @@ Advanced Search API Routes (Simplified)
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-import logging
+from core.monitoring.logger import get_logger
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from core.schemas.materials import Material
 from services.materials import MaterialsService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
 # Simplified models for advanced search

@@ -3,7 +3,7 @@
 Адаптер для работы с Pinecone векторной базой данных с поддержкой всех обязательных методов.
 """
 
-import logging
+from core.monitoring.logger import get_logger
 from typing import List, Dict, Any, Optional
 import json
 from datetime import datetime
@@ -11,7 +11,7 @@ from datetime import datetime
 from core.database.interfaces import IVectorDatabase
 from core.database.exceptions import DatabaseError, ConnectionError, ConfigurationError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PineconeVectorDatabase(IVectorDatabase):

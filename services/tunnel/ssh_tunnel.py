@@ -4,7 +4,7 @@ SSH Tunnel implementation for secure database connections.
 Updated to use proven sshtunnel library based on internet research.
 """
 
-import logging
+from core.monitoring.logger import get_logger
 import time
 import threading
 from typing import Optional, Dict, Any
@@ -16,7 +16,7 @@ import paramiko
 from .tunnel_config import TunnelConfig
 from .exceptions import SSHTunnelError, SSHTunnelKeyError, SSHTunnelConnectionError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SSHTunnel:

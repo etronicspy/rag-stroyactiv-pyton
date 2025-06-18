@@ -24,8 +24,9 @@ from .constants import (
 )
 from .database import DatabaseConfig
 from .ai import AIConfig
+from .logging import LoggingConfig
 
-class Settings(BaseSettings):
+class Settings(LoggingConfig, BaseSettings):
     """Main application settings with modular configuration."""
     
     # === PROJECT SETTINGS ===
@@ -286,54 +287,7 @@ class Settings(BaseSettings):
     )
     
     # === LOGGING SETTINGS ===
-    LOG_LEVEL: LogLevel = Field(
-        default=LogLevel.INFO,
-        description="Logging level"
-    )
-    LOG_FILE: Optional[str] = Field(
-        default=None,
-        description="Log file path"
-    )
-    LOG_REQUEST_BODY: bool = Field(
-        default=True,
-        description="Log request bodies"
-    )
-    LOG_RESPONSE_BODY: bool = Field(
-        default=False,
-        description="Log response bodies"
-    )
-    ENABLE_STRUCTURED_LOGGING: bool = Field(
-        default=False,
-        description="Enable JSON structured logging"
-    )
-    ENABLE_REQUEST_LOGGING: bool = Field(
-        default=True,
-        description="Enable request logging middleware"
-    )
-    LOG_FORMAT: str = Field(
-        default="simple",
-        description="Log format: simple, detailed, json"
-    )
-    LOG_COLORS: bool = Field(
-        default=True,
-        description="Enable colored logging"
-    )
-    LOG_CORRELATION_ID: bool = Field(
-        default=True,
-        description="Include correlation IDs"
-    )
-    LOG_PERFORMANCE: bool = Field(
-        default=True,
-        description="Log performance metrics"
-    )
-    LOG_SQL_QUERIES: bool = Field(
-        default=False,
-        description="Log SQL queries"
-    )
-    LOG_THIRD_PARTY_LEVEL: LogLevel = Field(
-        default=LogLevel.WARNING,
-        description="Third-party libraries log level"
-    )
+    # 🔧 UNIFIED: All logging settings now inherited from LoggingConfig
     
     # === MODEL CONFIGURATION ===
     model_config = ConfigDict(

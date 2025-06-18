@@ -4,7 +4,9 @@
 """
 
 from typing import List, Optional, Dict, Any
-import logging
+from core.monitoring.logger import get_logger
+from core.monitoring.unified_manager import get_unified_logging_manager, log_database_operation
+from core.monitoring.context import with_correlation_context, get_correlation_id
 import uuid
 import asyncio
 from datetime import datetime
@@ -19,7 +21,8 @@ from core.repositories.base import BaseRepository
 from core.monitoring.metrics import get_metrics_collector
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+unified_manager = get_unified_logging_manager()
 
 
 class MaterialsService(BaseRepository):
@@ -120,6 +123,8 @@ class MaterialsService(BaseRepository):
     
     # === CRUD Operations ===
     
+    @with_correlation_context
+    @log_database_operation("qdrant", "create_material")
     async def create_material(self, material: MaterialCreate) -> Material:
         """Create a new material with semantic embedding.
         
@@ -132,6 +137,9 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If creation fails
         """
+        correlation_id = get_correlation_id()
+        logger.info(f"Creating material: {material.name}")
+        
         with self.performance_tracker.time_operation("materials_service", "create_material", 1):
             try:
                 await self._ensure_collection_exists()
@@ -183,6 +191,7 @@ class MaterialsService(BaseRepository):
                 logger.error(f"Failed to create material '{material.name}': {e}")
                 await self._handle_database_error("create_material", e)
     
+    @with_correlation_context
     async def get_material(self, material_id: str) -> Optional[Material]:
         """Get material by ID.
         
@@ -195,6 +204,9 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If retrieval fails
         """
+        correlation_id = get_correlation_id()
+        logger.debug(f"Retrieving material: {material_id}")
+        
         try:
             await self._ensure_collection_exists()
             
@@ -319,6 +331,8 @@ class MaterialsService(BaseRepository):
     
     # === Search Operations ===
     
+    @with_correlation_context
+    @log_database_operation("qdrant", "search_materials")
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
         """Search materials using semantic search with fallback.
         
@@ -334,6 +348,9 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If search fails
         """
+        correlation_id = get_correlation_id()
+        logger.debug(f"Performing vector search for: '{query}'")
+        
         with self.performance_tracker.time_operation("materials_service", "search_materials", limit):
             try:
                 await self._ensure_collection_exists()
@@ -442,6 +459,8 @@ class MaterialsService(BaseRepository):
     
     # === Batch Operations ===
     
+    @with_correlation_context
+    @log_database_operation("qdrant", "create_materials_batch")
     async def create_materials_batch(self, materials: List[MaterialCreate], batch_size: int = 100) -> MaterialBatchResponse:
         """Create multiple materials in batches with optimized performance.
         
@@ -456,6 +475,9 @@ class MaterialsService(BaseRepository):
             DatabaseError: If batch creation fails
         """
         import time
+        
+        correlation_id = get_correlation_id()
+        logger.info(f"Starting batch creation of {len(materials)} materials")
         
         start_time = time.time()
         successful_creates = 0

@@ -4,7 +4,7 @@
 """
 
 from typing import List, Optional
-import logging
+from core.monitoring.logger import get_logger
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime
 
@@ -18,7 +18,7 @@ from core.database.exceptions import DatabaseError, ConnectionError, QueryError
 from services.materials import MaterialsService
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter()
 
 

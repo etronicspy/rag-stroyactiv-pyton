@@ -5,7 +5,7 @@ Provides distributed rate limiting with minimal race conditions.
 
 import asyncio
 import time
-import logging
+from core.monitoring.logger import get_logger
 from typing import Optional, Dict, Any, Callable, Tuple
 from datetime import datetime, timedelta
 
@@ -15,7 +15,7 @@ import redis.asyncio as aioredis
 
 from core.config import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class OptimizedRateLimitMiddleware(BaseHTTPMiddleware):

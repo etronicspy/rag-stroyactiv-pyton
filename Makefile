@@ -119,4 +119,123 @@ help:
 	@echo "  test-pattern PATTERN=<pattern> - Тесты по паттерну"
 	@echo "  test-profile      - Тесты с профилированием"
 	@echo "  test-validate     - Валидация тестов"
-	@echo "  help              - Показать эту справку" 
+	@echo "  help              - Показать эту справку"
+
+# ========================================
+# DEPENDENCY MANAGEMENT
+# ========================================
+.PHONY: install install-dev update-deps check-deps clean-deps
+
+install:
+	@echo "📦 Installing production dependencies..."
+	pip install -r requirements.txt
+
+install-dev:
+	@echo "🔧 Installing development dependencies..."
+	pip install -r requirements-dev.txt
+
+install-all:
+	@echo "📦 Installing all dependencies with pip-tools..."
+	pip install -e .[dev,docs,analysis,database]
+
+update-deps:
+	@echo "🔄 Updating dependencies..."
+	pip install --upgrade pip setuptools wheel
+	pip install --upgrade -r requirements.txt
+	pip install --upgrade -r requirements-dev.txt
+
+check-deps:
+	@echo "🔍 Checking dependency conflicts..."
+	pip check
+	@echo "✅ Dependencies check complete"
+
+list-deps:
+	@echo "📋 Listing installed packages..."
+	pip list --format=columns
+
+outdated-deps:
+	@echo "⏰ Checking for outdated packages..."
+	pip list --outdated --format=columns
+
+clean-deps:
+	@echo "🧹 Cleaning unused packages..."
+	pip-autoremove -y || echo "pip-autoremove not installed"
+
+freeze-deps:
+	@echo "❄️ Freezing current dependencies..."
+	pip freeze > requirements-frozen.txt
+	@echo "📄 Frozen dependencies saved to requirements-frozen.txt"
+
+# ========================================
+# SECURITY & VULNERABILITY SCANNING
+# ========================================
+.PHONY: security-scan audit-deps
+
+security-scan:
+	@echo "🔒 Running security scan..."
+	pip install safety
+	safety check
+	@echo "✅ Security scan complete"
+
+audit-deps:
+	@echo "🔍 Auditing dependencies for vulnerabilities..."
+	pip-audit || echo "pip-audit not installed, install with: pip install pip-audit"
+
+# ========================================
+# CODE QUALITY
+# ========================================
+.PHONY: format lint type-check quality
+
+format:
+	@echo "🎨 Formatting code with black..."
+	black .
+	@echo "🔧 Sorting imports with isort..."
+	isort .
+
+lint:
+	@echo "🔍 Running flake8 linting..."
+	flake8 .
+
+type-check:
+	@echo "🔬 Running mypy type checking..."
+	mypy .
+
+quality: format lint type-check
+	@echo "✅ Code quality checks complete"
+
+# ========================================
+# TESTING
+# ========================================
+.PHONY: test test-unit test-integration test-coverage
+
+test:
+	@echo "🧪 Running all tests..."
+	pytest
+
+test-unit:
+	@echo "🧪 Running unit tests..."
+	pytest -m "unit" -v
+
+test-integration:
+	@echo "🧪 Running integration tests..."
+	pytest -m "integration" -v
+
+test-coverage:
+	@echo "📊 Running tests with coverage..."
+	pytest --cov=. --cov-report=html --cov-report=term-missing
+
+# ========================================
+# DEVELOPMENT HELPERS
+# ========================================
+.PHONY: dev-setup pre-commit-install dev-server
+
+dev-setup: install-dev pre-commit-install
+	@echo "🚀 Development environment setup complete!"
+
+pre-commit-install:
+	@echo "🪝 Installing pre-commit hooks..."
+	pre-commit install
+
+dev-server:
+	@echo "🚀 Starting development server with auto-reload..."
+	uvicorn main:app --reload --host 0.0.0.0 --port 8000 

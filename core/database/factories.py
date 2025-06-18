@@ -5,7 +5,7 @@
 
 from functools import lru_cache
 from typing import Optional, Dict, Any
-import logging
+from core.monitoring.logger import get_logger
 from enum import Enum
 
 from core.config import settings, DatabaseType, AIProvider
@@ -23,7 +23,7 @@ from core.database.adapters.mock_adapters import (
 )
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DatabaseFactory:

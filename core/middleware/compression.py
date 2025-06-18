@@ -6,7 +6,7 @@ Supports multiple compression algorithms with intelligent selection.
 import gzip
 import zlib
 import time
-import logging
+from core.monitoring.logger import get_logger
 from typing import Optional, List, Dict, Any, Callable
 from io import BytesIO
 
@@ -15,7 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import StreamingResponse
 from starlette.types import ASGIApp
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CompressionMiddleware(BaseHTTPMiddleware):

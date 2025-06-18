@@ -4,7 +4,7 @@
 """
 
 import asyncio
-import logging
+from core.monitoring.logger import get_logger
 from typing import Dict, Any, Optional
 import subprocess
 import sys
@@ -20,7 +20,7 @@ from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
 from core.database.seed_data import seed_database
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DatabaseInitializer:

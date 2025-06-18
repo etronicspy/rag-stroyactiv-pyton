@@ -1,3 +1,50 @@
-pytest==8.0.0
-pytest-asyncio==0.23.5
-httpx==0.26.0 
+# ========================================
+# DEVELOPMENT DEPENDENCIES
+# ========================================
+
+# Include production dependencies
+-r requirements.txt
+
+# ========================================
+# TESTING FRAMEWORK
+# ========================================
+pytest>=8.0.0
+pytest-asyncio>=0.23.5
+pytest-mock>=3.12.0
+pytest-cov>=4.1.0
+pytest-xdist>=3.5.0  # Parallel test execution
+
+# ========================================
+# CODE QUALITY & LINTING
+# ========================================
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.8.0
+pre-commit>=3.6.0
+
+# ========================================
+# DOCUMENTATION
+# ========================================
+mkdocs>=1.5.0
+mkdocs-material>=9.5.0
+mkdocstrings[python]>=0.24.0
+
+# ========================================
+# DEVELOPMENT UTILITIES
+# ========================================
+ipython>=8.20.0
+jupyter>=1.0.0
+python-dotenv>=1.0.0  # For .env support in development
+
+# ========================================
+# PERFORMANCE PROFILING
+# ========================================
+memory-profiler>=0.61.0
+line-profiler>=4.1.0
+
+# ========================================
+# DATABASE DEVELOPMENT TOOLS
+# ========================================
+alembic>=1.13.1  # Database migrations
+pgcli>=4.0.0     # PostgreSQL CLI with autocomplete 
