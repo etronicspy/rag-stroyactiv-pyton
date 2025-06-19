@@ -45,11 +45,11 @@ class DatabaseMetrics:
     last_operation_time: Optional[datetime] = None
     operation_history: deque = field(default_factory=lambda: deque(maxlen=1000))
     
-    def update(self, duration_ms: float, success: bool, record_count: int = 0):
+    def update(self, duration_ms: float, success: bool, record_count: Optional[int] = None):
         """Update metrics with new operation data."""
         self.operation_count += 1
         self.total_duration_ms += duration_ms
-        self.records_processed += record_count
+        self.records_processed += record_count or 0
         self.last_operation_time = datetime.utcnow()
         
         if success:

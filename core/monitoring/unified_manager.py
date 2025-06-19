@@ -105,19 +105,21 @@ class UnifiedLoggingManager:
         # 🎯 ЭТАП 5.2: Metrics Integration Settings
         self.enable_metrics_integration = getattr(settings, 'ENABLE_METRICS_INTEGRATION', True)
         
+        # Initialize logger for this manager
+        self.logger = get_logger("unified_manager")
+        
         # Initialize metrics integrated logger if enabled
         if self.enable_metrics_integration:
             try:
                 self.metrics_integrated_logger = get_metrics_integrated_logger("unified_manager")
             except Exception as e:
-                logger = get_logger("unified_manager")
-                logger.warning(f"Metrics integration not available: {e}, falling back to standard logging")
+                self.logger.warning(f"Metrics integration not available: {e}, falling back to standard logging")
                 self.metrics_integrated_logger = None
                 self.enable_metrics_integration = False
         else:
             self.metrics_integrated_logger = None
         
-        logger.info(
+        self.logger.info(
             f"✅ UnifiedLoggingManager initialized with performance optimization: "
             f"batching={self.enable_batching}, async={self.enable_async_processing}, "
             f"optimization={self.enable_performance_optimization}, "
@@ -128,13 +130,13 @@ class UnifiedLoggingManager:
         """Initialize async components including performance optimizer."""
         if self.enable_performance_optimization:
             await self.performance_optimizer.initialize()
-            logger.info("🚀 Performance optimization system initialized")
+            self.logger.info("🚀 Performance optimization system initialized")
     
     async def shutdown_async_components(self):
         """Shutdown async components."""
         if self.enable_performance_optimization:
             await self.performance_optimizer.shutdown()
-            logger.info("✅ Performance optimization system shutdown completed")
+            self.logger.info("✅ Performance optimization system shutdown completed")
     
     def get_optimized_logger(self, name: str):
         """Get performance-optimized logger instance."""
