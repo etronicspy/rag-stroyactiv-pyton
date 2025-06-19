@@ -18,32 +18,60 @@ from core.monitoring.context import CorrelationContext, set_correlation_id
 from core.monitoring.performance_optimizer import get_performance_optimizer
 from core.monitoring.logger import get_logger
 
-# 🔧 CONSTANTS: Moved hardcoded values to constants
-EXCLUDE_PATHS = ["/docs", "/openapi.json", "/favicon.ico", "/static"]
-
-
-# 🔧 ELIMINATED: BaseLoggingHandler removed - using core.monitoring.logger.RequestLogger instead
-
 def should_exclude_path(path: str) -> bool:
-    """Fast path exclusion check."""
-    return any(path.startswith(exclude_path) for exclude_path in EXCLUDE_PATHS)
+    """
+    Smart path exclusion with support for:
+    - Exact matches: /health
+    - Prefix patterns: /docs*  
+    - Suffix patterns: */health
+    - Wildcard patterns: /api/*/health/*
+    - Path segments: health (matches any path containing 'health')
+    """
+    from core.config import get_settings
+    import fnmatch
+    
+    settings = get_settings()
+    exclude_paths = getattr(settings, 'LOG_EXCLUDE_PATHS', [])
+    
+    for exclude_pattern in exclude_paths:
+        # 1. Exact match
+        if path == exclude_pattern:
+            return True
+            
+        # 2. Simple prefix match (legacy support)
+        if exclude_pattern.endswith('*'):
+            if path.startswith(exclude_pattern[:-1]):
+                return True
+        elif path.startswith(exclude_pattern):
+            return True
+            
+        # 3. Suffix match  
+        if exclude_pattern.startswith('*'):
+            if path.endswith(exclude_pattern[1:]):
+                return True
+                
+        # 4. Wildcard pattern matching (advanced)
+        if '*' in exclude_pattern:
+            if fnmatch.fnmatch(path, exclude_pattern):
+                return True
+                
+        # 5. Path segment matching (contains)
+        if '/' not in exclude_pattern and exclude_pattern in path:
+            return True
+    
+    return False
 
 
 class LoggingMiddleware:
     """Enhanced ASGI logging middleware with performance optimization."""
     
-    def __init__(
-        self, 
-        app: ASGIApp, 
-        settings: Optional[Settings] = None,
-        enable_performance_optimization: bool = True
-    ):
-        """Initialize logging middleware with performance optimization."""
+    def __init__(self, app: ASGIApp):
+        """Initialize logging middleware with FastAPI-compatible signature."""
         self.app = app
-        self.settings = settings or get_settings()
+        self.settings = get_settings()
         
         # 🚀 ЭТАП 4.4: Performance Optimization Integration
-        self.enable_performance_optimization = enable_performance_optimization
+        self.enable_performance_optimization = getattr(self.settings, 'ENABLE_PERFORMANCE_OPTIMIZATION', True)
         if self.enable_performance_optimization:
             self.performance_optimizer = get_performance_optimizer()
         
@@ -84,9 +112,19 @@ class LoggingMiddleware:
         client_ip = self._get_client_ip(request)
         user_agent = request.headers.get("user-agent", "")
         
+        # 🔧 Check if path should be excluded from logging
+        if should_exclude_path(path):
+            # Debug log for excluded paths
+            self.app_logger.info(f"🚫 Path excluded from logging: {path}")
+            await self.app(scope, receive, send)
+            return
+        
         # 🎯 ЭТАП 3.1: Generate and set correlation ID in context
         correlation_id = str(uuid.uuid4())
         set_correlation_id(correlation_id)
+        
+        # 🔧 DEBUG: Always log that middleware is processing request
+        self.app_logger.info(f"🔄 Processing HTTP request: {method} {path} (correlation_id: {correlation_id})")
         
         # Set request metadata in context  
         request_metadata = {
@@ -97,14 +135,22 @@ class LoggingMiddleware:
         }
         CorrelationContext.set_request_metadata(request_metadata)
         
-        # 🚀 ЭТАП 4.4: Performance-optimized request logging
+        # 🚀 ЭТАП 4.4: Performance-optimized logging with fallback
         if self.log_requests:
-            if self.enable_batching and self.enable_performance_optimization:
-                # Use batch logging for high performance
-                self.performance_optimizer.log_with_batching(
-                    logger_name="http.requests",
-                    level="INFO",
-                    message=f"Request started: {method} {path}",
+            if self.enable_performance_optimization and self.request_logger:
+                # Use optimized batched logging
+                self.request_logger.log_request_start(
+                    correlation_id=correlation_id,
+                    method=method,
+                    path=path,
+                    client_ip=client_ip,
+                    user_agent=user_agent,
+                    query_params=query_params
+                )
+            else:
+                # Traditional logging fallback
+                self.app_logger.info(
+                    f"[{correlation_id}] Request started: {method} {path}",
                     extra={
                         "method": method,
                         "path": path,
@@ -112,18 +158,6 @@ class LoggingMiddleware:
                         "client_ip": client_ip,
                         "user_agent": user_agent,
                         "query_params": query_params
-                    }
-                )
-            else:
-                # Traditional logging
-                self.app_logger.info(
-                    f"Request started: {method} {path}",
-                    extra={
-                        "method": method,
-                        "path": path,
-                        "correlation_id": correlation_id,
-                        "client_ip": client_ip,
-                        "user_agent": user_agent
                     }
                 )
         
@@ -145,11 +179,20 @@ class LoggingMiddleware:
             duration_ms = (time.time() - start_time) * 1000
             
             # 🚀 ЭТАП 4.4: Performance-optimized error logging
-            if self.enable_batching and self.enable_performance_optimization:
-                self.performance_optimizer.log_with_batching(
-                    logger_name="http.requests",
-                    level="ERROR",
-                    message=f"Request failed: {method} {path} - {str(e)} ({duration_ms:.2f}ms)",
+            if self.enable_performance_optimization and self.request_logger:
+                self.request_logger.log_request_error(
+                    correlation_id=correlation_id,
+                    method=method,
+                    path=path,
+                    status_code=response_status,
+                    duration_ms=duration_ms,
+                    error=str(e),
+                    client_ip=client_ip
+                )
+            else:
+                # Traditional error logging fallback
+                self.app_logger.error(
+                    f"[{correlation_id}] Request failed: {method} {path} - {str(e)} ({duration_ms:.2f}ms)",
                     extra={
                         "method": method,
                         "path": path,
@@ -160,19 +203,6 @@ class LoggingMiddleware:
                         "client_ip": client_ip
                     }
                 )
-            else:
-                # Traditional error logging
-                self.app_logger.error(
-                    f"Request failed: {method} {path} - {str(e)} ({duration_ms:.2f}ms)",
-                    extra={
-                        "method": method,
-                        "path": path,
-                        "status_code": response_status,
-                        "duration_ms": duration_ms,
-                        "correlation_id": correlation_id,
-                        "error": str(e)
-                    }
-                )
             
             raise
         
@@ -180,17 +210,33 @@ class LoggingMiddleware:
             # Calculate request duration
             duration_ms = (time.time() - start_time) * 1000
             
-            # 🚀 ЭТАП 4.4: Use performance-optimized HTTP logging
+            # 🚀 ЭТАП 4.4: Performance-optimized completion logging
             if self.log_requests:
-                self.unified_manager.log_http_request(
-                    method=method,
-                    path=path,
-                    status_code=response_status,
-                    duration_ms=duration_ms,
-                    request_id=correlation_id,
-                    ip_address=client_ip,
-                    user_agent=user_agent
-                )
+                if self.enable_performance_optimization and self.request_logger:
+                    # Use optimized batched logging
+                    self.request_logger.log_request_completion(
+                        correlation_id=correlation_id,
+                        method=method,
+                        path=path,
+                        status_code=response_status,
+                        duration_ms=duration_ms,
+                        client_ip=client_ip,
+                        user_agent=user_agent
+                    )
+                else:
+                    # Traditional logging fallback
+                    self.app_logger.info(
+                        f"[{correlation_id}] Request completed: {method} {path} - {response_status} ({duration_ms:.2f}ms)",
+                        extra={
+                            "method": method,
+                            "path": path,
+                            "status_code": response_status,
+                            "duration_ms": duration_ms,
+                            "correlation_id": correlation_id,
+                            "client_ip": client_ip,
+                            "user_agent": user_agent
+                        }
+                    )
             
             # 🚀 ЭТАП 4.4: Record performance metrics with batching
             if self.log_performance_metrics and self.enable_performance_optimization:

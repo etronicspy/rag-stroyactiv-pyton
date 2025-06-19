@@ -26,15 +26,9 @@ class MiddlewareConfig:
     @staticmethod
     def get_logging_config(settings: Settings) -> Dict[str, Any]:
         """Get logging middleware configuration."""
-        return {
-            "log_level": settings.LOG_LEVEL,
-            "log_request_body": settings.LOG_REQUEST_BODY,
-            "log_response_body": settings.LOG_RESPONSE_BODY,
-            "max_body_size": 64 * 1024,  # 64KB
-            "exclude_paths": MiddlewareConfig.DEFAULT_EXCLUDE_PATHS,
-            "include_headers": True,
-            "mask_sensitive_headers": True,
-        }
+        # LoggingMiddleware gets settings internally via get_settings()
+        # Return None to indicate no additional parameters needed
+        return None
     
     @staticmethod
     def get_body_cache_config(settings: Settings) -> Dict[str, Any]:
@@ -164,14 +158,18 @@ def setup_middleware(app: FastAPI, settings: Settings) -> None:
     # Add middleware stack in reverse order (LIFO)
     for middleware_class, middleware_config in reversed(middleware_stack):
         try:
-            app.add_middleware(middleware_class, **middleware_config)
+            # Handle None config (no additional parameters needed)
+            if middleware_config is None:
+                app.add_middleware(middleware_class)
+            else:
+                app.add_middleware(middleware_class, **middleware_config)
             # Log successful initialization
-            import logging
+            from core.monitoring.logger import get_logger
             logger = get_logger(__name__)
             logger.info(f"✅ {middleware_class.__name__} initialized")
         except Exception as e:
             # Log initialization failure but continue
-            import logging
+            from core.monitoring.logger import get_logger
             logger = get_logger(__name__)
             logger.warning(f"Failed to initialize {middleware_class.__name__}: {e}")
 
@@ -185,10 +183,7 @@ def create_development_middleware_stack(app: FastAPI, settings: Settings) -> Non
         settings: Application settings
     """
     # Minimal middleware for development
-    app.add_middleware(LoggingMiddleware,
-        log_level=settings.LOG_LEVEL,
-        exclude_paths=MiddlewareConfig.DEFAULT_EXCLUDE_PATHS,
-    )
+    app.add_middleware(LoggingMiddleware)
     
     # Security with minimal overhead
     app.add_middleware(SecurityMiddleware,

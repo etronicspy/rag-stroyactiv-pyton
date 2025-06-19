@@ -96,7 +96,7 @@ def setup_middleware_with_correlation(app: FastAPI):
     """Setup middleware with correlation context."""
     with CorrelationContext.with_correlation_id() as middleware_correlation_id:
         logger.info(f"🔧 Setting up middleware stack... (middleware_id: {middleware_correlation_id})")
-        setup_middleware(app)
+        setup_middleware(app, settings)
         logger.info("✅ Middleware stack setup completed")
 
 # 🔧 REFACTORED: Use centralized API configuration
@@ -115,6 +115,9 @@ app.default_response_class = UTF8JSONResponse
 # 🔧 REFACTORED: Use middleware factory for clean setup
 logger.info("🔧 Setting up middleware stack...")
 setup_middleware_with_correlation(app)
+
+# Middleware setup completed - no additional middleware needed
+
 logger.info("✅ Middleware stack setup completed")
 
 # Include routers
