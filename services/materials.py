@@ -8,6 +8,10 @@ from core.monitoring.logger import get_logger
 from core.monitoring.unified_manager import get_unified_logging_manager
 from core.monitoring.context import with_correlation_context, get_correlation_id
 from core.monitoring import log_database_operation_optimized  # 🚀 ЭТАП 4.5: Performance-optimized decorator
+from core.monitoring import (  # 🎯 ЭТАП 5.4: Metrics Integration
+    get_metrics_integrated_logger,
+    log_database_operation_with_metrics
+)
 import uuid
 import asyncio
 from datetime import datetime
@@ -77,7 +81,10 @@ class MaterialsService(BaseRepository):
         self.metrics_collector = get_metrics_collector()
         self.performance_tracker = self.metrics_collector.get_performance_tracker()
         
-        logger.info("MaterialsService initialized with consolidated architecture and performance tracking")
+        # 🎯 ЭТАП 5.4: Initialize metrics-integrated logger
+        self.metrics_logger = get_metrics_integrated_logger("materials_service")
+        
+        logger.info("MaterialsService initialized with consolidated architecture, performance tracking, and metrics integration")
     
     async def initialize(self) -> None:
         """Initialize service and ensure collection exists.

@@ -524,6 +524,19 @@ class Settings(LoggingConfig, BaseSettings):
     # Performance metrics
     LOG_OPTIMIZATION_METRICS: bool = Field(default=True, description="Enable optimization metrics")
     LOG_CACHE_METRICS: bool = Field(default=True, description="Enable cache metrics")
+    
+    # 🎯 ЭТАП 5.6: Metrics Integration Settings
+    ENABLE_METRICS_INTEGRATION: bool = Field(default=True, description="Enable metrics integration with logging")
+    METRICS_COLLECTION_INTERVAL: float = Field(default=30.0, description="Metrics collection interval in seconds")
+    METRICS_BATCH_SIZE: int = Field(default=500, description="Metrics batch size")
+    METRICS_AUTO_EXPORT: bool = Field(default=True, description="Enable automatic metrics export")
+    METRICS_EXPORT_INTERVAL: float = Field(default=60.0, description="Metrics export interval in seconds")
+    METRICS_RETENTION_HOURS: int = Field(default=24, description="Metrics retention period in hours")
+    ENABLE_APPLICATION_EVENT_METRICS: bool = Field(default=True, description="Enable application event metrics")
+    ENABLE_HTTP_REQUEST_METRICS: bool = Field(default=True, description="Enable HTTP request metrics")
+    ENABLE_DATABASE_OPERATION_METRICS: bool = Field(default=True, description="Enable database operation metrics")
+    METRICS_CARDINALITY_LIMIT: int = Field(default=10000, description="Maximum metric cardinality")
+    ENABLE_METRICS_SUMMARY: bool = Field(default=True, description="Enable metrics summary generation")
 
 def get_settings() -> Settings:
     """

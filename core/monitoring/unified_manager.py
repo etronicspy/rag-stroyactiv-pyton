@@ -30,6 +30,11 @@ from core.monitoring.performance_optimizer import (
     LogEntry,
     MetricEntry
 )
+from core.monitoring.metrics_integration import (
+    MetricsIntegratedLogger,
+    get_metrics_integrated_logger,
+    log_database_operation_with_metrics
+)
 
 
 class LogLevel(str, Enum):
@@ -82,6 +87,9 @@ class UnifiedLoggingManager:
         # 🚀 ЭТАП 4.2: Performance Optimization Integration
         self.performance_optimizer = get_performance_optimizer()
         
+        # 🎯 ЭТАП 5.2: Metrics Integration
+        self.metrics_integrated_logger = get_metrics_integrated_logger("unified_manager")
+        
         # Initialize all components
         self.metrics_collector = get_metrics_collector()
         self.performance_tracker = self.metrics_collector.get_performance_tracker()
@@ -96,10 +104,26 @@ class UnifiedLoggingManager:
         self.enable_async_processing = getattr(settings, 'ENABLE_ASYNC_LOG_PROCESSING', True)
         self.enable_performance_optimization = getattr(settings, 'ENABLE_PERFORMANCE_OPTIMIZATION', True)
         
+        # 🎯 ЭТАП 5.2: Metrics Integration Settings
+        self.enable_metrics_integration = getattr(settings, 'ENABLE_METRICS_INTEGRATION', True)
+        
+        # Initialize metrics integrated logger if enabled
+        if self.enable_metrics_integration:
+            try:
+                from core.monitoring.metrics_integration import get_metrics_integrated_logger
+                self.metrics_integrated_logger = get_metrics_integrated_logger("unified_manager")
+            except ImportError:
+                logger.warning("Metrics integration not available, falling back to standard logging")
+                self.metrics_integrated_logger = None
+                self.enable_metrics_integration = False
+        else:
+            self.metrics_integrated_logger = None
+        
         logger.info(
             f"✅ UnifiedLoggingManager initialized with performance optimization: "
             f"batching={self.enable_batching}, async={self.enable_async_processing}, "
-            f"optimization={self.enable_performance_optimization}"
+            f"optimization={self.enable_performance_optimization}, "
+            f"metrics_integration={self.enable_metrics_integration}"
         )
     
     async def initialize_async_components(self):
@@ -151,51 +175,65 @@ class UnifiedLoggingManager:
                               record_count: Optional[int] = None,
                               error: Optional[str] = None,
                               **kwargs):
-        """🎯 Enhanced database operation logging with performance optimization."""
-        correlation_id = get_correlation_id()
+        """🎯 Enhanced database operation logging with metrics integration and performance optimization."""
         
-        # Prepare log message
-        status = "SUCCESS" if success else "FAILED"
-        message = f"[{db_type.upper()}] {operation} - {status} ({duration_ms:.2f}ms)"
-        
-        if record_count is not None:
-            message += f" | Records: {record_count}"
-        
-        if error:
-            message += f" | Error: {error}"
-        
-        # Enhanced extra data
-        extra_data = {
-            "db_type": db_type,
-            "operation": operation,
-            "duration_ms": duration_ms,
-            "success": success,
-            "correlation_id": correlation_id,
-            **kwargs
-        }
-        
-        if record_count is not None:
-            extra_data["record_count"] = record_count
-        
-        if error:
-            extra_data["error"] = error
-        
-        # 🚀 ЭТАП 4.2: Use performance-optimized logging
-        if self.enable_batching and self.enable_performance_optimization:
-            # Use batch processing for high-performance logging
-            self.performance_optimizer.log_with_batching(
-                logger_name=f"db.{db_type}",
-                level="ERROR" if not success else "INFO",
-                message=message,
-                extra=extra_data
+        # 🎯 ЭТАП 5.2: Use MetricsIntegratedLogger for comprehensive logging + metrics
+        if self.enable_metrics_integration:
+            self.metrics_integrated_logger.log_database_operation(
+                db_type=db_type,
+                operation=operation,
+                duration_ms=duration_ms,
+                success=success,
+                record_count=record_count,
+                error=error,
+                **kwargs
             )
         else:
-            # Traditional logging
-            logger = self.get_optimized_logger(f"db.{db_type}")
-            if success:
-                logger.info(message, extra=extra_data)
+            # Fallback to original implementation
+            correlation_id = get_correlation_id()
+            
+            # Prepare log message
+            status = "SUCCESS" if success else "FAILED"
+            message = f"[{db_type.upper()}] {operation} - {status} ({duration_ms:.2f}ms)"
+            
+            if record_count is not None:
+                message += f" | Records: {record_count}"
+            
+            if error:
+                message += f" | Error: {error}"
+            
+            # Enhanced extra data
+            extra_data = {
+                "db_type": db_type,
+                "operation": operation,
+                "duration_ms": duration_ms,
+                "success": success,
+                "correlation_id": correlation_id,
+                **kwargs
+            }
+            
+            if record_count is not None:
+                extra_data["record_count"] = record_count
+            
+            if error:
+                extra_data["error"] = error
+            
+            # 🚀 ЭТАП 4.2: Use performance-optimized logging
+            if self.enable_batching and self.enable_performance_optimization:
+                # Use batch processing for high-performance logging
+                self.performance_optimizer.log_with_batching(
+                    logger_name=f"db.{db_type}",
+                    level="ERROR" if not success else "INFO",
+                    message=message,
+                    extra=extra_data
+                )
             else:
-                logger.error(message, extra=extra_data)
+                # Traditional logging
+                logger = self.get_optimized_logger(f"db.{db_type}")
+                if success:
+                    logger.info(message, extra=extra_data)
+                else:
+                    logger.error(message, extra=extra_data)
         
         # Record performance metrics with batching
         if self.enable_performance_optimization:
@@ -223,64 +261,82 @@ class UnifiedLoggingManager:
                         request_id: Optional[str] = None,
                         ip_address: Optional[str] = None,
                         user_agent: Optional[str] = None,
+                        request_size_bytes: int = 0,
+                        response_size_bytes: int = 0,
                         **kwargs):
-        """🎯 Enhanced HTTP request logging with performance optimization."""
-        correlation_id = request_id or get_correlation_id()
+        """🎯 Enhanced HTTP request logging with metrics integration and performance optimization."""
         
-        # Prepare log message
-        message = f"[HTTP] {method} {path} - {status_code} ({duration_ms:.2f}ms)"
-        
-        # Enhanced extra data
-        extra_data = {
-            "method": method,
-            "path": path,
-            "status_code": status_code,
-            "duration_ms": duration_ms,
-            "correlation_id": correlation_id,
-            **kwargs
-        }
-        
-        if ip_address:
-            extra_data["ip_address"] = ip_address
-        
-        if user_agent:
-            extra_data["user_agent"] = user_agent
-        
-        # 🚀 ЭТАП 4.2: Use performance-optimized logging
-        if self.enable_batching and self.enable_performance_optimization:
-            # Use batch processing for high-performance logging
-            level = "ERROR" if status_code >= 500 else "WARNING" if status_code >= 400 else "INFO"
-            self.performance_optimizer.log_with_batching(
-                logger_name="http.requests",
-                level=level,
-                message=message,
-                extra=extra_data
-            )
-        else:
-            # Traditional logging
-            logger = self.get_optimized_logger("http.requests")
-            self.request_logger.log_request(
+        # 🎯 ЭТАП 5.2: Use MetricsIntegratedLogger for comprehensive HTTP logging + metrics
+        if self.enable_metrics_integration:
+            self.metrics_integrated_logger.log_http_request(
                 method=method,
                 path=path,
                 status_code=status_code,
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
                 ip_address=ip_address,
-                user_agent=user_agent
+                user_agent=user_agent,
+                request_size_bytes=request_size_bytes,
+                response_size_bytes=response_size_bytes,
+                **kwargs
             )
-        
-        # Record performance metrics with batching
-        if self.enable_performance_optimization:
-            self.performance_optimizer.record_metric_with_batching(
-                metric_type="histogram",
-                metric_name="http_request_duration_ms",
-                value=duration_ms,
-                labels={
-                    "method": method,
-                    "status_code": str(status_code),
-                    "path_pattern": self._get_path_pattern(path)
-                }
-            )
+        else:
+            # Fallback to original implementation
+            correlation_id = request_id or get_correlation_id()
+            
+            # Prepare log message
+            message = f"[HTTP] {method} {path} - {status_code} ({duration_ms:.2f}ms)"
+            
+            # Enhanced extra data
+            extra_data = {
+                "method": method,
+                "path": path,
+                "status_code": status_code,
+                "duration_ms": duration_ms,
+                "correlation_id": correlation_id,
+                **kwargs
+            }
+            
+            if ip_address:
+                extra_data["ip_address"] = ip_address
+            
+            if user_agent:
+                extra_data["user_agent"] = user_agent
+            
+            # 🚀 ЭТАП 4.2: Use performance-optimized logging
+            if self.enable_batching and self.enable_performance_optimization:
+                # Use batch processing for high-performance logging
+                level = "ERROR" if status_code >= 500 else "WARNING" if status_code >= 400 else "INFO"
+                self.performance_optimizer.log_with_batching(
+                    logger_name="http.requests",
+                    level=level,
+                    message=message,
+                    extra=extra_data
+                )
+            else:
+                # Traditional logging
+                logger = self.get_optimized_logger("http.requests")
+                self.request_logger.log_request(
+                    method=method,
+                    path=path,
+                    status_code=status_code,
+                    duration_ms=duration_ms,
+                    correlation_id=correlation_id,
+                    ip_address=ip_address,
+                    user_agent=user_agent
+                )
+            
+            # Record performance metrics with batching
+            if self.enable_performance_optimization:
+                self.performance_optimizer.record_metric_with_batching(
+                    metric_type="histogram",
+                    metric_name="http_request_duration_ms",
+                    value=duration_ms,
+                    labels={
+                        "method": method,
+                        "status_code": str(status_code),
+                        "path_pattern": self._get_path_pattern(path)
+                    }
+                )
     
     def _get_path_pattern(self, path: str) -> str:
         """Extract path pattern for metrics."""

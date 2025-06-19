@@ -34,6 +34,14 @@ from .performance_optimizer import (
     get_cached_correlation_id
 )
 
+# 🎯 ЭТАП 5.3: Metrics Integration Exports
+from .metrics_integration import (
+    MetricsIntegratedLogger,
+    get_metrics_integrated_logger,
+    log_database_operation_with_metrics,
+    get_global_metrics_logger
+)
+
 __all__ = [
     "get_logger",
     "DatabaseLogger", 
@@ -69,5 +77,10 @@ __all__ = [
     "OptimizedJSONEncoder",
     "LoggerInstanceCache",
     "BatchProcessor",
-    "get_cached_correlation_id"
+    "get_cached_correlation_id",
+    # 🎯 ЭТАП 5.3: Metrics Integration
+    "MetricsIntegratedLogger",
+    "get_metrics_integrated_logger",
+    "log_database_operation_with_metrics",
+    "get_global_metrics_logger"
 ] 
