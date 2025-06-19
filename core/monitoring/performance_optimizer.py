@@ -214,21 +214,84 @@ class BatchProcessor:
         self.logger.info("✅ Background batch processing stopped")
     
     def add_log_entry(self, entry: LogEntry) -> bool:
-        """Add log entry to batch queue."""
+        """Add log entry to batch queue with overflow protection."""
         try:
-            if len(self.log_queue) >= self.max_queue_size:
-                # Drop oldest to prevent memory issues
-                self.log_queue.popleft()
+            # 🚨 ЗАЩИТА ОТ ПЕРЕПОЛНЕНИЯ: Проверяем критический уровень заполнения
+            queue_utilization = len(self.log_queue) / self.max_queue_size
             
+            if queue_utilization >= 0.9:  # 90% заполнения
+                # КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ
+                import sys
+                warning_msg = f"[QUEUE-CRITICAL] Log queue {queue_utilization:.1%} full ({len(self.log_queue)}/{self.max_queue_size})\n"
+                sys.stderr.write(warning_msg)
+                sys.stderr.flush()
+                
+                # АВАРИЙНЫЙ СЛИВ: Принудительно обрабатываем старые логи
+                try:
+                    emergency_batch = []
+                    emergency_count = min(50, len(self.log_queue))  # Сливаем 50 старых записей
+                    
+                    for _ in range(emergency_count):
+                        if self.log_queue:
+                            emergency_batch.append(self.log_queue.popleft())
+                    
+                    if emergency_batch:
+                        # Обрабатываем аварийный батч в текущем потоке (синхронно)
+                        self._process_log_batch(emergency_batch)
+                        
+                        emergency_msg = f"[QUEUE-EMERGENCY] Processed {len(emergency_batch)} logs to prevent overflow\n"
+                        sys.stderr.write(emergency_msg)
+                        sys.stderr.flush()
+                        
+                except Exception as emergency_error:
+                    # Если аварийный слив не удался - хотя бы запишем в stderr
+                    import sys
+                    for log_entry in emergency_batch if 'emergency_batch' in locals() else []:
+                        try:
+                            timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(log_entry.timestamp))
+                            emergency_log = f"[EMERGENCY-DIRECT] {timestamp} [{log_entry.level}] {log_entry.logger_name}: {log_entry.message}\n"
+                            sys.stderr.write(emergency_log)
+                        except Exception:
+                            pass
+                    sys.stderr.flush()
+            
+            elif queue_utilization >= 0.8:  # 80% заполнения - предупреждение
+                import sys
+                warning_msg = f"[QUEUE-WARNING] Log queue {queue_utilization:.1%} full ({len(self.log_queue)}/{self.max_queue_size})\n"
+                sys.stderr.write(warning_msg)
+                sys.stderr.flush()
+            
+            # Проверяем, можем ли добавить запись
+            if len(self.log_queue) >= self.max_queue_size:
+                # 🚨 ПЕРЕПОЛНЕНИЕ: Пытаемся сохранить лог напрямую
+                try:
+                    import sys
+                    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(entry.timestamp))
+                    overflow_log = f"[OVERFLOW-DIRECT] {timestamp} [{entry.level}] {entry.logger_name}: {entry.message} (correlation_id: {entry.correlation_id or 'unknown'})\n"
+                    sys.stderr.write(overflow_log)
+                    sys.stderr.flush()
+                except Exception:
+                    pass
+                
+                self._stats.total_logs_processed += 1  # Считаем как обработанный
+                return False
+            
+            # Добавляем в очередь
             self.log_queue.append(entry)
             self._stats.total_logs_processed += 1
-            
-            # Trigger immediate flush if batch is full
-            if len(self.log_queue) >= self.batch_size:
-                asyncio.create_task(self._flush_log_batch())
-            
             return True
+            
         except Exception as e:
+            # 🚨 КРИТИЧЕСКИЙ FALLBACK: Если добавление в очередь падает
+            try:
+                import sys
+                timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(entry.timestamp))
+                critical_log = f"[CRITICAL-QUEUE-FAIL] {timestamp} [{entry.level}] {entry.logger_name}: {entry.message} (error: {str(e)})\n"
+                sys.stderr.write(critical_log)
+                sys.stderr.flush()
+            except Exception:
+                pass
+            
             self.logger.error(f"Failed to add log entry: {e}")
             return False
     
@@ -340,7 +403,70 @@ class BatchProcessor:
                 corr_id = log_entry.correlation_id or "unknown"
                 grouped_logs[corr_id].append(log_entry)
             
-            # Serialize batch efficiently
+            # 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: РЕАЛЬНЫЙ ВЫВОД ЛОГОВ
+            for corr_id, logs in grouped_logs.items():
+                for log_entry in logs:
+                    try:
+                        # 1. ОСНОВНОЙ ВЫВОД: Попытка записи через стандартную систему логирования
+                        import logging
+                        batch_logger = logging.getLogger(log_entry.logger_name)
+                        
+                        # Форматируем сообщение для батча
+                        formatted_message = f"[BATCH] {log_entry.message}"
+                        
+                        # Добавляем correlation_id и extra данные
+                        extra_data = log_entry.extra or {}
+                        if log_entry.correlation_id:
+                            extra_data['correlation_id'] = log_entry.correlation_id
+                        extra_data['batch_processed'] = True
+                        extra_data['batch_timestamp'] = log_entry.timestamp
+                        
+                        # Логируем через стандартную систему
+                        log_level = getattr(logging, log_entry.level.upper(), logging.INFO)
+                        batch_logger.log(log_level, formatted_message, extra=extra_data)
+                        
+                    except Exception as primary_error:
+                        # 2. FALLBACK: Прямой вывод в stderr
+                        try:
+                            import sys
+                            import json
+                            timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(log_entry.timestamp))
+                            
+                            fallback_data = {
+                                "timestamp": timestamp,
+                                "level": log_entry.level,
+                                "logger": log_entry.logger_name,
+                                "message": log_entry.message,
+                                "correlation_id": log_entry.correlation_id or "unknown",
+                                "extra": log_entry.extra or {},
+                                "batch_fallback_reason": f"Primary batch logging failed: {str(primary_error)}"
+                            }
+                            
+                            # Структурированный вывод в stderr
+                            sys.stderr.write(f"[BATCH-FALLBACK] {json.dumps(fallback_data, ensure_ascii=False)}\n")
+                            sys.stderr.flush()
+                            
+                        except Exception as fallback_error:
+                            # 3. ПОСЛЕДНЯЯ ЛИНИЯ ОБОРОНЫ: Простой текст в stderr
+                            try:
+                                import sys
+                                timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(log_entry.timestamp))
+                                simple_message = f"[BATCH-EMERGENCY] {timestamp} [{log_entry.level}] {log_entry.logger_name}: {log_entry.message} (correlation_id: {log_entry.correlation_id or 'unknown'})\n"
+                                sys.stderr.write(simple_message)
+                                sys.stderr.flush()
+                            except Exception:
+                                # Если даже stderr недоступен - ничего больше не можем сделать
+                                pass
+            
+            # 4. ДОПОЛНИТЕЛЬНО: Сохранение в файл логов батча (если включено)
+            try:
+                if hasattr(self, '_batch_log_file') and self._batch_log_file:
+                    self._write_batch_to_file(grouped_logs)
+            except Exception as file_error:
+                # Ошибки записи в файл не должны ломать основное логирование
+                pass
+            
+            # Serialize batch efficiently for metrics and monitoring
             serialized_batch = []
             for corr_id, logs in grouped_logs.items():
                 batch_data = {
@@ -348,15 +474,75 @@ class BatchProcessor:
                     "batch_size": len(logs),
                     "logs": [log.to_dict() for log in logs]
                 }
-                serialized_batch.append(self._json_encoder.encode(batch_data))
-            
-            # Here would be the actual output (to file, network, etc.)
-            # For now, just track performance
+                try:
+                    serialized_batch.append(self._json_encoder.encode(batch_data))
+                except Exception as serialize_error:
+                    # Если сериализация падает, пропускаем этот элемент
+                    self.logger.warning(f"Failed to serialize batch data: {serialize_error}")
             
             self._stats.serialization_time += time.time() - start_time
+            self._stats.total_logs_processed += len(batch)
             
         except Exception as e:
+            # 🚨 КРИТИЧЕСКИЙ FALLBACK: Если весь батч упал - сохраняем каждый лог отдельно
+            import sys
             self.logger.error(f"Log batch processing failed: {e}")
+            
+            for log_entry in batch:
+                try:
+                    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(log_entry.timestamp))
+                    emergency_message = f"[EMERGENCY-BATCH] {timestamp} [{log_entry.level}] {log_entry.logger_name}: {log_entry.message} (correlation_id: {log_entry.correlation_id or 'unknown'})\n"
+                    sys.stderr.write(emergency_message)
+                    sys.stderr.flush()
+                except Exception:
+                    # Последняя попытка сохранить хоть что-то
+                    try:
+                        sys.stderr.write(f"[CRITICAL-LOSS] Failed to save log: {log_entry.message}\n")
+                        sys.stderr.flush()
+                    except Exception:
+                        pass
+    
+    def _write_batch_to_file(self, grouped_logs: dict):
+        """
+        🔧 ДОПОЛНИТЕЛЬНАЯ ФУНКЦИЯ: Запись батча в отдельный файл.
+        
+        Для критических случаев когда нужно сохранить все логи.
+        """
+        try:
+            import os
+            from datetime import datetime
+            
+            # Создаем директорию для batch логов
+            batch_log_dir = "logs/batch"
+            os.makedirs(batch_log_dir, exist_ok=True)
+            
+            # Имя файла с timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            batch_file = os.path.join(batch_log_dir, f"batch_{timestamp}.jsonl")
+            
+            with open(batch_file, 'a', encoding='utf-8') as f:
+                for corr_id, logs in grouped_logs.items():
+                    for log_entry in logs:
+                        try:
+                            log_data = {
+                                "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(log_entry.timestamp)),
+                                "level": log_entry.level,
+                                "logger": log_entry.logger_name,
+                                "message": log_entry.message,
+                                "correlation_id": log_entry.correlation_id,
+                                "extra": log_entry.extra or {}
+                            }
+                            f.write(self._json_encoder.encode(log_data) + '\n')
+                        except Exception as write_error:
+                            # Если не можем записать structured - пишем простой текст
+                            simple_line = f"{log_entry.timestamp} [{log_entry.level}] {log_entry.logger_name}: {log_entry.message}\n"
+                            f.write(simple_line)
+                            
+        except Exception as file_error:
+            # Ошибки файловой записи не критичны - основное логирование уже прошло
+            import sys
+            sys.stderr.write(f"[BATCH-FILE-ERROR] Failed to write batch file: {file_error}\n")
+            sys.stderr.flush()
     
     def _process_metric_batch(self, batch: List[MetricEntry]):
         """Process metric batch (runs in thread pool)."""

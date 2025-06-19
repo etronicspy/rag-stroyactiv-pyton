@@ -7,7 +7,7 @@ import pytest
 import json
 import time
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from main import app
 
 client = TestClient(app)
@@ -22,34 +22,30 @@ class TestFullMiddlewareRecovery:
             "description": "Testing request body logging functionality"
         }
         
-        with patch('core.monitoring.logger.get_logger') as mock_get_logger:
-            mock_logger = MagicMock()
-            mock_get_logger.return_value = mock_logger
+        with patch('core.middleware.logging.logger') as mock_logger:
+            response = client.post("/api/v1/test/materials", json=test_data)
             
-            response = client.post("/api/v1/materials", json=test_data)
+            assert response.status_code == 200
             
-            # Проверяем что request обрабатывается (middleware working)
-            print(f"✅ Request processed with status: {response.status_code}")
+            # Проверяем что request body логируется
+            log_calls = [str(call) for call in mock_logger.info.call_args_list]
+            request_body_logged = any("request_body" in call for call in log_calls)
             
-            # Проверяем что логгер был вызван
-            logger_called = mock_get_logger.called
-            print(f"✅ Request body logging: {'ENABLED' if logger_called else 'DISABLED'}")
+            print(f"✅ Request body logging: {'ENABLED' if request_body_logged else 'DISABLED'}")
             # Может быть включено или отключено в зависимости от конфигурации
     
     def test_logging_middleware_response_body_logging(self):
         """Тест логирования тел ответов."""
-        with patch('core.monitoring.logger.get_logger') as mock_get_logger:
-            mock_logger = MagicMock()
-            mock_get_logger.return_value = mock_logger
+        with patch('core.middleware.logging.logger') as mock_logger:
+            response = client.get("/api/v1/test/materials/1")
             
-            response = client.get("/api/v1/materials")
+            assert response.status_code == 200
             
-            # Проверяем что response обрабатывается (middleware working)
-            print(f"✅ Response processed with status: {response.status_code}")
+            # Проверяем что response body логируется
+            log_calls = [str(call) for call in mock_logger.info.call_args_list]
+            response_body_logged = any("response_body" in call for call in log_calls)
             
-            # Проверяем что логгер был вызван
-            logger_called = mock_get_logger.called
-            print(f"✅ Response body logging: {'ENABLED' if logger_called else 'DISABLED'}")
+            print(f"✅ Response body logging: {'ENABLED' if response_body_logged else 'DISABLED'}")
     
     def test_logging_middleware_headers_logging(self):
         """Тест логирования headers."""
@@ -59,33 +55,27 @@ class TestFullMiddlewareRecovery:
             "User-Agent": "MiddlewareRecoveryTest/1.0"
         }
         
-        with patch('core.monitoring.logger.get_logger') as mock_get_logger:
-            mock_logger = MagicMock()
-            mock_get_logger.return_value = mock_logger
+        with patch('core.middleware.logging.logger') as mock_logger:
+            response = client.get("/api/v1/test/materials/1", headers=headers)
             
-            response = client.get("/api/v1/materials", headers=headers)
+            assert response.status_code == 200
             
-            # Проверяем что headers обрабатываются (middleware working)
-            print(f"✅ Headers processed with status: {response.status_code}")
+            # Проверяем что headers логируются
+            log_calls = [str(call) for call in mock_logger.info.call_args_list]
+            headers_logged = any("X-Custom-Header" in call for call in log_calls)
             
-            # Проверяем что логгер был вызван
-            logger_called = mock_get_logger.called
-            print(f"✅ Headers logging: {'ENABLED' if logger_called else 'DISABLED'}")
+            # Проверяем что sensitive headers маскируются
+            sensitive_masked = not any("secret-key-12345" in call for call in log_calls)
             
-            # Тест маскировки sensitive data (упрощенный)
-            # LoggingMiddleware маскирует данные внутренне, проверяем концептуально
-            sensitive_keys = ["X-API-Key", "Authorization", "Cookie"]
-            has_sensitive_headers = any(key in headers for key in sensitive_keys)
-            print(f"✅ Sensitive headers masking: {'ENABLED' if has_sensitive_headers else 'DISABLED'}")
-            print("ℹ️  Sensitive data masking implemented in LoggingMiddleware internally")
+            print(f"✅ Headers logging: {'ENABLED' if headers_logged else 'DISABLED'}")
+            print(f"✅ Sensitive headers masking: {'ENABLED' if sensitive_masked else 'DISABLED'}")
     
     def test_compression_middleware_brotli_support(self):
         """Тест поддержки Brotli сжатия."""
         headers = {"Accept-Encoding": "br, gzip, deflate"}
         
-        response = client.get("/api/v1/health", headers=headers)
+        response = client.get("/api/v1/test/large-data", headers=headers)
         
-        # Health endpoint должен существовать
         assert response.status_code == 200
         
         content_encoding = response.headers.get("Content-Encoding", "none")
@@ -105,9 +95,8 @@ class TestFullMiddlewareRecovery:
         """Тест fallback на gzip если Brotli не поддерживается."""
         headers = {"Accept-Encoding": "gzip, deflate"}  # No Brotli
         
-        response = client.get("/api/v1/health", headers=headers)
+        response = client.get("/api/v1/test/large-data", headers=headers)
         
-        # Health endpoint должен существовать
         assert response.status_code == 200
         
         content_encoding = response.headers.get("Content-Encoding", "none")
@@ -125,9 +114,8 @@ class TestFullMiddlewareRecovery:
         # Для этого теста нужен endpoint возвращающий действительно большие данные
         headers = {"Accept-Encoding": "gzip"}
         
-        response = client.get("/api/v1/health", headers=headers)
+        response = client.get("/api/v1/test/large-data", headers=headers)
         
-        # Health endpoint должен существовать
         assert response.status_code == 200
         
         # Проверяем Transfer-Encoding для streaming
@@ -138,9 +126,8 @@ class TestFullMiddlewareRecovery:
     
     def test_rate_limit_middleware_headers(self):
         """Тест наличия rate limit headers."""
-        response = client.get("/api/v1/materials")
+        response = client.get("/api/v1/test/materials/1")
         
-        # Materials endpoint должен существовать
         assert response.status_code == 200
         
         # Проверяем наличие rate limit headers
@@ -162,8 +149,7 @@ class TestFullMiddlewareRecovery:
         with patch('core.middleware.rate_limiting.logger') as mock_logger:
             # Несколько запросов для тестирования performance logging
             for i in range(3):
-                response = client.get("/api/v1/materials")
-                # Materials endpoint должен существовать
+                response = client.get("/api/v1/test/materials/1")
                 assert response.status_code == 200
                 time.sleep(0.1)
             
@@ -181,11 +167,11 @@ class TestFullMiddlewareRecovery:
             "description": "Testing security after full recovery"
         }
         
-        response = client.post("/api/v1/materials", json=malicious_data)
+        response = client.post("/api/v1/test/materials", json=malicious_data)
         
-        # Security middleware должен обрабатывать вредоносные данные
-        # Может возвращать 400 (блокировка) или 422 (validation error)
-        assert response.status_code in [400, 422]
+        assert response.status_code == 400
+        response_data = response.json()
+        assert "Invalid input detected" in response_data["message"]
         
         print("✅ SecurityMiddleware still blocking attacks after full recovery")
     
@@ -206,7 +192,7 @@ class TestFullMiddlewareRecovery:
         start_time = time.time()
         
         response = client.post(
-            "/api/v1/materials", 
+            "/api/v1/test/materials", 
             json=legitimate_data, 
             headers=headers
         )
@@ -214,16 +200,12 @@ class TestFullMiddlewareRecovery:
         end_time = time.time()
         duration = end_time - start_time
         
-        # POST может возвращать 422 (validation error) или 200 (success)
-        assert response.status_code in [200, 422]
+        assert response.status_code == 200
+        response_data = response.json()
         
-        if response.status_code == 200:
-            response_data = response.json()
-            # Проверяем что данные корректно прошли
-            assert response_data["status"] == "success"
-            assert response_data["data"]["name"] == "Интеграционный тест цемента"
-        else:
-            print("ℹ️  POST request returned validation error (expected for test data)")
+        # Проверяем что данные корректно прошли
+        assert response_data["status"] == "success"
+        assert response_data["data"]["name"] == "Интеграционный тест цемента"
         
         # Проверяем middleware headers
         security_headers = [
@@ -258,7 +240,7 @@ class TestMiddlewarePerformance:
         for i in range(requests_count):
             start_time = time.time()
             
-            response = client.get("/api/v1/materials")
+            response = client.get("/api/v1/test/materials/1")
             
             end_time = time.time()
             request_time = end_time - start_time
@@ -276,8 +258,8 @@ class TestMiddlewarePerformance:
         print(f"    - Success rate: {success_rate:.1f}%")
         print(f"    - Requests per second: {requests_count/total_time:.1f}")
         
-        # Базовые критерии производительности (более реалистичные)
-        assert avg_time < 0.2, f"Average response time too high: {avg_time:.3f}s"  # 200ms вместо 100ms
+        # Базовые критерии производительности
+        assert avg_time < 0.1, f"Average response time too high: {avg_time:.3f}s"
         assert success_rate >= 95, f"Success rate too low: {success_rate:.1f}%"
         
         print("✅ Performance test passed")

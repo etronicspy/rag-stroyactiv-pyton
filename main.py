@@ -116,7 +116,7 @@ app.default_response_class = UTF8JSONResponse
 logger.info("🔧 Setting up middleware stack...")
 setup_middleware_with_correlation(app)
 
-# Middleware setup completed - no additional middleware needed
+# 🧪 TestMiddleware removed - debugging completed
 
 logger.info("✅ Middleware stack setup completed")
 
