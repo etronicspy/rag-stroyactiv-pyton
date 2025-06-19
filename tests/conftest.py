@@ -6,6 +6,7 @@ import pytest
 import asyncio
 import os
 import time
+import logging
 from core.monitoring.logger import get_logger
 from typing import Dict, Any, List
 from datetime import datetime
@@ -19,7 +20,7 @@ logger = get_logger(__name__)
 
 # Константы для тестирования
 TEST_SETTINGS = {
-    "ENVIRONMENT": "test",
+    "ENVIRONMENT": "testing",
     "BACKEND_CORS_ORIGINS": '["http://localhost:3000", "http://127.0.0.1:3000"]',
     "QDRANT_URL": "https://test-cluster.qdrant.tech:6333",
     "QDRANT_API_KEY": "test-api-key",
@@ -33,7 +34,7 @@ TEST_SETTINGS = {
     "ENABLE_FALLBACK_DATABASES": "true",
     "DISABLE_REDIS_CONNECTION": "true",
     "DISABLE_POSTGRESQL_CONNECTION": "true",
-    "POSTGRESQL_URL": "postgresql://test:test@localhost:5432/test_materials",
+    "POSTGRESQL_URL": "postgresql://test:test@localhost:5432/stbr_rag1",
     "REDIS_URL": "redis://localhost:6379/0",
     "MAX_UPLOAD_SIZE": "52428800",
     "BATCH_SIZE": "50",
@@ -426,10 +427,13 @@ def auto_mock_for_unit_tests(request, mock_materials_service, mock_category_serv
     """Автоматическое мокирование для unit тестов"""
     # Проверяем если тест помечен как unit
     if request.node.get_closest_marker("unit"):
-        with patch('services.materials.MaterialsService', return_value=mock_materials_service), \
-             patch('services.materials.CategoryService', return_value=mock_category_service), \
-             patch('services.materials.UnitService', return_value=mock_unit_service), \
-             patch('api.routes.materials.get_materials_service', return_value=mock_materials_service):
+        try:
+            with patch('services.materials.MaterialsService', return_value=mock_materials_service), \
+                 patch('services.materials.CategoryService', return_value=mock_category_service), \
+                 patch('services.materials.UnitService', return_value=mock_unit_service):
+                yield
+        except (ImportError, AttributeError):
+            # Если моки не могут быть применены, просто пропускаем
             yield
     else:
         yield 

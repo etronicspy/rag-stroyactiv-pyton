@@ -9,13 +9,14 @@ import time
 import uuid
 from typing import Optional, Dict, Any, List, Callable
 
-# 🔧 CLEANED: Removed unused imports (Request, Response, BaseHTTPMiddleware)
 from starlette.types import ASGIApp, Receive, Scope, Send, Message
+from starlette.requests import Request
 
-from core.config import get_settings
+from core.config import get_settings, Settings
 from core.monitoring.unified_manager import get_unified_logging_manager
 from core.monitoring.context import CorrelationContext, set_correlation_id
 from core.monitoring.performance_optimizer import get_performance_optimizer
+from core.monitoring.logger import get_logger
 
 # 🔧 CONSTANTS: Moved hardcoded values to constants
 EXCLUDE_PATHS = ["/docs", "/openapi.json", "/favicon.ico", "/static"]
