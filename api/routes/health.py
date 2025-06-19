@@ -22,6 +22,7 @@ from core.database.factories import DatabaseFactory
 from core.database.exceptions import ConnectionError as DatabaseConnectionError
 from core.database.pool_manager import get_pool_manager
 from core.monitoring.context import CorrelationContext, get_correlation_id, with_correlation_context
+from core.monitoring.performance_optimizer import get_performance_optimizer
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -1028,6 +1029,263 @@ async def test_correlation_tracing():
             "error": str(e),
             "partial_tracing": "correlation ID propagated to error handler",
             "timestamp": datetime.utcnow().isoformat()
+        }
+
+
+@router.get("/performance-optimization")
+async def performance_optimization_health_check():
+    """🚀 Performance Optimization System Health Check - ЭТАП 4.6"""
+    
+    try:
+        # Get performance optimizer
+        performance_optimizer = get_performance_optimizer()
+        
+        # Get comprehensive stats
+        perf_stats = performance_optimizer.get_comprehensive_stats()
+        
+        # Test performance optimization components
+        test_results = {
+            "logger_caching": await _test_logger_caching(),
+            "batch_processing": await _test_batch_processing(performance_optimizer),
+            "correlation_optimization": await _test_correlation_optimization(),
+            "json_serialization": await _test_json_serialization()
+        }
+        
+        # Overall status
+        all_tests_passed = all(result["status"] == "success" for result in test_results.values())
+        
+        return {
+            "status": "healthy" if all_tests_passed else "degraded",
+            "timestamp": datetime.utcnow().isoformat(),
+            "performance_optimization": {
+                "enabled": True,
+                "comprehensive_stats": perf_stats,
+                "component_tests": test_results,
+                "optimization_features": [
+                    "Logger instance caching",
+                    "Batch processing for logs and metrics", 
+                    "Optimized JSON serialization",
+                    "Correlation ID caching",
+                    "Asynchronous log processing",
+                    "Memory-conscious operations",
+                    "Thread-safe context management"
+                ]
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "timestamp": datetime.utcnow().isoformat(),
+            "error": str(e),
+            "performance_optimization": {
+                "enabled": False,
+                "error_details": str(e)
+            }
+        }
+
+
+async def _test_logger_caching() -> Dict[str, Any]:
+    """Test logger instance caching performance."""
+    try:
+        import time
+        from core.monitoring.performance_optimizer import get_performance_optimizer
+        
+        optimizer = get_performance_optimizer()
+        
+        # Test cache performance
+        start_time = time.time()
+        
+        # Create multiple logger instances (should hit cache)
+        loggers = []
+        for i in range(100):
+            logger = optimizer.get_optimized_logger(f"test.cache.{i % 10}")  # Only 10 unique names
+            loggers.append(logger)
+        
+        cache_time = time.time() - start_time
+        
+        # Test without cache (traditional way)
+        start_time = time.time()
+        
+        traditional_loggers = []
+        for i in range(100):
+            from core.monitoring.logger import get_logger
+            logger = get_logger(f"test.traditional.{i}")
+            traditional_loggers.append(logger)
+        
+        traditional_time = time.time() - start_time
+        
+        # Calculate performance improvement
+        performance_improvement = (traditional_time - cache_time) / traditional_time * 100
+        
+        return {
+            "status": "success",
+            "cache_time_ms": cache_time * 1000,
+            "traditional_time_ms": traditional_time * 1000,
+            "performance_improvement_percent": performance_improvement,
+            "cache_efficiency": "excellent" if performance_improvement > 50 else "good" if performance_improvement > 20 else "moderate"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+
+async def _test_batch_processing(performance_optimizer) -> Dict[str, Any]:
+    """Test batch processing performance."""
+    try:
+        import time
+        import asyncio
+        from core.monitoring.performance_optimizer import LogEntry, MetricEntry
+        
+        # Test log batching
+        start_time = time.time()
+        
+        # Add many log entries
+        for i in range(100):
+            entry = LogEntry(
+                timestamp=time.time(),
+                level="INFO",
+                logger_name="test.batch",
+                message=f"Test batch log {i}",
+                correlation_id=f"test-{i}"
+            )
+            performance_optimizer.batch_processor.add_log_entry(entry)
+        
+        # Add many metric entries
+        for i in range(100):
+            entry = MetricEntry(
+                timestamp=time.time(),
+                metric_type="counter",
+                metric_name="test_batch_metric",
+                value=i,
+                labels={"test": "batch"},
+                correlation_id=f"test-{i}"
+            )
+            performance_optimizer.batch_processor.add_metric_entry(entry)
+        
+        batch_time = time.time() - start_time
+        
+        # Wait a bit for background processing
+        await asyncio.sleep(0.5)
+        
+        # Get batch processor stats
+        batch_stats = performance_optimizer.batch_processor.get_performance_stats()
+        
+        return {
+            "status": "success",
+            "batch_submission_time_ms": batch_time * 1000,
+            "queue_stats": batch_stats["queue_status"],
+            "performance_stats": batch_stats["performance_stats"],
+            "batching_efficiency": "excellent" if batch_time < 0.1 else "good" if batch_time < 0.5 else "moderate"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error", 
+            "error": str(e)
+        }
+
+
+async def _test_correlation_optimization() -> Dict[str, Any]:
+    """Test correlation ID optimization."""
+    try:
+        import time
+        from core.monitoring.performance_optimizer import get_cached_correlation_id
+        from core.monitoring.context import get_correlation_id, generate_correlation_id
+        
+        # Test cached correlation ID performance
+        start_time = time.time()
+        
+        cached_ids = []
+        for i in range(1000):
+            corr_id = get_cached_correlation_id()  # Should hit @lru_cache
+            cached_ids.append(corr_id)
+        
+        cached_time = time.time() - start_time
+        
+        # Test traditional correlation ID generation
+        start_time = time.time()
+        
+        traditional_ids = []
+        for i in range(1000):
+            corr_id = generate_correlation_id()  # New generation each time
+            traditional_ids.append(corr_id)
+        
+        traditional_time = time.time() - start_time
+        
+        # Calculate performance improvement
+        performance_improvement = (traditional_time - cached_time) / traditional_time * 100
+        
+        return {
+            "status": "success",
+            "cached_time_ms": cached_time * 1000,
+            "traditional_time_ms": traditional_time * 1000,
+            "performance_improvement_percent": performance_improvement,
+            "cache_hits": len(set(cached_ids)) < len(cached_ids),  # Should have duplicates due to caching
+            "correlation_efficiency": "excellent" if performance_improvement > 80 else "good" if performance_improvement > 50 else "moderate"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+
+async def _test_json_serialization() -> Dict[str, Any]:
+    """Test optimized JSON serialization."""
+    try:
+        import time
+        import json
+        from core.monitoring.performance_optimizer import OptimizedJSONEncoder
+        
+        # Test data
+        test_data = {
+            "timestamp": datetime.utcnow(),
+            "correlation_id": "test-123",
+            "message": "Performance test message",
+            "extra": {
+                "duration_ms": 123.45,
+                "success": True,
+                "metadata": {
+                    "test": True,
+                    "items": list(range(100))
+                }
+            }
+        }
+        
+        # Test optimized JSON encoder
+        optimized_encoder = OptimizedJSONEncoder()
+        
+        start_time = time.time()
+        for i in range(1000):
+            serialized = optimized_encoder.encode(test_data)
+        optimized_time = time.time() - start_time
+        
+        # Test standard JSON encoder
+        start_time = time.time()
+        for i in range(1000):
+            serialized = json.dumps(test_data, default=str)
+        standard_time = time.time() - start_time
+        
+        # Calculate performance improvement
+        performance_improvement = (standard_time - optimized_time) / standard_time * 100
+        
+        return {
+            "status": "success",
+            "optimized_time_ms": optimized_time * 1000,
+            "standard_time_ms": standard_time * 1000,
+            "performance_improvement_percent": performance_improvement,
+            "serialization_efficiency": "excellent" if performance_improvement > 30 else "good" if performance_improvement > 10 else "moderate"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
         }
 
 

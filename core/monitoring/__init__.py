@@ -10,13 +10,28 @@ from .metrics import MetricsCollector, DatabaseMetrics, PerformanceTracker, get_
 from .unified_manager import (
     UnifiedLoggingManager, get_unified_logging_manager, 
     get_logger_with_metrics, log_database_operation,
-    OperationContext, LogLevel
+    OperationContext, LogLevel,
+    log_database_operation_optimized
 )
 from .context import (
     CorrelationContext, CorrelationLoggingAdapter,
     get_correlation_id, set_correlation_id, generate_correlation_id,
     get_or_generate_correlation_id, with_correlation_context,
     log_with_correlation
+)
+
+# 🚀 ЭТАП 4.3: Performance Optimization Exports
+from .performance_optimizer import (
+    PerformanceOptimizer,
+    get_performance_optimizer,
+    performance_optimized_log,
+    LogEntry,
+    MetricEntry,
+    PerformanceStats,
+    OptimizedJSONEncoder,
+    LoggerInstanceCache,
+    BatchProcessor,
+    get_cached_correlation_id
 )
 
 __all__ = [
@@ -32,6 +47,7 @@ __all__ = [
     "get_unified_logging_manager",
     "get_logger_with_metrics",
     "log_database_operation",
+    "log_database_operation_optimized",
     "OperationContext",
     "LogLevel",
     # Correlation context system exports
@@ -42,5 +58,16 @@ __all__ = [
     "generate_correlation_id",
     "get_or_generate_correlation_id",
     "with_correlation_context",
-    "log_with_correlation"
+    "log_with_correlation",
+    # 🚀 ЭТАП 4.3: Performance Optimization
+    "PerformanceOptimizer",
+    "get_performance_optimizer",
+    "performance_optimized_log",
+    "LogEntry",
+    "MetricEntry", 
+    "PerformanceStats",
+    "OptimizedJSONEncoder",
+    "LoggerInstanceCache",
+    "BatchProcessor",
+    "get_cached_correlation_id"
 ] 

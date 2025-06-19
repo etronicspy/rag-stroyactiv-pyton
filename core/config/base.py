@@ -486,6 +486,45 @@ class Settings(LoggingConfig, BaseSettings):
         """Check if running in development."""
         return self.ENVIRONMENT == Environment.DEVELOPMENT
 
+    # 🚀 ЭТАП 4.7: PERFORMANCE OPTIMIZATION SETTINGS
+    # Enable/disable performance optimizations  
+    ENABLE_PERFORMANCE_OPTIMIZATION: bool = Field(default=True, description="Enable performance optimizations")
+    ENABLE_LOG_BATCHING: bool = Field(default=True, description="Enable log batching")
+    ENABLE_ASYNC_LOG_PROCESSING: bool = Field(default=True, description="Enable async log processing")
+    
+    # Logger caching settings
+    LOG_CACHE_MAX_SIZE: int = Field(default=1000, description="Maximum logger cache size")
+    LOG_CACHE_TTL: int = Field(default=3600, description="Logger cache TTL in seconds")
+    
+    # Batch processing settings
+    LOG_BATCH_SIZE: int = Field(default=100, description="Log batch size")
+    LOG_FLUSH_INTERVAL: float = Field(default=1.0, description="Log flush interval in seconds")
+    LOG_MAX_QUEUE_SIZE: int = Field(default=10000, description="Maximum log queue size")
+    
+    # Performance thresholds
+    LOG_SLOW_OPERATION_THRESHOLD_MS: int = Field(default=1000, description="Slow operation threshold in ms")
+    LOG_BATCH_EFFICIENCY_THRESHOLD: float = Field(default=0.8, description="Batch efficiency threshold")
+    
+    # JSON serialization optimization
+    ENABLE_JSON_SERIALIZATION_CACHE: bool = Field(default=True, description="Enable JSON serialization cache")
+    JSON_CACHE_MAX_SIZE: int = Field(default=500, description="JSON cache maximum size")
+    
+    # Correlation ID optimization
+    ENABLE_CORRELATION_ID_CACHE: bool = Field(default=True, description="Enable correlation ID cache")
+    CORRELATION_CACHE_SIZE: int = Field(default=128, description="Correlation ID cache size")
+    
+    # Background processing
+    LOG_BACKGROUND_PROCESSING_THREADS: int = Field(default=2, description="Background processing threads")
+    LOG_BACKGROUND_FLUSH_INTERVAL: float = Field(default=0.1, description="Background flush interval")
+    
+    # Memory management
+    LOG_MEMORY_LIMIT_MB: int = Field(default=100, description="Log memory limit in MB")
+    LOG_ENABLE_MEMORY_MONITORING: bool = Field(default=True, description="Enable memory monitoring")
+    
+    # Performance metrics
+    LOG_OPTIMIZATION_METRICS: bool = Field(default=True, description="Enable optimization metrics")
+    LOG_CACHE_METRICS: bool = Field(default=True, description="Enable cache metrics")
+
 def get_settings() -> Settings:
     """
     Factory function to get settings instance.

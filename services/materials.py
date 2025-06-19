@@ -5,8 +5,9 @@
 
 from typing import List, Optional, Dict, Any
 from core.monitoring.logger import get_logger
-from core.monitoring.unified_manager import get_unified_logging_manager, log_database_operation
+from core.monitoring.unified_manager import get_unified_logging_manager
 from core.monitoring.context import with_correlation_context, get_correlation_id
+from core.monitoring import log_database_operation_optimized  # 🚀 ЭТАП 4.5: Performance-optimized decorator
 import uuid
 import asyncio
 from datetime import datetime
@@ -124,7 +125,7 @@ class MaterialsService(BaseRepository):
     # === CRUD Operations ===
     
     @with_correlation_context
-    @log_database_operation("qdrant", "create_material")
+    @log_database_operation_optimized("qdrant", "create_material")  # 🚀 ЭТАП 4.5: Performance-optimized
     async def create_material(self, material: MaterialCreate) -> Material:
         """Create a new material with semantic embedding.
         
@@ -332,7 +333,7 @@ class MaterialsService(BaseRepository):
     # === Search Operations ===
     
     @with_correlation_context
-    @log_database_operation("qdrant", "search_materials")
+    @log_database_operation_optimized("qdrant", "search_materials")  # 🚀 ЭТАП 4.5: Performance-optimized
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
         """Search materials using semantic search with fallback.
         
@@ -460,7 +461,7 @@ class MaterialsService(BaseRepository):
     # === Batch Operations ===
     
     @with_correlation_context
-    @log_database_operation("qdrant", "create_materials_batch")
+    @log_database_operation_optimized("qdrant", "create_materials_batch")  # 🚀 ЭТАП 4.5: Performance-optimized
     async def create_materials_batch(self, materials: List[MaterialCreate], batch_size: int = 100) -> MaterialBatchResponse:
         """Create multiple materials in batches with optimized performance.
         

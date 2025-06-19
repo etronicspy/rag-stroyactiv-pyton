@@ -12,6 +12,8 @@ from enum import Enum
 from dataclasses import dataclass
 from contextlib import contextmanager
 from functools import wraps
+from datetime import datetime
+import asyncio
 
 from core.config import get_settings
 from core.monitoring.logger import (
@@ -20,6 +22,13 @@ from core.monitoring.logger import (
 )
 from core.monitoring.metrics import (
     MetricsCollector, PerformanceTracker, get_metrics_collector
+)
+from core.monitoring.performance_optimizer import (
+    get_performance_optimizer, 
+    PerformanceOptimizer,
+    performance_optimized_log,
+    LogEntry,
+    MetricEntry
 )
 
 
@@ -67,22 +76,50 @@ class UnifiedLoggingManager:
     """
     
     def __init__(self, settings: Optional[Any] = None):
-        """Initialize unified logging manager."""
+        """Initialize unified logging manager with performance optimization."""
         self.settings = settings or get_settings()
         
-        # Initialize core components
+        # 🚀 ЭТАП 4.2: Performance Optimization Integration
+        self.performance_optimizer = get_performance_optimizer()
+        
+        # Initialize all components
         self.metrics_collector = get_metrics_collector()
         self.performance_tracker = self.metrics_collector.get_performance_tracker()
-        
-        # Initialize specialized loggers
         self.request_logger = RequestLogger()
         self.database_logger = DatabaseLogger("unified")
-        self.app_logger = get_logger("unified_manager")
         
-        # Context storage for correlation IDs
-        self._operation_contexts: Dict[str, OperationContext] = {}
+        # Health checker initialization (optional)
+        self.health_checker = None
         
-        self.app_logger.info("✅ UnifiedLoggingManager initialized with full metrics integration")
+        # Performance settings
+        self.enable_batching = getattr(settings, 'ENABLE_LOG_BATCHING', True)
+        self.enable_async_processing = getattr(settings, 'ENABLE_ASYNC_LOG_PROCESSING', True)
+        self.enable_performance_optimization = getattr(settings, 'ENABLE_PERFORMANCE_OPTIMIZATION', True)
+        
+        logger.info(
+            f"✅ UnifiedLoggingManager initialized with performance optimization: "
+            f"batching={self.enable_batching}, async={self.enable_async_processing}, "
+            f"optimization={self.enable_performance_optimization}"
+        )
+    
+    async def initialize_async_components(self):
+        """Initialize async components including performance optimizer."""
+        if self.enable_performance_optimization:
+            await self.performance_optimizer.initialize()
+            logger.info("🚀 Performance optimization system initialized")
+    
+    async def shutdown_async_components(self):
+        """Shutdown async components."""
+        if self.enable_performance_optimization:
+            await self.performance_optimizer.shutdown()
+            logger.info("✅ Performance optimization system shutdown completed")
+    
+    def get_optimized_logger(self, name: str):
+        """Get performance-optimized logger instance."""
+        if self.enable_performance_optimization:
+            return self.performance_optimizer.get_optimized_logger(name)
+        else:
+            return get_logger(name, enable_correlation=True)
     
     def get_logger(self, name: str):
         """Get a logger with unified configuration."""
@@ -106,169 +143,208 @@ class UnifiedLoggingManager:
     
     # === UNIFIED LOGGING METHODS ===
     
-    def log_database_operation(
-        self,
-        db_type: str,
-        operation: str,
-        duration_ms: float,
-        success: bool,
-        record_count: int = 0,
-        correlation_id: Optional[str] = None,
-        error: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
-    ):
-        """
-        Log database operation with integrated metrics.
+    def log_database_operation(self, 
+                              db_type: str, 
+                              operation: str, 
+                              duration_ms: float,
+                              success: bool,
+                              record_count: Optional[int] = None,
+                              error: Optional[str] = None,
+                              **kwargs):
+        """🎯 Enhanced database operation logging with performance optimization."""
+        correlation_id = get_correlation_id()
         
-        Args:
-            db_type: Database type (postgresql, qdrant, etc.)
-            operation: Operation name
-            duration_ms: Duration in milliseconds
-            success: Whether operation succeeded
-            record_count: Number of records processed
-            correlation_id: Correlation ID for tracing
-            error: Error message if failed
-            metadata: Additional metadata
-        """
-        # Log using specialized database logger
-        self.database_logger.log_operation(
-            operation=operation,
-            duration_ms=duration_ms,
-            success=success,
-            record_count=record_count,
-            metadata=metadata,
-            correlation_id=correlation_id
-        )
+        # Prepare log message
+        status = "SUCCESS" if success else "FAILED"
+        message = f"[{db_type.upper()}] {operation} - {status} ({duration_ms:.2f}ms)"
         
-        # Track performance metrics
+        if record_count is not None:
+            message += f" | Records: {record_count}"
+        
+        if error:
+            message += f" | Error: {error}"
+        
+        # Enhanced extra data
+        extra_data = {
+            "db_type": db_type,
+            "operation": operation,
+            "duration_ms": duration_ms,
+            "success": success,
+            "correlation_id": correlation_id,
+            **kwargs
+        }
+        
+        if record_count is not None:
+            extra_data["record_count"] = record_count
+        
+        if error:
+            extra_data["error"] = error
+        
+        # 🚀 ЭТАП 4.2: Use performance-optimized logging
+        if self.enable_batching and self.enable_performance_optimization:
+            # Use batch processing for high-performance logging
+            self.performance_optimizer.log_with_batching(
+                logger_name=f"db.{db_type}",
+                level="ERROR" if not success else "INFO",
+                message=message,
+                extra=extra_data
+            )
+        else:
+            # Traditional logging
+            logger = self.get_optimized_logger(f"db.{db_type}")
+            if success:
+                logger.info(message, extra=extra_data)
+            else:
+                logger.error(message, extra=extra_data)
+        
+        # Record performance metrics with batching
+        if self.enable_performance_optimization:
+            self.performance_optimizer.record_metric_with_batching(
+                metric_type="histogram",
+                metric_name=f"db_operation_duration_ms",
+                value=duration_ms,
+                labels={
+                    "db_type": db_type,
+                    "operation": operation,
+                    "success": str(success).lower()
+                }
+            )
+        
+        # Traditional metrics tracking
         self.performance_tracker.track_operation(
-            db_type=db_type,
-            operation=operation,
-            duration_ms=duration_ms,
-            success=success,
-            record_count=record_count
+            db_type, operation, duration_ms, success, record_count
         )
+    
+    def log_http_request(self, 
+                        method: str, 
+                        path: str, 
+                        status_code: int, 
+                        duration_ms: float,
+                        request_id: Optional[str] = None,
+                        ip_address: Optional[str] = None,
+                        user_agent: Optional[str] = None,
+                        **kwargs):
+        """🎯 Enhanced HTTP request logging with performance optimization."""
+        correlation_id = request_id or get_correlation_id()
         
-        # Collect additional metrics
-        self.metrics_collector.increment_counter(
-            f"database_{db_type}_operations_total",
-            labels={"operation": operation, "success": str(success)}
-        )
+        # Prepare log message
+        message = f"[HTTP] {method} {path} - {status_code} ({duration_ms:.2f}ms)"
         
-        self.metrics_collector.record_histogram(
-            f"database_{db_type}_duration_ms",
-            duration_ms,
-            labels={"operation": operation}
-        )
+        # Enhanced extra data
+        extra_data = {
+            "method": method,
+            "path": path,
+            "status_code": status_code,
+            "duration_ms": duration_ms,
+            "correlation_id": correlation_id,
+            **kwargs
+        }
         
-        if not success and error:
-            self.metrics_collector.increment_counter(
-                f"database_{db_type}_errors_total",
-                labels={"operation": operation, "error_type": "database_error"}
+        if ip_address:
+            extra_data["ip_address"] = ip_address
+        
+        if user_agent:
+            extra_data["user_agent"] = user_agent
+        
+        # 🚀 ЭТАП 4.2: Use performance-optimized logging
+        if self.enable_batching and self.enable_performance_optimization:
+            # Use batch processing for high-performance logging
+            level = "ERROR" if status_code >= 500 else "WARNING" if status_code >= 400 else "INFO"
+            self.performance_optimizer.log_with_batching(
+                logger_name="http.requests",
+                level=level,
+                message=message,
+                extra=extra_data
+            )
+        else:
+            # Traditional logging
+            logger = self.get_optimized_logger("http.requests")
+            self.request_logger.log_request(
+                method=method,
+                path=path,
+                status_code=status_code,
+                duration_ms=duration_ms,
+                correlation_id=correlation_id,
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+        
+        # Record performance metrics with batching
+        if self.enable_performance_optimization:
+            self.performance_optimizer.record_metric_with_batching(
+                metric_type="histogram",
+                metric_name="http_request_duration_ms",
+                value=duration_ms,
+                labels={
+                    "method": method,
+                    "status_code": str(status_code),
+                    "path_pattern": self._get_path_pattern(path)
+                }
             )
     
-    def log_http_request(
-        self,
-        method: str,
-        path: str,
-        status_code: int,
-        duration_ms: float,
-        request_id: str,
-        ip_address: str,
-        metadata: Optional[Dict[str, Any]] = None
-    ):
-        """
-        Log HTTP request with integrated metrics.
+    def _get_path_pattern(self, path: str) -> str:
+        """Extract path pattern for metrics."""
+        # Convert dynamic paths to patterns
+        # /api/v1/materials/123 -> /api/v1/materials/{id}
+        import re
         
-        Args:
-            method: HTTP method
-            path: Request path
-            status_code: Response status code
-            duration_ms: Request duration
-            request_id: Request/correlation ID
-            ip_address: Client IP
-            metadata: Additional metadata
-        """
-        # Log using specialized request logger
-        self.request_logger.log_request(
-            method=method,
-            path=path,
-            status_code=status_code,
-            duration_ms=duration_ms,
-            request_id=request_id,
-            ip_address=ip_address,
-            metadata=metadata
-        )
+        patterns = [
+            (r'/\d+', '/{id}'),
+            (r'/[a-f0-9-]{36}', '/{uuid}'),
+            (r'/[a-zA-Z0-9_-]{10,}', '/{token}')
+        ]
         
-        # Collect HTTP metrics
-        self.metrics_collector.increment_counter(
-            "http_requests_total",
-            labels={
-                "method": method,
-                "status_code": str(status_code),
-                "status_class": f"{status_code // 100}xx"
-            }
-        )
+        path_pattern = path
+        for pattern, replacement in patterns:
+            path_pattern = re.sub(pattern, replacement, path_pattern)
         
-        self.metrics_collector.record_histogram(
-            "http_request_duration_ms",
-            duration_ms,
-            labels={"method": method, "path": path}
-        )
-        
-        # Track errors
-        if status_code >= 400:
-            self.metrics_collector.increment_counter(
-                "http_errors_total",
-                labels={"status_code": str(status_code), "method": method}
-            )
+        return path_pattern
     
     # === CONTEXT MANAGERS ===
     
     @contextmanager
-    def database_operation_context(
-        self,
-        db_type: str,
-        operation: str,
-        correlation_id: Optional[str] = None,
-        record_count: int = 0,
-        metadata: Optional[Dict[str, Any]] = None
-    ):
-        """
-        Context manager specifically for database operations.
-        
-        Args:
-            db_type: Database type
-            operation: Operation name
-            correlation_id: Correlation ID
-            record_count: Expected record count
-            metadata: Additional metadata
-        """
+    def database_operation_context(self, 
+                                  db_type: str, 
+                                  operation: str,
+                                  enable_performance_optimization: bool = True):
+        """🎯 Enhanced context manager with performance optimization."""
         start_time = time.time()
-        correlation_id = correlation_id or str(uuid.uuid4())
-        success = True
-        error_msg = None
+        correlation_id = get_correlation_id()
+        
+        # 🚀 ЭТАП 4.2: Performance-optimized context
+        if enable_performance_optimization and self.enable_performance_optimization:
+            # Use optimized logging
+            logger = self.performance_optimizer.get_optimized_logger(f"db.{db_type}")
+        else:
+            logger = get_logger(f"db.{db_type}")
+        
+        logger.debug(f"Starting {operation} operation", extra={
+            "db_type": db_type,
+            "operation": operation,
+            "correlation_id": correlation_id
+        })
         
         try:
             yield
-        except Exception as e:
-            success = False
-            error_msg = str(e)
-            raise
-        finally:
-            duration_ms = (time.time() - start_time) * 1000
             
-            # Log database operation with metrics
+            duration_ms = (time.time() - start_time) * 1000
             self.log_database_operation(
                 db_type=db_type,
                 operation=operation,
                 duration_ms=duration_ms,
-                success=success,
-                record_count=record_count,
-                correlation_id=correlation_id,
-                error=error_msg,
-                metadata=metadata
+                success=True
             )
+            
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            self.log_database_operation(
+                db_type=db_type,
+                operation=operation,
+                duration_ms=duration_ms,
+                success=False,
+                error=str(e)
+            )
+            raise
     
     # === DECORATORS ===
     
@@ -312,24 +388,51 @@ class UnifiedLoggingManager:
     # === METRICS AND HEALTH ===
     
     def get_health_status(self) -> Dict[str, Any]:
-        """Get comprehensive health status with metrics."""
-        health_metrics = self.metrics_collector.get_health_metrics()
-        
-        return {
+        """🎯 Enhanced health status with performance optimization metrics."""
+        base_health = {
             "status": "healthy",
-            "timestamp": time.time(),
+            "timestamp": datetime.utcnow().isoformat(),
             "unified_logging": {
-                "active_contexts": len(self._operation_contexts),
+                "enabled": True,
+                "components": {
+                    "request_logger": "active",
+                    "database_logger": "active", 
+                    "performance_tracker": "active",
+                    "metrics_collector": "active"
+                },
                 "settings": {
-                    "structured_logging": self.settings.ENABLE_STRUCTURED_LOGGING,
-                    "request_logging": self.settings.ENABLE_REQUEST_LOGGING,
-                    "database_logging": self.settings.LOG_DATABASE_OPERATIONS,
-                    "performance_metrics": self.settings.LOG_PERFORMANCE_METRICS
+                    "enable_batching": self.enable_batching,
+                    "enable_async_processing": self.enable_async_processing,
+                    "enable_performance_optimization": self.enable_performance_optimization
                 }
-            },
-            "metrics": health_metrics,
-            "performance": self.performance_tracker.get_database_summary()
+            }
         }
+        
+        # 🚀 ЭТАП 4.2: Add performance optimization metrics
+        if self.enable_performance_optimization:
+            perf_stats = self.performance_optimizer.get_comprehensive_stats()
+            base_health["performance_optimization"] = perf_stats
+        
+        return base_health
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """Get comprehensive performance summary."""
+        summary = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "performance_tracker": self.performance_tracker.get_database_summary(),
+            "optimization_features": {
+                "logger_caching": self.enable_performance_optimization,
+                "batch_processing": self.enable_batching,
+                "async_processing": self.enable_async_processing
+            }
+        }
+        
+        # 🚀 ЭТАП 4.2: Add detailed performance optimization stats
+        if self.enable_performance_optimization:
+            perf_stats = self.performance_optimizer.get_comprehensive_stats()
+            summary["detailed_optimization_stats"] = perf_stats
+        
+        return summary
 
 
 # Global unified logging manager instance
@@ -353,3 +456,33 @@ def get_logger_with_metrics(name: str):
 def log_database_operation(db_type: str, operation: str = None):
     """Decorator for database operations."""
     return get_unified_logging_manager().log_database_operation_decorator(db_type, operation)
+
+
+# 🚀 ЭТАП 4.2: Enhanced decorator with performance optimization
+def log_database_operation_optimized(db_type: str, operation: str = None):
+    """Enhanced decorator with performance optimization."""
+    def decorator(func):
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            unified_manager = get_unified_logging_manager()
+            op_name = operation or func.__name__
+            
+            # 🚀 Use performance-optimized context
+            with unified_manager.database_operation_context(
+                db_type, op_name, enable_performance_optimization=True
+            ):
+                return await func(*args, **kwargs)
+        
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            unified_manager = get_unified_logging_manager()
+            op_name = operation or func.__name__
+            
+            # 🚀 Use performance-optimized context
+            with unified_manager.database_operation_context(
+                db_type, op_name, enable_performance_optimization=True
+            ):
+                return func(*args, **kwargs)
+        
+        return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+    return decorator

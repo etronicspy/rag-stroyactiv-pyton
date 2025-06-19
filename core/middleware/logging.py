@@ -15,6 +15,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send, Message
 from core.config import get_settings
 from core.monitoring.unified_manager import get_unified_logging_manager
 from core.monitoring.context import CorrelationContext, set_correlation_id
+from core.monitoring.performance_optimizer import get_performance_optimizer
 
 # 🔧 CONSTANTS: Moved hardcoded values to constants
 EXCLUDE_PATHS = ["/docs", "/openapi.json", "/favicon.ico", "/static"]
@@ -28,128 +29,194 @@ def should_exclude_path(path: str) -> bool:
 
 
 class LoggingMiddleware:
-    """
-    🚀 Unified ASGI HTTP Request/Response Logging Middleware
-    
-    Features:
-    - Pure ASGI implementation (compatible with BodyCacheMiddleware)
-    - Integrated with core.monitoring.logger.RequestLogger
-    - High performance with cached loggers
-    """
+    """Enhanced ASGI logging middleware with performance optimization."""
     
     def __init__(
-        self,
-        app: ASGIApp,
-        log_level: Optional[str] = None,
-        log_request_body: Optional[bool] = None,
-        log_response_body: Optional[bool] = None,
-        max_body_size: int = 64 * 1024,  # 64KB
-        exclude_paths: Optional[List[str]] = None,
-        include_headers: bool = True,
-        mask_sensitive_headers: bool = True,
+        self, 
+        app: ASGIApp, 
+        settings: Optional[Settings] = None,
+        enable_performance_optimization: bool = True
     ):
+        """Initialize logging middleware with performance optimization."""
         self.app = app
+        self.settings = settings or get_settings()
         
-        # Get settings once and cache
-        settings = get_settings()
+        # 🚀 ЭТАП 4.4: Performance Optimization Integration
+        self.enable_performance_optimization = enable_performance_optimization
+        if self.enable_performance_optimization:
+            self.performance_optimizer = get_performance_optimizer()
         
-        # Cache configuration for performance
-        self.log_level = log_level or settings.LOG_LEVEL
-        self.enable_request_logging = settings.ENABLE_REQUEST_LOGGING
-        
-        # 🔧 UNIFIED: Use UnifiedLoggingManager for complete integration
+        # Use optimized manager
         self.unified_manager = get_unified_logging_manager()
         self.request_logger = self.unified_manager.get_request_logger()
-        self.app_logger = self.unified_manager.get_logger("middleware.asgi")
         
-        # Override exclude paths if provided
-        self.exclude_paths = exclude_paths or EXCLUDE_PATHS
-        
-        # Log initialization
-        if self.enable_request_logging:
-            self.app_logger.info("✅ LoggingMiddleware initialized with ASGI implementation")
+        # Get optimized logger
+        if self.enable_performance_optimization:
+            self.app_logger = self.unified_manager.get_optimized_logger("middleware.asgi")
         else:
-            self.app_logger.info("⚠️ LoggingMiddleware initialized but REQUEST LOGGING DISABLED")
-
+            self.app_logger = get_logger("middleware.asgi")
+        
+        # Performance settings
+        self.enable_batching = getattr(self.settings, 'ENABLE_LOG_BATCHING', True)
+        self.log_requests = getattr(self.settings, 'ENABLE_REQUEST_LOGGING', True)
+        self.log_request_body = getattr(self.settings, 'LOG_REQUEST_BODY', False) 
+        self.log_request_headers = getattr(self.settings, 'LOG_REQUEST_HEADERS', True)
+        self.log_performance_metrics = getattr(self.settings, 'LOG_PERFORMANCE_METRICS', True)
+        
+        self.app_logger.info(
+            f"✅ LoggingMiddleware initialized with performance optimization: "
+            f"optimization={self.enable_performance_optimization}, "
+            f"batching={self.enable_batching}"
+        )
+    
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Pure ASGI middleware entry point."""
-        if scope["type"] != "http" or not self.enable_request_logging:
-            await self.app(scope, receive, send)
-            return
-            
-        # Fast path exclusion check
-        path = scope.get("path", "")
-        if should_exclude_path(path):
+        """Process HTTP request with performance-optimized logging."""
+        if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
         
-        # Generate correlation ID and extract request info
+        # Extract request information
+        request = Request(scope, receive)
+        method = request.method
+        path = str(request.url.path)
+        query_params = str(request.url.query)
+        client_ip = self._get_client_ip(request)
+        user_agent = request.headers.get("user-agent", "")
+        
+        # 🎯 ЭТАП 3.1: Generate and set correlation ID in context
         correlation_id = str(uuid.uuid4())
-        start_time = time.time()
-        method = scope.get("method", "GET")
-        client_ip = self._get_client_ip_from_scope(scope)
-        
-        # 🎯 ЭТАП 3.1: Установить correlation ID в контекст для всего запроса
         set_correlation_id(correlation_id)
         
-        # Set request metadata in context
+        # Set request metadata in context  
         request_metadata = {
             "method": method,
             "path": path,
             "client_ip": client_ip,
-            "user_agent": scope.get("headers", {}).get("user-agent", "unknown")
+            "user_agent": user_agent
         }
         CorrelationContext.set_request_metadata(request_metadata)
         
-        # 🔧 UNIFIED: Simple start logging
-        self.app_logger.info(f"[{correlation_id}] {method} {path} - Started from {client_ip}")
+        # 🚀 ЭТАП 4.4: Performance-optimized request logging
+        if self.log_requests:
+            if self.enable_batching and self.enable_performance_optimization:
+                # Use batch logging for high performance
+                self.performance_optimizer.log_with_batching(
+                    logger_name="http.requests",
+                    level="INFO",
+                    message=f"Request started: {method} {path}",
+                    extra={
+                        "method": method,
+                        "path": path,
+                        "correlation_id": correlation_id,
+                        "client_ip": client_ip,
+                        "user_agent": user_agent,
+                        "query_params": query_params
+                    }
+                )
+            else:
+                # Traditional logging
+                self.app_logger.info(
+                    f"Request started: {method} {path}",
+                    extra={
+                        "method": method,
+                        "path": path,
+                        "correlation_id": correlation_id,
+                        "client_ip": client_ip,
+                        "user_agent": user_agent
+                    }
+                )
         
-        # Wrap send to capture response info
-        response_started = False
-        status_code = 200
+        # Process request
+        start_time = time.time()
+        response_status = 200
         
-        async def send_wrapper(message: Message) -> None:
-            nonlocal response_started, status_code
-            
+        async def send_wrapper(message):
+            nonlocal response_status
             if message["type"] == "http.response.start":
-                response_started = True
-                status_code = message.get("status", 200)
-                
-                # Add correlation ID to response headers
-                headers = list(message.get("headers", []))
-                headers.append((b"x-correlation-id", correlation_id.encode()))
-                message["headers"] = headers
-            
-            elif message["type"] == "http.response.body" and not message.get("more_body", False):
-                # This is the last response chunk - log the response
-                if response_started:
-                    duration_ms = (time.time() - start_time) * 1000
-                    # 🔧 UNIFIED: Use UnifiedLoggingManager for logging + metrics
-                    self.unified_manager.log_http_request(
-                        method=method,
-                        path=path,
-                        status_code=status_code,
-                        duration_ms=duration_ms,
-                        request_id=correlation_id,
-                        ip_address=client_ip
-                    )
-            
+                response_status = message["status"]
             await send(message)
         
         try:
             await self.app(scope, receive, send_wrapper)
-        except Exception as exception:
-            # Log exception
+            
+        except Exception as e:
+            response_status = 500
             duration_ms = (time.time() - start_time) * 1000
-            self.app_logger.error(
-                f"[{correlation_id}] {method} {path} - ERROR: {type(exception).__name__}: {str(exception)} ({duration_ms:.2f}ms)",
-                exc_info=exception
-            )
+            
+            # 🚀 ЭТАП 4.4: Performance-optimized error logging
+            if self.enable_batching and self.enable_performance_optimization:
+                self.performance_optimizer.log_with_batching(
+                    logger_name="http.requests",
+                    level="ERROR",
+                    message=f"Request failed: {method} {path} - {str(e)} ({duration_ms:.2f}ms)",
+                    extra={
+                        "method": method,
+                        "path": path,
+                        "status_code": response_status,
+                        "duration_ms": duration_ms,
+                        "correlation_id": correlation_id,
+                        "error": str(e),
+                        "client_ip": client_ip
+                    }
+                )
+            else:
+                # Traditional error logging
+                self.app_logger.error(
+                    f"Request failed: {method} {path} - {str(e)} ({duration_ms:.2f}ms)",
+                    extra={
+                        "method": method,
+                        "path": path,
+                        "status_code": response_status,
+                        "duration_ms": duration_ms,
+                        "correlation_id": correlation_id,
+                        "error": str(e)
+                    }
+                )
+            
             raise
+        
+        finally:
+            # Calculate request duration
+            duration_ms = (time.time() - start_time) * 1000
+            
+            # 🚀 ЭТАП 4.4: Use performance-optimized HTTP logging
+            if self.log_requests:
+                self.unified_manager.log_http_request(
+                    method=method,
+                    path=path,
+                    status_code=response_status,
+                    duration_ms=duration_ms,
+                    request_id=correlation_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent
+                )
+            
+            # 🚀 ЭТАП 4.4: Record performance metrics with batching
+            if self.log_performance_metrics and self.enable_performance_optimization:
+                self.performance_optimizer.record_metric_with_batching(
+                    metric_type="counter",
+                    metric_name="http_requests_total",
+                    value=1,
+                    labels={
+                        "method": method,
+                        "status_code": str(response_status),
+                        "path_pattern": self.unified_manager._get_path_pattern(path)
+                    }
+                )
+                
+                self.performance_optimizer.record_metric_with_batching(
+                    metric_type="histogram", 
+                    metric_name="http_request_duration_seconds",
+                    value=duration_ms / 1000.0,
+                    labels={
+                        "method": method,
+                        "path_pattern": self.unified_manager._get_path_pattern(path)
+                    }
+                )
 
-    def _get_client_ip_from_scope(self, scope: Scope) -> str:
+    def _get_client_ip(self, request: Request) -> str:
         """Extract client IP from ASGI scope."""
-        headers = dict(scope.get("headers", []))
+        headers = dict(request.scope.get("headers", []))
         
         # Check forwarded headers
         forwarded_for = headers.get(b"x-forwarded-for")
@@ -161,7 +228,7 @@ class LoggingMiddleware:
             return real_ip.decode()
         
         # Fallback to client info
-        client = scope.get("client")
+        client = request.scope.get("client")
         return client[0] if client else "unknown"
 
 
