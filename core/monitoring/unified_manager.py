@@ -35,6 +35,7 @@ from core.monitoring.metrics_integration import (
     get_metrics_integrated_logger,
     log_database_operation_with_metrics
 )
+from core.monitoring.context import get_correlation_id
 
 
 class LogLevel(str, Enum):
@@ -87,9 +88,6 @@ class UnifiedLoggingManager:
         # 🚀 ЭТАП 4.2: Performance Optimization Integration
         self.performance_optimizer = get_performance_optimizer()
         
-        # 🎯 ЭТАП 5.2: Metrics Integration
-        self.metrics_integrated_logger = get_metrics_integrated_logger("unified_manager")
-        
         # Initialize all components
         self.metrics_collector = get_metrics_collector()
         self.performance_tracker = self.metrics_collector.get_performance_tracker()
@@ -110,10 +108,10 @@ class UnifiedLoggingManager:
         # Initialize metrics integrated logger if enabled
         if self.enable_metrics_integration:
             try:
-                from core.monitoring.metrics_integration import get_metrics_integrated_logger
                 self.metrics_integrated_logger = get_metrics_integrated_logger("unified_manager")
-            except ImportError:
-                logger.warning("Metrics integration not available, falling back to standard logging")
+            except Exception as e:
+                logger = get_logger("unified_manager")
+                logger.warning(f"Metrics integration not available: {e}, falling back to standard logging")
                 self.metrics_integrated_logger = None
                 self.enable_metrics_integration = False
         else:
