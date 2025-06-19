@@ -19,7 +19,7 @@ from core.config import get_settings
 from core.monitoring.context import CorrelationLoggingAdapter
 
 # 🔧 CONSTANTS: Moved hardcoded values to module level
-LOGGER_NAMES_TO_CONFIGURE = ["middleware", "services", "api", "database"]
+LOGGER_NAMES_TO_CONFIGURE = ["middleware", "services", "api", "database", "api.requests"]
 THIRD_PARTY_LOGGERS = ["uvicorn", "httpx", "openai", "paramiko"]
 MIDDLEWARE_LOGGER_NAME = "middleware.http"
 CORE_LOGGER_NAME = "core"
@@ -268,30 +268,90 @@ class LoggingSetup:
     
     def _create_file_handler(self, log_file: str, log_level: str, 
                            enable_structured: bool) -> Optional[logging.FileHandler]:
-        """Create and configure file handler."""
+        """Create and configure file handler with safe error handling."""
         if not log_file:
             return None
         
-        # Create log directory if it doesn't exist
-        log_dir = os.path.dirname(log_file)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir, exist_ok=True)
-        
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(getattr(logging, log_level.upper()))
-        
-        # Always use structured format for file logging
-        if enable_structured:
-            file_handler.setFormatter(StructuredFormatter())
-        else:
-            file_handler.setFormatter(
-                logging.Formatter(
-                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S'
-                )
-            )
-        
-        return file_handler
+        try:
+            # Create log directory if it doesn't exist
+            log_dir = os.path.dirname(log_file)
+            if log_dir and not os.path.exists(log_dir):
+                try:
+                    os.makedirs(log_dir, exist_ok=True)
+                except (OSError, PermissionError) as dir_error:
+                    # 🚨 FALLBACK: Если не можем создать директорию
+                    import sys
+                    fallback_msg = f"[LOG-SETUP-ERROR] Cannot create log directory '{log_dir}': {dir_error}. Logs will go to stderr only.\n"
+                    sys.stderr.write(fallback_msg)
+                    sys.stderr.flush()
+                    return None
+            
+            # Проверяем доступность для записи
+            try:
+                # Тестовая запись для проверки permissions
+                with open(log_file, 'a', encoding='utf-8') as test_file:
+                    test_file.write('')  # Пустая запись для проверки
+            except (OSError, PermissionError, IOError) as write_error:
+                # 🚨 FALLBACK: Если файл недоступен для записи
+                import sys
+                fallback_msg = f"[LOG-SETUP-ERROR] Cannot write to log file '{log_file}': {write_error}. Using stderr fallback.\n"
+                sys.stderr.write(fallback_msg)
+                sys.stderr.flush()
+                return None
+            
+            # Создаем файловый хендлер
+            try:
+                file_handler = logging.FileHandler(log_file, encoding='utf-8')
+                file_handler.setLevel(getattr(logging, log_level.upper()))
+                
+                # Настраиваем форматтер
+                if enable_structured:
+                    file_handler.setFormatter(StructuredFormatter())
+                else:
+                    file_handler.setFormatter(
+                        logging.Formatter(
+                            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                            datefmt='%Y-%m-%d %H:%M:%S'
+                        )
+                    )
+                
+                # 🔧 ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: Тестируем хендлер
+                try:
+                    test_record = logging.LogRecord(
+                        name="test.logger",
+                        level=logging.INFO,
+                        pathname="",
+                        lineno=0,
+                        msg="Log handler test",
+                        args=(),
+                        exc_info=None
+                    )
+                    file_handler.emit(test_record)
+                except Exception as emit_error:
+                    # Если emit падает - хендлер неработоспособен
+                    import sys
+                    sys.stderr.write(f"[LOG-SETUP-ERROR] File handler test failed: {emit_error}\n")
+                    sys.stderr.flush()
+                    file_handler.close()
+                    return None
+                
+                return file_handler
+                
+            except Exception as handler_error:
+                # 🚨 FALLBACK: Ошибка создания хендлера
+                import sys
+                fallback_msg = f"[LOG-SETUP-ERROR] Failed to create file handler: {handler_error}. Using stderr fallback.\n"
+                sys.stderr.write(fallback_msg)
+                sys.stderr.flush()
+                return None
+                
+        except Exception as general_error:
+            # 🚨 ОБЩИЙ FALLBACK: Любая неожиданная ошибка
+            import sys
+            fallback_msg = f"[LOG-SETUP-CRITICAL] Unexpected error in file handler setup: {general_error}. Using stderr fallback.\n"
+            sys.stderr.write(fallback_msg)
+            sys.stderr.flush()
+            return None
     
     def _configure_third_party_loggers(self, third_party_level: str):
         """Configure third-party loggers to reduce noise."""
@@ -303,25 +363,12 @@ class LoggingSetup:
     def _configure_application_loggers(self, log_level: str):
         """Configure application-specific loggers."""
         app_log_level = getattr(logging, log_level.upper())
-        
-        # Configure middleware.http logger (used by LoggingMiddleware)
-        middleware_logger = logging.getLogger(MIDDLEWARE_LOGGER_NAME)
-        middleware_logger.handlers = []
-        middleware_logger.propagate = True
-        middleware_logger.setLevel(app_log_level)
-        
-        # Configure core namespace logger
-        core_logger = logging.getLogger(CORE_LOGGER_NAME)
-        core_logger.handlers = []
-        core_logger.propagate = True
-        core_logger.setLevel(app_log_level)
-        
-        # Configure other named loggers
+        print(f"DEBUG: _configure_application_loggers called with log_level: {log_level}, app_log_level: {app_log_level}")
         for logger_name in LOGGER_NAMES_TO_CONFIGURE:
             named_logger = logging.getLogger(logger_name)
-            named_logger.handlers = []
             named_logger.propagate = True
             named_logger.setLevel(app_log_level)
+            print(f"DEBUG: Configured logger '{logger_name}' to level: {logging.getLevelName(named_logger.level)}")
     
     def setup(self, log_level: Optional[str] = None, enable_structured: Optional[bool] = None,
               log_file: Optional[str] = None, enable_colors: Optional[bool] = None,
@@ -492,6 +539,17 @@ class RequestLogger:
         
         # Add only non-None fields
         extra.update({k: v for k, v in optional_fields.items() if v is not None})
+        
+        # Прямое логирование в файл для отладки
+        try:
+            with open('logs/app.log', 'a') as f:
+                timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                f.write(f"{timestamp} - api.requests - {'ERROR' if status_code >= 400 else 'INFO'} - HTTP Request: {message}\n")
+        except Exception as e:
+            print(f"Failed to write to log file: {e}")
             
-        adapter = logging.LoggerAdapter(self.logger, extra)
-        adapter.log(level, message, extra=extra) 
+        # Используем более надежный способ логирования
+        if level == logging.INFO:
+            self.logger.info(message, extra=extra)
+        else:
+            self.logger.error(message, extra=extra) 
