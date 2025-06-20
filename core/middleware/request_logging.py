@@ -25,57 +25,7 @@ from core.monitoring.performance_optimizer import get_performance_optimizer
 from core.monitoring.logger import get_logger
 from core.logging.context.correlation import get_correlation_id
 from core.logging.managers.unified import UnifiedLoggingManager
-
-
-def safe_log(logger, level: str, message: str, extra: Optional[Dict[str, Any]] = None, correlation_id: Optional[str] = None):
-    """
-    🛡️ БЕЗОПАСНОЕ ЛОГИРОВАНИЕ с fallback в stderr.
-    
-    Гарантирует, что сообщение будет залогировано даже при сбое основного логгера.
-    
-    Args:
-        logger: Основной логгер
-        level: Уровень логирования (INFO, ERROR, etc.)
-        message: Сообщение для логирования
-        extra: Дополнительные данные
-        correlation_id: ID корреляции
-    """
-    try:
-        # Попытка основного логирования
-        if hasattr(logger, level.lower()):
-            log_method = getattr(logger, level.lower())
-            if extra:
-                log_method(message, extra=extra)
-            else:
-                log_method(message)
-        else:
-            logger.log(getattr(logging, level.upper()), message, extra=extra or {})
-    except Exception as primary_error:
-        # 🚨 КРИТИЧЕСКИЙ FALLBACK: Вывод в stderr
-        try:
-            import json
-            timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-            fallback_data = {
-                "timestamp": timestamp,
-                "level": level,
-                "message": message,
-                "correlation_id": correlation_id or "unknown",
-                "extra": extra or {},
-                "fallback_reason": f"Primary logger failed: {str(primary_error)}"
-            }
-            # Структурированный вывод в stderr
-            sys.stderr.write(f"[FALLBACK-LOG] {json.dumps(fallback_data, ensure_ascii=False)}\n")
-            sys.stderr.flush()
-        except Exception as fallback_error:
-            # 🚨 ПОСЛЕДНЯЯ ЛИНИЯ ОБОРОНЫ: Простой текст в stderr
-            try:
-                timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                fallback_message = f"[FALLBACK-LOG] {timestamp} [{level}] {message} (correlation_id: {correlation_id or 'unknown'})\n"
-                sys.stderr.write(fallback_message)
-                sys.stderr.flush()
-            except Exception:
-                # Если даже stderr недоступен - ничего не можем сделать
-                pass
+from core.logging import safe_log
 
 
 def should_exclude_path(path: str) -> bool:
@@ -352,9 +302,9 @@ class LoggingMiddleware:
                 # 🔧 DEBUG: Log entry point for request started
                 try:
                     print(f"RAW DEBUG: Attempting to log request start")
-                    # Прямое логирование в файл для отладки
-                    with open('logs/http_debug.log', 'a') as f:
-                        f.write(f"HTTP Request: {method} {path} at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    # ✅ UNIFIED LOGGING: Use unified logger instead of direct file write
+                    unified_logger = logging.getLogger('middleware.http.debug')
+                    unified_logger.info(f"HTTP Request: {method} {path}")
                     
                     # 🔧 ВРЕМЕННО ОТКЛЮЧЕНО: Прямая запись в app.log для тестирования safe_log
                     # with open('logs/app.log', 'a') as f:
@@ -593,6 +543,7 @@ class LoggingMiddleware:
             # 3. Создадим console handler
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(logging.DEBUG)
+            # ✅ UNIFIED FORMAT: Console может быть упрощенным для читаемости
             console_formatter = logging.Formatter(
                 '%(levelname)s     - %(message)s'
             )
@@ -609,9 +560,9 @@ class LoggingMiddleware:
                     
                     file_handler = logging.FileHandler(log_file)
                     file_handler.setLevel(logging.DEBUG)
-                    file_formatter = logging.Formatter(
-                        '%(asctime)s - %(name)s - %(levelname)-8s - %(message)s'
-                    )
+                    # ✅ UNIFIED FORMAT: Use centralized unified formatter
+                    from core.config.log_config import create_unified_formatter
+                    file_formatter = create_unified_formatter()
                     file_handler.setFormatter(file_formatter)
                     root_logger.addHandler(file_handler)
                     

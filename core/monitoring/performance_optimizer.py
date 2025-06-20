@@ -167,10 +167,12 @@ class BatchProcessor:
     def __init__(self, 
                  batch_size: int = 100,
                  flush_interval: float = 1.0,
-                 max_queue_size: int = 10000):
+                 max_queue_size: int = 10000,
+                 settings = None):
         self.batch_size = batch_size
         self.flush_interval = flush_interval
         self.max_queue_size = max_queue_size
+        self.settings = settings
         
         # Queues for different types
         self.log_queue: deque = deque(maxlen=max_queue_size)
@@ -512,13 +514,14 @@ class BatchProcessor:
             import os
             from datetime import datetime
             
-            # Создаем директорию для batch логов
-            batch_log_dir = "logs/batch"
-            os.makedirs(batch_log_dir, exist_ok=True)
+            # ✅ UNIFIED LOGGING: Use LOG_FILE from environment instead of separate batch files
+            log_file = getattr(self.settings, 'LOG_FILE', 'logs/app.log') if hasattr(self, 'settings') else 'logs/app.log'
             
-            # Имя файла с timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            batch_file = os.path.join(batch_log_dir, f"batch_{timestamp}.jsonl")
+            # Создаем директорию основного файла логов если не существует
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            
+            # Используем основной файл логов для batch записи
+            batch_file = log_file
             
             with open(batch_file, 'a', encoding='utf-8') as f:
                 for corr_id, logs in grouped_logs.items():
@@ -634,7 +637,8 @@ class PerformanceOptimizer:
         self.batch_processor = BatchProcessor(
             batch_size=getattr(self.settings, 'LOG_BATCH_SIZE', 100),
             flush_interval=getattr(self.settings, 'LOG_FLUSH_INTERVAL', 1.0),
-            max_queue_size=getattr(self.settings, 'LOG_MAX_QUEUE_SIZE', 10000)
+            max_queue_size=getattr(self.settings, 'LOG_MAX_QUEUE_SIZE', 10000),
+            settings=self.settings
         )
         
         # Performance tracking

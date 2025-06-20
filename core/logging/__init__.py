@@ -78,7 +78,7 @@ Integration Examples:
 
 # Import from base components
 from .base.interfaces import LoggerInterface
-from .base.loggers import get_logger
+from .base.loggers import get_logger, safe_log, get_safe_logger
 from .base.formatters import StructuredFormatter, ColoredFormatter
 
 # Import from context management
@@ -88,6 +88,7 @@ from .context.correlation import (
     set_correlation_id, 
     generate_correlation_id,
     get_or_generate_correlation_id,
+    force_clear_correlation_id,
     with_correlation_context
 )
 from .context.adapters import CorrelationLoggingAdapter, log_with_correlation
@@ -130,6 +131,8 @@ log_database_operation_optimized = log_database_operation
 __all__ = [
     # Core functions
     "get_logger",
+    "safe_log",
+    "get_safe_logger", 
     "setup_structured_logging",
     
     # Configuration
@@ -142,7 +145,8 @@ __all__ = [
     "get_correlation_id", 
     "set_correlation_id",
     "generate_correlation_id",
-    "get_or_generate_correlation_id", 
+    "get_or_generate_correlation_id",
+    "force_clear_correlation_id",
     "with_correlation_context",
     "CorrelationLoggingAdapter",
     "log_with_correlation",

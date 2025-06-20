@@ -122,4 +122,48 @@ class LoggingConfig(BaseSettings):
     
     class Config:
         env_file = ".env"
-        case_sensitive = True 
+        case_sensitive = True
+
+
+# ✅ UNIFIED LOG FORMAT STANDARD
+UNIFIED_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)-8s - %(message)s"
+UNIFIED_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def get_unified_log_format() -> str:
+    """
+    🎯 ЕДИНЫЙ СТАНДАРТНЫЙ ФОРМАТ ЛОГОВ
+    
+    Возвращает стандартизированный формат для всех компонентов логирования:
+    - Timestamp с миллисекундами: 2025-06-20 19:31:04,468
+    - Logger name: middleware.test, services.ssh_tunnel, etc.
+    - Level (8 chars): INFO    , ERROR   , WARNING , DEBUG   
+    - Message: актуальное сообщение
+    
+    Формат: "YYYY-MM-DD HH:MM:SS,mmm - logger.name - LEVEL    - message"
+    Пример: "2025-06-20 19:31:04,468 - middleware.test - INFO     - ✅ Test completed"
+    """
+    return UNIFIED_LOG_FORMAT
+
+
+def get_unified_date_format() -> str:
+    """
+    🕐 ЕДИНЫЙ ФОРМАТ ДАТЫ И ВРЕМЕНИ
+    
+    Стандартный формат временных меток для всех логов.
+    По умолчанию Python logging добавляет миллисекунды автоматически.
+    """
+    return UNIFIED_LOG_DATE_FORMAT
+
+
+def create_unified_formatter() -> 'logging.Formatter':
+    """
+    🔧 СОЗДАНИЕ ЕДИНОГО ФОРМАТТЕРА
+    
+    Создает стандартизированный форматтер для использования во всех компонентах.
+    """
+    import logging
+    return logging.Formatter(
+        fmt=get_unified_log_format(),
+        datefmt=get_unified_date_format()
+    ) 

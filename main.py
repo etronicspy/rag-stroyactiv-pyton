@@ -166,15 +166,25 @@ def configure_uvicorn_logging():
             logger = logging.getLogger('uvicorn.intercepted')
             logger.log(getattr(logging, level, logging.INFO), record.getMessage())
     
-    # Настраиваем корневое логирование
+    # ✅ UNIFIED LOGGING: Use LOG_FILE from environment and unified format
+    from core.config.log_config import create_unified_formatter
+    log_file = settings.LOG_FILE or 'logs/app.log'
+    
+    # Создаем единый форматтер
+    unified_formatter = create_unified_formatter()
+    
+    # Настраиваем корневое логирование с единым форматом
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler('logs/app.log', mode='a', encoding='utf-8')
+            logging.FileHandler(log_file, mode='a', encoding='utf-8')
         ]
     )
+    
+    # Применяем единый форматтер ко всем handlers
+    for handler in logging.getLogger().handlers:
+        handler.setFormatter(unified_formatter)
     
     # Настраиваем uvicorn логгеры для использования нашей конфигурации
     intercept_handler = InterceptHandler()

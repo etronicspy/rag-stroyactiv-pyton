@@ -16,7 +16,7 @@ from functools import wraps, lru_cache
 from contextlib import contextmanager
 
 from core.config import get_settings
-from core.monitoring.context import CorrelationLoggingAdapter
+from core.logging.context.adapters import CorrelationLoggingAdapter
 
 # 🔧 CONSTANTS: Moved hardcoded values to module level
 LOGGER_NAMES_TO_CONFIGURE = ["middleware", "services", "api", "database"]
@@ -256,6 +256,7 @@ class LoggingSetup:
     
     def _configure_console_formatter(self, handler: logging.StreamHandler, enable_colors: bool):
         """Configure formatter for console handler."""
+        # ✅ UNIFIED FORMAT: Console может использовать упрощенный формат для читаемости
         if enable_colors:
             formatter = ColoredFormatter('%(levelname)s - %(message)s')
         else:
@@ -286,8 +287,9 @@ class LoggingSetup:
             if enable_structured:
                 formatter = StructuredFormatter()
             else:
-                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                                            '%Y-%m-%d %H:%M:%S')
+                # ✅ UNIFIED FORMAT: Use centralized unified formatter
+                from core.config.log_config import create_unified_formatter
+                formatter = create_unified_formatter()
                 
             file_handler.setFormatter(formatter)
             return file_handler

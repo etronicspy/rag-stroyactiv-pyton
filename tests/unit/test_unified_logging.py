@@ -163,11 +163,12 @@ class TestUnifiedLoggingSystemStage3:
 @pytest.fixture
 def clean_correlation_context():
     """Fixture to ensure clean correlation context for each test."""
-    # Clear any existing correlation ID
-    CorrelationContext.set_correlation_id(None)
+    from core.logging import force_clear_correlation_id
+    # Force clear any existing correlation ID
+    force_clear_correlation_id()
     yield
     # Clean up after test
-    CorrelationContext.set_correlation_id(None)
+    force_clear_correlation_id()
 
 
 @pytest.fixture

@@ -60,6 +60,18 @@ def set_correlation_id(correlation_id_value: Optional[str] = None) -> str:
     return correlation_id_value
 
 
+def force_clear_correlation_id() -> None:
+    """
+    Force clear correlation ID (set to None without generating new one).
+    Used primarily for testing purposes.
+    """
+    try:
+        _correlation_id.set(None)
+    except Exception as e:
+        sys.stderr.write(f"[CONTEXT-ERROR] Failed to force clear correlation ID: {e}\n")
+        sys.stderr.flush()
+
+
 def get_correlation_id() -> Optional[str]:
     """
     Get current correlation ID from context.
@@ -166,9 +178,18 @@ class CorrelationContext(ContextManagerInterface):
         """Get current correlation ID from context."""
         return get_correlation_id()
         
-    def set_correlation_id(self, correlation_id: str) -> None:
+    def set_correlation_id(self, correlation_id: Optional[str]) -> None:
         """Set correlation ID in current context."""
         set_correlation_id(correlation_id)
+    
+    @staticmethod
+    def set_correlation_id(correlation_id: Optional[str]) -> str:
+        """Set correlation ID in current context (static method)."""
+        if correlation_id is None:
+            force_clear_correlation_id()
+            return None
+        else:
+            return set_correlation_id(correlation_id)
     
     def get_metadata(self) -> Dict[str, Any]:
         """Get current request metadata."""
@@ -247,14 +268,16 @@ class CorrelationContext(ContextManagerInterface):
                 self.previous_id = get_correlation_id()
                 if self.correlation_id is None:
                     self.correlation_id = generate_correlation_id()
-                set_correlation_id(self.correlation_id)
+                else:
+                    # Direct set via ContextVar for explicit IDs
+                    _correlation_id.set(self.correlation_id)
                 return self.correlation_id
                 
             def __exit__(self, exc_type, exc_val, exc_tb):
                 if self.previous_id is not None:
-                    set_correlation_id(self.previous_id)
+                    _correlation_id.set(self.previous_id)
                 else:
-                    clear_correlation_context()
+                    force_clear_correlation_id()
                 return False
                 
         return CorrelationContextManager(corr_id)

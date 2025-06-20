@@ -53,6 +53,60 @@ def get_logger(name: str, enable_correlation: bool = True) -> logging.Logger:
     return logger
 
 
+def safe_log(logger, level: str, message: str, extra: Optional[dict] = None, correlation_id: Optional[str] = None):
+    """
+    🛡️ Safe logging with fallback to stderr.
+    
+    Guarantees that the message will be logged even if the main logger fails.
+    
+    Args:
+        logger: Main logger instance
+        level: Logging level (INFO, ERROR, etc.)
+        message: Message to log
+        extra: Additional data
+        correlation_id: Correlation ID
+    """
+    import sys
+    import json
+    import time
+    
+    try:
+        # Try main logging
+        if hasattr(logger, level.lower()):
+            log_method = getattr(logger, level.lower())
+            if extra:
+                log_method(message, extra=extra)
+            else:
+                log_method(message)
+        else:
+            logger.log(getattr(logging, level.upper()), message, extra=extra or {})
+    except Exception as primary_error:
+        # 🚨 CRITICAL FALLBACK: Output to stderr
+        try:
+            timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+            fallback_data = {
+                "timestamp": timestamp,
+                "level": level,
+                "message": message,
+                "correlation_id": correlation_id or "unknown",
+                "extra": extra or {},
+                "fallback_reason": f"Primary logger failed: {str(primary_error)}"
+            }
+            # Structured output to stderr
+            sys.stderr.write(f"[FALLBACK-LOG] {json.dumps(fallback_data, ensure_ascii=False)}\n")
+            sys.stderr.flush()
+        except Exception:
+            # 🚨 LAST LINE OF DEFENSE: Simple text to stderr
+            try:
+                timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                fallback_message = f"[FALLBACK-LOG] {timestamp} [{level}] {message} (correlation_id: {correlation_id or 'unknown'})\n"
+                sys.stderr.write(fallback_message)
+                sys.stderr.flush()
+            except Exception:
+                # If even stderr is not available - we can't do anything
+                pass
+
+
 def get_safe_logger(name: str) -> logging.Logger:
     """
     Get a safe logger that handles closed file errors gracefully.
@@ -115,6 +169,7 @@ class LoggingSetup:
     
     def _configure_console_formatter(self, handler: logging.StreamHandler, enable_colors: bool):
         """Configure console formatter with optional colors."""
+        # ✅ UNIFIED FORMAT: Console может использовать упрощенный формат
         if enable_colors:
             from .formatters import ColoredFormatter
             formatter = ColoredFormatter(
@@ -150,9 +205,9 @@ class LoggingSetup:
                 from .formatters import StructuredFormatter
                 handler.setFormatter(StructuredFormatter())
             else:
-                formatter = logging.Formatter(
-                    '%(asctime)s | %(levelname)-8s | %(name)s | %(funcName)s:%(lineno)d | %(message)s'
-                )
+                # ✅ UNIFIED FORMAT: Use centralized unified formatter
+                from core.config.log_config import create_unified_formatter
+                formatter = create_unified_formatter()
                 handler.setFormatter(formatter)
             
             return handler

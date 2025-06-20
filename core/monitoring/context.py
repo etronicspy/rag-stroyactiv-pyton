@@ -19,78 +19,19 @@ from typing import Optional, Callable, Any, Dict
 from functools import wraps
 import logging
 
-# Context variables with clear defaults
-_correlation_id: ContextVar[Optional[str]] = ContextVar('correlation_id', default=None)
-_request_metadata: ContextVar[Dict[str, Any]] = ContextVar('request_metadata', default={})
+# Import centralized correlation functions and context vars to eliminate duplication
+from core.logging.context.correlation import (
+    generate_correlation_id,
+    set_correlation_id, 
+    get_correlation_id,
+    get_or_generate_correlation_id,
+    _correlation_id,
+    _request_metadata
+)
 
 # Backward compatibility aliases
 correlation_id = _correlation_id
 request_metadata = _request_metadata
-
-
-def generate_correlation_id() -> str:
-    """
-    Generate new correlation ID with basic fallback.
-    
-    Returns:
-        New correlation ID
-    """
-    try:
-        return str(uuid.uuid4())
-    except Exception:
-        # Simple fallback - timestamp-based ID
-        import time
-        return f"fallback-{int(time.time() * 1000000)}"
-
-
-def set_correlation_id(correlation_id_value: Optional[str] = None) -> str:
-    """
-    Set correlation ID in current context.
-    
-    Args:
-        correlation_id_value: ID to set (generates new if None)
-        
-    Returns:
-        Set correlation ID
-    """
-    if correlation_id_value is None:
-        correlation_id_value = generate_correlation_id()
-    
-    try:
-        _correlation_id.set(correlation_id_value)
-    except Exception as e:
-        sys.stderr.write(f"[CONTEXT-ERROR] Failed to set correlation ID: {e}\n")
-        sys.stderr.flush()
-    
-    return correlation_id_value
-
-
-def get_correlation_id() -> Optional[str]:
-    """
-    Get current correlation ID from context.
-    
-    Returns:
-        Current correlation ID or None if not set
-    """
-    try:
-        return _correlation_id.get()
-    except Exception as e:
-        sys.stderr.write(f"[CONTEXT-ERROR] Failed to get correlation ID: {e}\n")
-        sys.stderr.flush()
-        return None
-
-
-def get_or_generate_correlation_id() -> str:
-    """
-    Get current correlation ID or generate new one if not exists.
-    
-    Returns:
-        Correlation ID (existing or newly generated)
-    """
-    current_id = get_correlation_id()
-    if current_id is None:
-        current_id = set_correlation_id()
-    return current_id
 
 
 def set_request_metadata(metadata: Dict[str, Any]) -> bool:
@@ -173,7 +114,7 @@ class CorrelationContext:
         return get_correlation_id()
     
     @staticmethod
-    def set_correlation_id(corr_id: str) -> None:
+    def set_correlation_id(corr_id: Optional[str]) -> None:
         """Set correlation ID in current context."""
         set_correlation_id(corr_id)
     
@@ -345,65 +286,13 @@ def with_correlation_context(func: Callable) -> Callable:
         return sync_wrapper
 
 
-def log_with_correlation(logger_func: Callable) -> Callable:
-    """
-    Decorator to automatically add correlation ID to log messages.
-    
-    Args:
-        logger_func: Logger function (logger.info, logger.error, etc.)
-        
-    Returns:
-        Enhanced logger function with correlation ID
-        
-    Usage:
-        @log_with_correlation
-        def enhanced_info(message, *args, **kwargs):
-            return logger.info(message, *args, **kwargs)
-    """
-    @wraps(logger_func)
-    def wrapper(message: str, *args, **kwargs):
-        corr_id = get_correlation_id()
-        if corr_id:
-            # Add correlation ID to extra fields
-            extra = kwargs.get('extra', {})
-            extra['correlation_id'] = corr_id
-            kwargs['extra'] = extra
-            
-            # Prefix message with correlation ID for easy reading
-            if not message.startswith('['):
-                message = f"[{corr_id}] {message}"
-        
-        return logger_func(message, *args, **kwargs)
-    return wrapper
+# Import centralized log_with_correlation from core.logging.context.adapters
+from core.logging.context.adapters import log_with_correlation
 
 
-class CorrelationLoggingAdapter(logging.LoggerAdapter):
-    """
-    Logging adapter that automatically includes correlation ID in log records.
-    
-    SIMPLIFIED: Essential functionality only, no excessive fallbacks.
-    """
-    
-    def __init__(self, logger: logging.Logger, extra: Dict[str, Any]):
-        super().__init__(logger, extra)
-    
-    def process(self, msg, kwargs):
-        """Add correlation ID to log record if available."""
-        try:
-            correlation_id_value = get_correlation_id()
-            if correlation_id_value:
-                # Add to extra data for structured logging
-                if 'extra' not in kwargs:
-                    kwargs['extra'] = {}
-                kwargs['extra']['correlation_id'] = correlation_id_value
-                
-                # Also add to the adapter's extra for traditional logging
-                self.extra['correlation_id'] = correlation_id_value
-        except Exception as e:
-            sys.stderr.write(f"[LOGGING-ADAPTER-ERROR] Failed to add correlation ID: {e}\n")
-            sys.stderr.flush()
-        
-        return msg, kwargs
+# CorrelationLoggingAdapter moved to core.logging.context.adapters for better modularity
+# Import from the centralized location for backward compatibility
+from core.logging.context.adapters import CorrelationLoggingAdapter
 
 
 # Backward compatibility functions (marked as legacy)
