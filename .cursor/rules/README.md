@@ -1,121 +1,155 @@
-# Cursor Rules Structure
+# 🎯 Cursor Rules - Централизованная структура правил
 
-This directory contains modular rules for the RAG Construction Materials API project, organized by domain and responsibility. **All rules are based on the original `.cursorrules` file content - no additional requirements added**, except for extended testing rules which were preserved by request.
+Этот каталог содержит все правила для RAG Construction Materials API проекта, организованные по доменам и областям ответственности. **Все правила объединены из оригинального файла `.cursor-rules`** и организованы в модульную структуру.
 
-## Rules Files Overview
+## 📁 Обзор файлов правил
+
+### 🚨 [filename-conflicts.mdc](./filename-conflicts.mdc)
+**КРИТИЧЕСКИ ВАЖНО** - Правила предотвращения конфликтов имен файлов:
+- 75+ запрещенных имен файлов Python модулей
+- Потенциально опасные имена и альтернативы
+- Автоматические проверки и pre-commit хуки
+- Интеграция с VS Code/Cursor IDE
+- Скрипт автоматического обнаружения конфликтов
 
 ### 🐍 [python.mdc](./python.mdc)
-Python-specific coding standards (from original rules):
-- Python 3.9+ requirements
-- FastAPI and async/await patterns
+Python-специфичные стандарты кодирования:
+- Требования Python 3.9+
+- FastAPI и паттерны async/await
 - PEP 8, type hints, docstrings
-- Pydantic models and validation
-- SQLAlchemy 2.0+ async patterns
+- Pydantic модели и валидация
+- SQLAlchemy 2.0+ async паттерны
 
 ### 🌐 [api-design.mdc](./api-design.mdc)
-API design principles (from original rules):
-- REST API versioning (/api/v1/)
-- UTF-8 responses and error handling
-- CSV/Excel support with required fields
-- Fallback strategies for search
-- Rate limiting and CORS
+Принципы дизайна API:
+- REST API версионирование (/api/v1/)
+- UTF-8 ответы и обработка ошибок
+- Поддержка CSV/Excel с обязательными полями
+- Fallback стратегии для поиска
+- Rate limiting и CORS
 
 ### 🗄️ [database.mdc](./database.mdc)
-Database architecture (from original rules):
-- Repository pattern implementation
-- Multi-database support (PostgreSQL, Qdrant, Weaviate, Pinecone, Redis)
-- Connection pooling and performance
-- Vector database operations
-- Database switching and configuration
+Архитектура базы данных:
+- Реализация Repository pattern
+- Поддержка множественных БД (PostgreSQL, Qdrant, Weaviate, Pinecone, Redis)
+- Connection pooling и производительность
+- Операции с векторными БД
+- Переключение БД и конфигурация
 
 ### 🧪 [testing.mdc](./testing.mdc)
-Testing strategies (**original rules + extended testing guidelines**):
-- pytest framework and fixtures
-- Mocking strategies for external APIs
-- Integration vs functional tests
-- API availability checks
-- **Extended**: Unit testing best practices
-- **Extended**: CI/CD integration guidelines
-- **Extended**: Performance testing approaches
-- **Extended**: Database testing specifics
+Стратегии тестирования:
+- pytest фреймворк и фикстуры
+- Стратегии мокирования для внешних API
+- Интеграционные vs функциональные тесты
+- Проверки доступности API
+- Лучшие практики unit тестирования
+- CI/CD интеграция
+- Подходы к тестированию производительности
+- Специфика тестирования БД
 
 ### 🔒 [security.mdc](./security.mdc)
-Security guidelines (from original rules):
-- Environment configuration security
-- Input validation and sanitization
-- Attack prevention basics
-- Password and key rotation
+Руководство по безопасности:
+- Безопасность конфигурации окружения
+- Валидация и санитизация входных данных
+- Основы предотвращения атак
+- Ротация паролей и ключей
+- **КАТЕГОРИЧЕСКИЙ ЗАПРЕТ** hardcoded значений
 
 ### 📊 [monitoring.mdc](./monitoring.mdc)
-Monitoring and logging (from original rules):
-- Health checks and diagnostics
-- Database operation logging
-- Debug level configuration
-- External API connection logging
+Мониторинг и логирование:
+- Health checks и диагностика
+- Логирование операций БД
+- Конфигурация debug уровня
+- Логирование подключений к внешним API
 
 ### 🏗️ [project-structure.mdc](./project-structure.mdc)
-Project organization (from original rules):
-- Folder structure (api/routes, core/config, services)
-- API versioning requirements
-- CSV/Excel support
-- Documentation maintenance
-- Embedding batching
+Организация проекта:
+- Структура папок (api/routes, core/config, services)
+- Требования к версионированию API
+- Поддержка CSV/Excel
+- Поддержка документации
+- Батчинг эмбеддингов
+- **ПРАВИЛА** безопасности имен файлов
 
 ### 🛠️ [development.mdc](./development.mdc)
-Development environment (from original rules):
-- .env.local configuration
-- API key management
-- Connection debugging
-- Timeout and retry settings
-- Fallback mechanisms
+Среда разработки:
+- Конфигурация .env.local
+- Управление API ключами
+- Отладка подключений
+- Настройки timeout и retry
+- Механизмы fallback
 
 ### 📚 [documentation.mdc](./documentation.mdc)
-Documentation standards (from original rules):
-- Language standards (English code, Russian/English docs)
+Стандарты документации:
+- Языковые стандарты (код на английском, документация на русском/английском)
 - Architecture Decision Records (ADR)
-- Inline documentation requirements
-- Technical reporting guidelines
+- Требования к inline документации
+- Руководство по техническим отчетам
+- Docstrings и OpenAPI требования
 
 ### ⚙️ [environment.mdc](./environment.mdc)
-Configuration management (from original rules):
-- .env file management and security
-- Configuration change workflow
-- Template management (env.example)
-- Connection timeout settings
+Управление конфигурацией:
+- Управление .env файлами и безопасность
+- Workflow изменения конфигурации
+- Управление шаблонами (env.example)
+- Настройки timeout подключений
+- **ЗАЩИТА** .env.local файлов
 
-## Usage
+### 🔄 [git-workflow.mdc](./git-workflow.mdc)
+Git workflow и управление версиями:
+- Стратегия ветвления (main/develop/feature)
+- Конвенции commit сообщений
+- Pull Request процесс
+- Правила защиты веток
+- Управление зависимостями и миграциями
+- Release management
 
-These rules are automatically loaded by Cursor IDE and provide context-aware assistance during development. Each file focuses on a specific domain while **maintaining the exact same requirements as the original monolithic `.cursorrules` file**.
+## 🚀 Использование
 
-## Cleanup Summary
+Эти правила автоматически загружаются Cursor IDE и обеспечивают контекстную помощь во время разработки. Каждый файл фокусируется на конкретной области, **сохраняя точно те же требования, что были в оригинальном файле `.cursor-rules`**.
 
-✅ **Removed 80+ new rules** that were not in the original `.cursorrules`  
-✅ **Preserved 100% of original rules** from `.cursorrules`  
-✅ **Kept extended testing rules** by special request  
-✅ **No breaking changes** to existing development practices
+## ✅ Резюме объединения
 
-## Migration from .cursorrules
+**✅ Сохранено 100% оригинальных правил** из `.cursor-rules`  
+**✅ Улучшена организация** по доменам и областям  
+**✅ Никаких breaking changes** в существующих практиках разработки  
+**✅ Контекстная помощь** IDE стала более точной  
+**✅ Центализованная структура** для легкого поддержания  
 
-This modular structure reorganizes the original `.cursorrules` content without adding new requirements:
-- ✅ 100% original rule preservation
-- ✅ Better organization by domain
-- ✅ No additional constraints (except testing)
-- ✅ Same development practices
-- ✅ Context-aware IDE assistance
+## 🎯 Миграция из .cursor-rules
 
-## Principles
+Эта модульная структура реорганизует содержимое оригинального `.cursor-rules` без добавления новых требований:
+- ✅ 100% сохранение оригинальных правил
+- ✅ Лучшая организация по доменам
+- ✅ Никаких дополнительных ограничений
+- ✅ Те же практики разработки
+- ✅ Контекстная помощь IDE
 
-- **No new requirements**: Only rules from original `.cursorrules`
-- **No breaking changes**: Existing codebase remains compliant
-- **Better organization**: Domain-specific rule grouping
-- **Maintainable**: Easier to update specific areas
-- **Testing exception**: Extended testing rules preserved for development quality
+## 🔧 Принципы организации
 
-## Contributing
+- **Никаких новых требований**: Только правила из оригинального `.cursor-rules`
+- **Никаких breaking changes**: Существующая кодовая база остается совместимой
+- **Лучшая организация**: Группировка правил по доменам
+- **Поддерживаемость**: Легче обновлять конкретные области
+- **Полнота**: Все аспекты разработки покрыты
 
-When adding new rules:
-1. Choose the appropriate domain file
-2. Follow the existing format and style
-3. Update this README if adding new files
-4. Ensure no duplication across files
-5. Test rules with actual development scenarios 
+## 📝 Вклад в развитие
+
+При добавлении новых правил:
+1. Выберите подходящий файл домена
+2. Следуйте существующему формату и стилю
+3. Обновите этот README при добавлении новых файлов
+4. Убедитесь в отсутствии дублирования между файлами
+5. Протестируйте правила в реальных сценариях разработки
+
+## 🔍 Поддерживаемые сценарии
+
+- Создание новых файлов с безопасными именами
+- Автоматическая проверка конфликтов имен
+- Контекстные подсказки по архитектуре
+- Проверка соответствия стандартам кодирования
+- Руководство по настройке конфигурации
+- Помощь в написании тестов
+- Рекомендации по безопасности
+
+**Все правила организованы в единой структуре `.cursor/rules/` для максимальной эффективности работы с Cursor IDE!** 
