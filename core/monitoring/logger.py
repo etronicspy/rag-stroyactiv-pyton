@@ -19,7 +19,7 @@ from core.config import get_settings
 from core.monitoring.context import CorrelationLoggingAdapter
 
 # 🔧 CONSTANTS: Moved hardcoded values to module level
-LOGGER_NAMES_TO_CONFIGURE = ["middleware", "services", "api", "database", "api.requests"]
+LOGGER_NAMES_TO_CONFIGURE = ["middleware", "services", "api", "database"]
 THIRD_PARTY_LOGGERS = ["uvicorn", "httpx", "openai", "paramiko"]
 MIDDLEWARE_LOGGER_NAME = "middleware.http"
 CORE_LOGGER_NAME = "core"
@@ -201,28 +201,31 @@ class DatabaseLogger:
         
         Args:
             operation: Operation name
-            record_count: Number of records being processed
+            record_count: Number of records affected
             correlation_id: Request correlation ID
             extra_data: Additional data to log
             
         Yields:
-            Context with operation tracking
+            None
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
+        success = True
         error = None
         
         try:
             yield
         except Exception as e:
+            success = False
             error = e
             raise
         finally:
-            duration_ms = (time.time() - start_time) * 1000
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            
             self.log_operation(
                 operation=operation,
                 duration_ms=duration_ms,
                 record_count=record_count,
-                success=error is None,
+                success=success,
                 error=error,
                 extra_data=extra_data,
                 correlation_id=correlation_id
@@ -230,120 +233,80 @@ class DatabaseLogger:
 
 
 class LoggingSetup:
-    """
-    🔧 REFACTORED: Centralized logging setup with modular methods.
-    
-    Breaks down the monolithic setup_structured_logging function into manageable parts.
-    """
+    """Centralized logging setup with error handling."""
     
     def __init__(self, settings=None):
-        """Initialize logging setup with settings."""
+        """Initialize with application settings."""
+        from core.config import get_settings
         self.settings = settings or get_settings()
     
     def _create_console_handler(self, log_level: str, enable_structured: bool, 
                                enable_colors: bool) -> logging.StreamHandler:
-        """Create and configure console handler."""
-        console_handler = logging.StreamHandler()
+        """Create console log handler with appropriate formatter."""
+        import sys
+        
+        # Create console handler
+        console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(getattr(logging, log_level.upper()))
         
-        if enable_structured:
-            console_handler.setFormatter(StructuredFormatter())
-        else:
-            self._configure_console_formatter(console_handler, enable_colors)
+        # Configure formatter
+        self._configure_console_formatter(console_handler, enable_colors)
         
         return console_handler
     
     def _configure_console_formatter(self, handler: logging.StreamHandler, enable_colors: bool):
-        """Configure console formatter with optional colors."""
+        """Configure formatter for console handler."""
         if enable_colors:
-            try:
-                import colorama
-                colorama.init()
-                handler.setFormatter(ColoredFormatter('%(levelname)s %(message)s'))
-            except ImportError:
-                # Fallback to simple format if colorama not available
-                handler.setFormatter(logging.Formatter('%(levelname)-8s %(message)s'))
+            formatter = ColoredFormatter('%(levelname)s - %(message)s')
         else:
-            handler.setFormatter(logging.Formatter('%(levelname)-8s %(message)s'))
+            formatter = logging.Formatter('%(levelname)s - %(message)s')
+            
+        handler.setFormatter(formatter)
     
     def _create_file_handler(self, log_file: str, log_level: str, 
                            enable_structured: bool) -> Optional[logging.FileHandler]:
-        """Create and configure file handler with safe error handling."""
+        """Create file log handler with appropriate formatter."""
+        import sys
+        
+        # Skip if no log file specified
         if not log_file:
             return None
-        
+            
         try:
-            # Create log directory if it doesn't exist
+            # Ensure directory exists
             log_dir = os.path.dirname(log_file)
             if log_dir and not os.path.exists(log_dir):
-                try:
-                    os.makedirs(log_dir, exist_ok=True)
-                except (OSError, PermissionError) as dir_error:
-                    # 🚨 FALLBACK: Если не можем создать директорию
-                    import sys
-                    fallback_msg = f"[LOG-SETUP-ERROR] Cannot create log directory '{log_dir}': {dir_error}. Logs will go to stderr only.\n"
-                    sys.stderr.write(fallback_msg)
-                    sys.stderr.flush()
-                    return None
+                os.makedirs(log_dir, exist_ok=True)
+                
+            # Create file handler
+            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler.setLevel(getattr(logging, log_level.upper()))
             
-            # Проверяем доступность для записи
-            try:
-                # Тестовая запись для проверки permissions
-                with open(log_file, 'a', encoding='utf-8') as test_file:
-                    test_file.write('')  # Пустая запись для проверки
-            except (OSError, PermissionError, IOError) as write_error:
-                # 🚨 FALLBACK: Если файл недоступен для записи
-                import sys
-                fallback_msg = f"[LOG-SETUP-ERROR] Cannot write to log file '{log_file}': {write_error}. Using stderr fallback.\n"
-                sys.stderr.write(fallback_msg)
-                sys.stderr.flush()
-                return None
+            # Configure formatter
+            if enable_structured:
+                formatter = StructuredFormatter()
+            else:
+                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                                            '%Y-%m-%d %H:%M:%S')
+                
+            file_handler.setFormatter(formatter)
+            return file_handler
             
-            # Создаем файловый хендлер
-            try:
-                file_handler = logging.FileHandler(log_file, encoding='utf-8')
-                file_handler.setLevel(getattr(logging, log_level.upper()))
-                
-                # Настраиваем форматтер
-                if enable_structured:
-                    file_handler.setFormatter(StructuredFormatter())
-                else:
-                    file_handler.setFormatter(
-                        logging.Formatter(
-                            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                            datefmt='%Y-%m-%d %H:%M:%S'
-                        )
-                    )
-                
-                # 🔧 ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: Тестируем хендлер
-                try:
-                    test_record = logging.LogRecord(
-                        name="test.logger",
-                        level=logging.INFO,
-                        pathname="",
-                        lineno=0,
-                        msg="Log handler test",
-                        args=(),
-                        exc_info=None
-                    )
-                    file_handler.emit(test_record)
-                except Exception as emit_error:
-                    # Если emit падает - хендлер неработоспособен
-                    import sys
-                    sys.stderr.write(f"[LOG-SETUP-ERROR] File handler test failed: {emit_error}\n")
-                    sys.stderr.flush()
-                    file_handler.close()
-                    return None
-                
-                return file_handler
-                
-            except Exception as handler_error:
-                # 🚨 FALLBACK: Ошибка создания хендлера
-                import sys
-                fallback_msg = f"[LOG-SETUP-ERROR] Failed to create file handler: {handler_error}. Using stderr fallback.\n"
-                sys.stderr.write(fallback_msg)
-                sys.stderr.flush()
-                return None
+        except PermissionError as perm_error:
+            # 🚨 PERMISSION ERROR: Не можем писать в файл
+            import sys
+            fallback_msg = f"[LOG-SETUP-ERROR] Permission denied for log file {log_file}: {perm_error}. Using stderr fallback.\n"
+            sys.stderr.write(fallback_msg)
+            sys.stderr.flush()
+            return None
+            
+        except FileNotFoundError as path_error:
+            # 🚨 PATH ERROR: Путь не существует и не может быть создан
+            import sys
+            fallback_msg = f"[LOG-SETUP-ERROR] Invalid log file path {log_file}: {path_error}. Using stderr fallback.\n"
+            sys.stderr.write(fallback_msg)
+            sys.stderr.flush()
+            return None
                 
         except Exception as general_error:
             # 🚨 ОБЩИЙ FALLBACK: Любая неожиданная ошибка
@@ -539,17 +502,6 @@ class RequestLogger:
         
         # Add only non-None fields
         extra.update({k: v for k, v in optional_fields.items() if v is not None})
-        
-        # Прямое логирование в файл для отладки
-        try:
-            with open('logs/app.log', 'a') as f:
-                timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                f.write(f"{timestamp} - api.requests - {'ERROR' if status_code >= 400 else 'INFO'} - HTTP Request: {message}\n")
-        except Exception as e:
-            print(f"Failed to write to log file: {e}")
             
-        # Используем более надежный способ логирования
-        if level == logging.INFO:
-            self.logger.info(message, extra=extra)
-        else:
-            self.logger.error(message, extra=extra) 
+        adapter = logging.LoggerAdapter(self.logger, extra)
+        adapter.log(level, message, extra=extra) 

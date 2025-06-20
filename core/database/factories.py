@@ -199,7 +199,7 @@ class DatabaseFactory:
             )
     
     @staticmethod
-    def _create_qdrant_client(config: Dict[str, Any]) -> 'QdrantVectorDatabase':
+    def _create_qdrant_client(config: Dict[str, Any]) -> IVectorDatabase:
         """Create Qdrant client instance.
         
         Args:
