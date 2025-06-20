@@ -9,17 +9,22 @@ import time
 import uuid
 import sys
 import logging
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, Any, List, Callable, Union
 import traceback
+import os
+from pathlib import Path
 
 from starlette.types import ASGIApp, Receive, Scope, Send, Message
 from starlette.requests import Request
+from starlette.responses import Response as StarletteResponse
 
 from core.config import get_settings, Settings
 from core.monitoring.unified_manager import get_unified_logging_manager
 from core.monitoring.context import CorrelationContext, set_correlation_id
 from core.monitoring.performance_optimizer import get_performance_optimizer
 from core.monitoring.logger import get_logger
+from core.logging.context.correlation import get_correlation_id
+from core.logging.managers.unified import UnifiedLoggingManager
 
 
 def safe_log(logger, level: str, message: str, extra: Optional[Dict[str, Any]] = None, correlation_id: Optional[str] = None):
@@ -212,6 +217,33 @@ def should_exclude_path(path: str) -> bool:
     return False
 
 
+class InterceptHandler(logging.Handler):
+    """
+    Перехватчик для uvicorn логов - перенаправляет их в нашу систему логирования
+    """
+    def emit(self, record):
+        try:
+            # Получаем соответствующий уровень Loguru/нашей системы
+            level = record.levelname
+            
+            # Находим правильного вызывающего
+            frame = sys._getframe(6)
+            depth = 6
+            while frame and frame.f_code.co_filename == logging.__file__:
+                frame = frame.f_back
+                depth += 1
+            
+            # Логируем через нашу систему
+            safe_log(level, record.getMessage(), 
+                    logger_name=record.name, 
+                    extra={'depth': depth})
+                    
+        except Exception as e:
+            # Fallback - логируем в stderr
+            print(f"[INTERCEPT-ERROR] Failed to intercept log: {e}", file=sys.stderr)
+            print(f"[INTERCEPT-FALLBACK] {record.levelname}: {record.getMessage()}", file=sys.stderr)
+
+
 class LoggingMiddleware:
     """Enhanced ASGI logging middleware with performance optimization."""
     
@@ -324,10 +356,10 @@ class LoggingMiddleware:
                     with open('logs/http_debug.log', 'a') as f:
                         f.write(f"HTTP Request: {method} {path} at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
                     
-                    # 🔧 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Прямая запись в app.log
-                    with open('logs/app.log', 'a') as f:
-                        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                        f.write(f"{timestamp} - middleware.http - INFO     - HTTP Request started: {method} {path} (request_id: {request_id})\n")
+                    # 🔧 ВРЕМЕННО ОТКЛЮЧЕНО: Прямая запись в app.log для тестирования safe_log
+                    # with open('logs/app.log', 'a') as f:
+                    #     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                    #     f.write(f"{timestamp} - middleware.http - INFO     - HTTP Request started: {method} {path} (request_id: {request_id})\n")
                     
                     safe_log(
                         self.app_logger,
@@ -374,10 +406,10 @@ class LoggingMiddleware:
                                 user_agent=user_agent
                             )
                             
-                            # 🔧 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Прямая запись в app.log
-                            with open('logs/app.log', 'a') as f:
-                                timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                                f.write(f"{timestamp} - middleware.http - INFO     - {method} {path} - {status_code} ({duration_ms:.2f}ms)\n")
+                            # 🔧 ВРЕМЕННО ОТКЛЮЧЕНО: Прямая запись в app.log для тестирования safe_log
+                            # with open('logs/app.log', 'a') as f:
+                            #     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                            #     f.write(f"{timestamp} - middleware.http - INFO     - {method} {path} - {status_code} ({duration_ms:.2f}ms)\n")
                             
                             # Стандартное логирование через safe_log
                             safe_log(
@@ -528,37 +560,101 @@ class LoggingMiddleware:
         """
         import logging
         import sys
+        import os
         
         try:
-            # Проверяем, настроено ли логирование
-            root_logger = logging.getLogger()
+            # 🚨 АГРЕССИВНАЯ ПРОВЕРКА: Всегда инициализируем заново
+            print(f"[MIDDLEWARE-INIT] 🔧 Starting aggressive logging initialization...", file=sys.stderr)
             
-            # Если нет handlers или level слишком высокий - принудительно настраиваем
-            if len(root_logger.handlers) == 0 or root_logger.level > logging.INFO:
-                sys.stderr.write("[MIDDLEWARE-INIT] Logging not configured, initializing...\n")
-                sys.stderr.flush()
+            # Проверяем текущее состояние
+            root_logger = logging.getLogger()
+            print(f"[MIDDLEWARE-INIT] Current root level: {root_logger.level}, handlers: {len(root_logger.handlers)}", file=sys.stderr)
+            
+            # 🚀 ПРИНУДИТЕЛЬНАЯ НАСТРОЙКА ЛОГИРОВАНИЯ (всегда)
+            
+            # 1. Очистим ВСЕ существующие handlers
+            for handler in root_logger.handlers[:]:
+                root_logger.removeHandler(handler)
+                handler.close()
+            
+            # Очистим handlers у всех логгеров
+            for name in ['middleware', 'middleware.asgi', 'middleware.http', 'services', 'api', 'database']:
+                logger = logging.getLogger(name)
+                for handler in logger.handlers[:]:
+                    logger.removeHandler(handler)
+                    handler.close()
+            
+            print(f"[MIDDLEWARE-INIT] ✅ Cleared all existing handlers", file=sys.stderr)
+            
+            # 2. Установим правильный уровень для root
+            root_logger.setLevel(logging.DEBUG)
+            print(f"[MIDDLEWARE-INIT] ✅ Set root level to DEBUG", file=sys.stderr)
+            
+            # 3. Создадим console handler
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(logging.DEBUG)
+            console_formatter = logging.Formatter(
+                '%(levelname)s     - %(message)s'
+            )
+            console_handler.setFormatter(console_formatter)
+            root_logger.addHandler(console_handler)
+            print(f"[MIDDLEWARE-INIT] ✅ Added console handler", file=sys.stderr)
+            
+            # 4. Создадим file handler для app.log
+            log_file = getattr(self.settings, 'LOG_FILE', 'logs/app.log')
+            if log_file:
+                try:
+                    # Создаем директорию если не существует
+                    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+                    
+                    file_handler = logging.FileHandler(log_file)
+                    file_handler.setLevel(logging.DEBUG)
+                    file_formatter = logging.Formatter(
+                        '%(asctime)s - %(name)s - %(levelname)-8s - %(message)s'
+                    )
+                    file_handler.setFormatter(file_formatter)
+                    root_logger.addHandler(file_handler)
+                    
+                    print(f"[MIDDLEWARE-INIT] ✅ File handler added: {log_file}", file=sys.stderr)
+                    
+                except Exception as file_error:
+                    print(f"[MIDDLEWARE-INIT] ❌ Could not create file handler: {file_error}", file=sys.stderr)
+            
+            # 5. Настроим специфичные логгеры для приложения
+            app_loggers = ['middleware', 'services', 'api', 'database', 'middleware.asgi', 'middleware.http']
+            for logger_name in app_loggers:
+                logger = logging.getLogger(logger_name)
+                logger.setLevel(logging.DEBUG)
+                logger.propagate = True
+                print(f"[MIDDLEWARE-INIT] ✅ Configured logger: {logger_name}", file=sys.stderr)
+            
+            # 6. Принудительно обновим self.app_logger
+            if hasattr(self, 'app_logger') and hasattr(self.app_logger, 'logger'):
+                self.app_logger.logger.setLevel(logging.DEBUG)
+                print(f"[MIDDLEWARE-INIT] ✅ Updated self.app_logger level", file=sys.stderr)
+            
+            print(f"[MIDDLEWARE-INIT] ✅ Aggressive logging initialization completed", file=sys.stderr)
+            
+            # 7. Тестовое сообщение для проверки
+            test_logger = logging.getLogger('middleware.test')
+            test_logger.info("🧪 Test message: Aggressive logging initialization completed")
+            
+            # 8. Проверим финальное состояние
+            final_root = logging.getLogger()
+            print(f"[MIDDLEWARE-INIT] Final state - Level: {final_root.level}, Handlers: {len(final_root.handlers)}", file=sys.stderr)
                 
-                # Импортируем и настраиваем логирование
-                from core.monitoring import setup_structured_logging
-                
-                setup_structured_logging(
-                    log_level=self.settings.LOG_LEVEL,
-                    enable_structured=self.settings.ENABLE_STRUCTURED_LOGGING,
-                    log_file=self.settings.LOG_FILE,
-                    enable_colors=self.settings.LOG_COLORS,
-                    third_party_level=self.settings.LOG_THIRD_PARTY_LEVEL
-                )
-                
-                sys.stderr.write("[MIDDLEWARE-INIT] ✅ Logging initialized successfully\n")
-                sys.stderr.flush()
-            else:
-                sys.stderr.write("[MIDDLEWARE-INIT] ✅ Logging already configured\n")
-                sys.stderr.flush()
+            # 9. Настраиваем uvicorn логгеры для перехвата
+            intercept_handler = InterceptHandler()
+            for logger_name in ['uvicorn', 'uvicorn.access', 'uvicorn.error']:
+                logger = logging.getLogger(logger_name)
+                logger.handlers = [intercept_handler]
+                logger.propagate = False
+                print(f"[MIDDLEWARE-INIT] ✅ Added intercept handler to: {logger_name}", file=sys.stderr)
                 
         except Exception as init_error:
             # Критический fallback
-            sys.stderr.write(f"[MIDDLEWARE-INIT] ❌ Failed to initialize logging: {init_error}\n")
-            sys.stderr.flush()
+            print(f"[MIDDLEWARE-INIT] ❌ Failed to initialize logging: {init_error}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
 
 
 # 🔧 ELIMINATED: LoggingMiddlewareAdapter removed - single unified LoggingMiddleware only

@@ -1,12 +1,16 @@
 import asyncio
 import time
-from core.monitoring.logger import get_logger
+import logging
+import sys
 from contextlib import asynccontextmanager
-from typing import Dict, Any
+from typing import Dict, Any, AsyncIterator
 
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
+from core.monitoring.logger import get_logger
 from core.config import get_settings
 from core.database.init_db import initialize_database_on_startup
 from core.database.pool_manager import initialize_pool_manager, shutdown_pool_manager, PoolConfig
@@ -139,4 +143,56 @@ async def root():
         "message": f"Welcome to {settings.PROJECT_NAME}",
         "version": settings.VERSION,
         "docs_url": "/docs"
-    } 
+    }
+
+def configure_uvicorn_logging():
+    """
+    Настройка логирования для uvicorn - предотвращает переопределение конфигурации
+    """
+    # Настраиваем перехватчики для uvicorn логов
+    class InterceptHandler(logging.Handler):
+        def emit(self, record):
+            # Получаем соответствующий уровень
+            level = record.levelname
+            
+            # Находим правильного вызывающего
+            frame = sys._getframe(6)
+            depth = 6
+            while frame and frame.f_code.co_filename == logging.__file__:
+                frame = frame.f_back
+                depth += 1
+            
+            # Создаем основной логгер для записи
+            logger = logging.getLogger('uvicorn.intercepted')
+            logger.log(getattr(logging, level, logging.INFO), record.getMessage())
+    
+    # Настраиваем корневое логирование
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('logs/app.log', mode='a', encoding='utf-8')
+        ]
+    )
+    
+    # Настраиваем uvicorn логгеры для использования нашей конфигурации
+    intercept_handler = InterceptHandler()
+    for logger_name in ['uvicorn', 'uvicorn.access', 'uvicorn.error']:
+        logger = logging.getLogger(logger_name)
+        logger.handlers = []
+        logger.propagate = True
+
+if __name__ == "__main__":
+    # Настройка логирования для разработки
+    configure_uvicorn_logging()
+    setup_structured_logging()
+    
+    # Запуск с отключенной конфигурацией логирования uvicorn
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8000,
+        log_config=None,  # Предотвращает переопределение нашей конфигурации
+        log_level=None,   # Предотвращает изменение уровня логирования
+    ) 
