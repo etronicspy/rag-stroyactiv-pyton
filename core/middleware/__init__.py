@@ -8,7 +8,7 @@ This package contains middleware components for:
 - Error handling and monitoring
 """
 
-from .logging import LoggingMiddleware
+from .request_logging import LoggingMiddleware
 from .rate_limiting import RateLimitMiddleware
 from .security import SecurityMiddleware
 from .conditional import ConditionalMiddleware, MiddlewareOptimizer

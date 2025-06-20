@@ -120,7 +120,7 @@ from .managers.unified import (
 from .base.loggers import setup_structured_logging
 
 # Configuration integration
-from core.config.logging import LoggingConfig, LogLevel, LogTimestampFormat
+from core.config.log_config import LoggingConfig, LogLevel, LogTimestampFormat
 
 # Backward compatibility aliases for core.monitoring imports
 # These ensure existing code continues to work without changes

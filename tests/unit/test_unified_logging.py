@@ -37,15 +37,15 @@ class TestUnifiedLoggingSystemStage0:
         """Test that BaseLoggingHandler has been completely eliminated."""
         # Should not be able to import BaseLoggingHandler
         with pytest.raises(ImportError):
-            from core.middleware.logging import BaseLoggingHandler
+            from core.middleware.request_logging import BaseLoggingHandler
     
     def test_single_logging_middleware(self):
         """Test that only one LoggingMiddleware exists."""
-        from core.middleware.logging import LoggingMiddleware
+        from core.middleware.request_logging import LoggingMiddleware
         
         # Should not be able to import LoggingMiddlewareAdapter
         with pytest.raises(ImportError):
-            from core.middleware.logging import LoggingMiddlewareAdapter
+            from core.middleware.request_logging import LoggingMiddlewareAdapter
     
     def test_unified_logging_config(self):
         """Test that LoggingConfig is properly integrated."""

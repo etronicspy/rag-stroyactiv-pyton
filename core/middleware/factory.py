@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import Settings
-from core.middleware.logging import LoggingMiddleware
+from core.middleware.request_logging import LoggingMiddleware
 from core.middleware.security import SecurityMiddleware
 from core.middleware.compression import CompressionMiddleware
 from core.middleware.rate_limiting import RateLimitMiddleware

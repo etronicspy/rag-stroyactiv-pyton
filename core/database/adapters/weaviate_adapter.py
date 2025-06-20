@@ -564,4 +564,107 @@ class WeaviateVectorDatabase(IVectorDatabase):
                 "database_type": "Weaviate",
                 "error": str(e),
                 "timestamp": datetime.utcnow().isoformat()
-            } 
+            }
+    
+    async def create_collection(self, name: str, vector_size: int, distance_metric: str = "cosine") -> bool:
+        """Create a new collection (class) in Weaviate.
+        
+        Args:
+            name: Class name
+            vector_size: Dimension of vectors (not used as Weaviate auto-detects)
+            distance_metric: Distance calculation method
+            
+        Returns:
+            True if class created successfully
+        """
+        try:
+            if not self.client:
+                await self.connect()
+            
+            # Check if class already exists
+            if await self.collection_exists(name):
+                logger.info(f"Weaviate class {name} already exists")
+                return True
+            
+            # Create the class schema
+            class_schema = {
+                "class": name,
+                "description": f"Vector collection: {name}",
+                "vectorizer": "none",  # We'll provide our own vectors
+                "properties": [
+                    {
+                        "name": "material_id",
+                        "dataType": ["text"],
+                        "description": "Unique material identifier"
+                    },
+                    {
+                        "name": "name",
+                        "dataType": ["text"],
+                        "description": "Material name"
+                    },
+                    {
+                        "name": "description",
+                        "dataType": ["text"],
+                        "description": "Material description"
+                    },
+                    {
+                        "name": "category",
+                        "dataType": ["text"],
+                        "description": "Material category"
+                    },
+                    {
+                        "name": "unit",
+                        "dataType": ["text"],
+                        "description": "Unit of measurement"
+                    },
+                    {
+                        "name": "price",
+                        "dataType": ["number"],
+                        "description": "Material price"
+                    },
+                    {
+                        "name": "metadata",
+                        "dataType": ["text"],
+                        "description": "Additional metadata (JSON string)"
+                    },
+                    {
+                        "name": "created_at",
+                        "dataType": ["date"],
+                        "description": "Creation timestamp"
+                    }
+                ]
+            }
+            
+            self.client.schema.create_class(class_schema)
+            logger.info(f"Created Weaviate class: {name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to create Weaviate class {name}: {e}")
+            raise DatabaseError(f"Failed to create Weaviate class: {e}")
+    
+    async def collection_exists(self, name: str) -> bool:
+        """Check if collection (class) exists in Weaviate.
+        
+        Args:
+            name: Class name
+            
+        Returns:
+            True if class exists
+        """
+        try:
+            if not self.client:
+                await self.connect()
+            
+            # Get existing schema
+            existing_schema = self.client.schema.get()
+            class_exists = any(
+                cls["class"] == name 
+                for cls in existing_schema.get("classes", [])
+            )
+            
+            return class_exists
+            
+        except Exception as e:
+            logger.error(f"Failed to check if Weaviate class {name} exists: {e}")
+            return False 

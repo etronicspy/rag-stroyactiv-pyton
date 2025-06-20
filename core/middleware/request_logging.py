@@ -1,5 +1,5 @@
 """
-Unified logging middleware using core monitoring system.
+Unified request logging middleware using core monitoring system.
 Eliminates code duplication by leveraging core/monitoring/logger.py components.
 
 ARCHITECTURE: Integrated with core.monitoring.logger for consistency

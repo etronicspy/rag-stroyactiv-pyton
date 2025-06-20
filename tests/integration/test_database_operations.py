@@ -10,18 +10,38 @@ Integration tests for database operations
 - test_hybrid_repository.py
 """
 import pytest
-import asyncio
 import unittest.mock
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch, Mock
 from typing import Dict, Any, List
 
-from core.database.adapters.postgresql_adapter import PostgreSQLAdapter, MaterialModel
+from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import ConnectionError, DatabaseError, QueryError
 from core.database.factories import DatabaseFactory
 from core.database.init_db import DatabaseInitializer
+from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
+from core.repositories.hybrid_materials import HybridMaterialsRepository
+from core.repositories.cached_materials import CachedMaterialsRepository
+from core.schemas.materials import MaterialCreate, Material
+from core.monitoring.logger import get_logger
+import redis.exceptions
+from sqlalchemy.exc import OperationalError
 
+logger = get_logger(__name__)
+
+# Create simple request/response classes for testing if they don't exist
+class SearchRequest:
+    def __init__(self, query: str, limit: int = 10):
+        self.query = query
+        self.limit = limit
+
+class SearchResponse:
+    def __init__(self, materials: List[Dict], total: int, query: str, search_type: str):
+        self.materials = materials
+        self.total = total
+        self.query = query
+        self.search_type = search_type
 
 class TestPostgreSQLIntegration:
     """Интеграционные тесты для PostgreSQL adapter"""
@@ -868,7 +888,6 @@ class TestPostgreSQLAdapter:
     @pytest.mark.integration
     async def test_connection_error_handling(self):
         """Тест обработки ошибок подключения"""
-        from adapters.database.postgresql_adapter import PostgreSQLAdapter
         from sqlalchemy.exc import OperationalError
         
         # Create adapter with invalid connection string
@@ -881,7 +900,6 @@ class TestPostgreSQLAdapter:
     @pytest.mark.integration
     async def test_query_execution_error(self):
         """Тест обработки ошибок выполнения запросов"""
-        from adapters.database.postgresql_adapter import PostgreSQLAdapter
         
         # Mock adapter for testing
         adapter = PostgreSQLAdapter("postgresql://test:test@localhost:5432/test")
@@ -901,11 +919,9 @@ class TestRedisAdapter:
     @pytest.mark.integration
     async def test_connection_error_handling(self):
         """Тест обработки ошибок подключения Redis"""
-        from adapters.database.redis_adapter import RedisAdapter
-        import redis.exceptions
         
         # Create adapter with invalid connection
-        adapter = RedisAdapter("redis://invalid:6379")
+        adapter = RedisDatabase({"redis_url": "redis://invalid:6379"})
         
         # Test connection error handling
         with pytest.raises(redis.exceptions.ConnectionError):
@@ -914,9 +930,8 @@ class TestRedisAdapter:
     @pytest.mark.integration
     async def test_operation_error_handling(self):
         """Тест обработки ошибок операций Redis"""
-        from adapters.database.redis_adapter import RedisAdapter
         
-        adapter = RedisAdapter("redis://localhost:6379")
+        adapter = RedisDatabase({"redis_url": "redis://localhost:6379"})
         
         # Mock Redis client that raises error
         with patch.object(adapter, 'get') as mock_get:
@@ -954,7 +969,6 @@ class TestCachedMaterialsRepository:
     @pytest.fixture
     def cached_repository(self, mock_repository, mock_cache):
         """Кешированный репозиторий для тестирования"""
-        from repositories.cached_materials_repository import CachedMaterialsRepository
         return CachedMaterialsRepository(mock_repository, mock_cache)
     
     @pytest.mark.integration
@@ -1026,7 +1040,6 @@ class TestHybridMaterialsRepository:
     @pytest.fixture
     def hybrid_repository(self, mock_sql_repo, mock_vector_repo):
         """Гибридный репозиторий для тестирования"""
-        from repositories.hybrid_materials_repository import HybridMaterialsRepository
         return HybridMaterialsRepository(mock_sql_repo, mock_vector_repo)
     
     @pytest.mark.integration

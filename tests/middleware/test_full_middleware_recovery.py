@@ -22,7 +22,7 @@ class TestFullMiddlewareRecovery:
             "description": "Testing request body logging functionality"
         }
         
-        with patch('core.middleware.logging.logger') as mock_logger:
+        with patch('core.middleware.request_logging.logger') as mock_logger:
             response = client.post("/api/v1/test/materials", json=test_data)
             
             assert response.status_code == 200
@@ -36,7 +36,7 @@ class TestFullMiddlewareRecovery:
     
     def test_logging_middleware_response_body_logging(self):
         """Тест логирования тел ответов."""
-        with patch('core.middleware.logging.logger') as mock_logger:
+        with patch('core.middleware.request_logging.logger') as mock_logger:
             response = client.get("/api/v1/test/materials/1")
             
             assert response.status_code == 200
@@ -55,7 +55,7 @@ class TestFullMiddlewareRecovery:
             "User-Agent": "MiddlewareRecoveryTest/1.0"
         }
         
-        with patch('core.middleware.logging.logger') as mock_logger:
+        with patch('core.middleware.request_logging.logger') as mock_logger:
             response = client.get("/api/v1/test/materials/1", headers=headers)
             
             assert response.status_code == 200

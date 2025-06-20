@@ -8,7 +8,7 @@ for various services used by the application.
 from functools import lru_cache
 from typing import Optional
 
-from .types import DatabaseType, AIProvider
+from .type_definitions import DatabaseType, AIProvider
 from .base import Settings, get_settings
 
 @lru_cache(maxsize=1)
@@ -199,4 +199,13 @@ def clear_client_cache():
     get_vector_db_client.cache_clear()
     get_ai_client.cache_clear()
     get_redis_client.cache_clear()
-    get_postgresql_engine.cache_clear() 
+    get_postgresql_engine.cache_clear()
+
+def get_cache_info():
+    """Get cache information for all client factories."""
+    return {
+        "vector_db_cache": get_vector_db_client.cache_info()._asdict(),
+        "ai_client_cache": get_ai_client.cache_info()._asdict(),
+        "redis_cache": get_redis_client.cache_info()._asdict(),
+        "postgresql_cache": get_postgresql_engine.cache_info()._asdict()
+    } 

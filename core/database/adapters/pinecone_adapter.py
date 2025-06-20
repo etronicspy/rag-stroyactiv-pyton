@@ -115,6 +115,64 @@ class PineconeVectorDatabase(IVectorDatabase):
             self.pinecone = None
         logger.info("Disconnected from Pinecone")
     
+    async def create_collection(self, name: str, vector_size: int, distance_metric: str = "cosine") -> bool:
+        """Create a new collection (index) in Pinecone.
+        
+        Args:
+            name: Index name
+            vector_size: Dimension of vectors
+            distance_metric: Distance calculation method ("cosine", "euclidean", "dotproduct")
+            
+        Returns:
+            True if index created successfully
+        """
+        try:
+            if not self.pinecone:
+                await self.connect()
+            
+            # Check if index already exists
+            if name in self.pinecone.list_indexes():
+                logger.info(f"Pinecone index {name} already exists")
+                return True
+            
+            # Create new index
+            self.pinecone.create_index(
+                name=name,
+                dimension=vector_size,
+                metric=distance_metric
+            )
+            
+            # Wait for index to be ready
+            import time
+            while name not in self.pinecone.list_indexes():
+                time.sleep(1)
+            
+            logger.info(f"Created Pinecone index: {name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to create Pinecone index {name}: {e}")
+            raise DatabaseError(f"Failed to create Pinecone index: {e}")
+    
+    async def collection_exists(self, name: str) -> bool:
+        """Check if collection (index) exists in Pinecone.
+        
+        Args:
+            name: Index name
+            
+        Returns:
+            True if index exists
+        """
+        try:
+            if not self.pinecone:
+                await self.connect()
+            
+            return name in self.pinecone.list_indexes()
+            
+        except Exception as e:
+            logger.error(f"Failed to check if Pinecone index {name} exists: {e}")
+            return False
+    
     async def search(self, collection_name: str, query_vector: List[float], 
                     limit: int = 10, filter_dict: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Search for similar vectors in Pinecone.

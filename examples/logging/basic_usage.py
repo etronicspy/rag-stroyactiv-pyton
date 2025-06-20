@@ -248,7 +248,7 @@ def configuration_example():
     print("⚙️ КОНФИГУРАЦИЯ")
     print("=" * 50)
     
-    from core.config.logging import LoggingConfig
+    from core.config.log_config import LoggingConfig
     
     # Получение текущей конфигурации
     config = LoggingConfig()

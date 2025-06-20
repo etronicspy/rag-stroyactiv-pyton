@@ -64,6 +64,19 @@ repos:
         args: [--convention=google]
         exclude: ^(tests/|alembic/versions/)
 
+  # 🚨 CRITICAL: Filename conflicts check
+  - repo: local
+    hooks:
+      - id: check-filename-conflicts
+        name: 🚨 Check for filename conflicts with Python stdlib
+        entry: python scripts/check_filename_conflicts.py --strict
+        language: python
+        files: \.py$
+        pass_filenames: false
+        always_run: true
+        stages: [commit, push]
+        verbose: true
+
 # Configuration
 ci:
   autofix_commit_msg: |

@@ -23,7 +23,7 @@ from .constants import (
 from .database import DatabaseConfig
 from .ai import AIConfig
 from .factories import get_vector_db_client, get_ai_client
-from .types import DatabaseType, AIProvider, LogLevel
+from .type_definitions import DatabaseType, AIProvider, LogLevel
 
 # Global settings instance (backward compatibility)
 settings = get_settings()

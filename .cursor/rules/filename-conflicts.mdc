@@ -1,0 +1,175 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 🚨 Filename Conflict Prevention Rules
+
+## Overview
+Правила предотвращения конфликтов имен файлов со стандартными модулями Python для обеспечения стабильности импортов и предотвращения циклических зависимостей.
+
+## 🔥 Critical Forbidden Filenames
+
+### Never use these filenames for Python files:
+```
+# Core Python modules
+os.py, sys.py, time.py, json.py, logging.py, typing.py, pathlib.py
+collections.py, functools.py, itertools.py, operator.py, re.py
+math.py, datetime.py, random.py, string.py, io.py, csv.py
+sqlite3.py, urllib.py, http.py, email.py, html.py, xml.py
+asyncio.py, subprocess.py, threading.py, multiprocessing.py
+
+# Testing & Debugging
+unittest.py, doctest.py, pdb.py, profile.py, test.py
+
+# File & Compression
+zipfile.py, tarfile.py, gzip.py, bz2.py, lzma.py, zlib.py
+
+# Configuration & Args
+configparser.py, argparse.py, optparse.py, getopt.py
+```
+
+## ⚠️ Potentially Dangerous Names
+
+Use with caution (only in submodules):
+- `config.py` → `app_config.py`, `settings.py`
+- `constants.py` → `app_constants.py`, `project_constants.py`
+- `exceptions.py` → `custom_exceptions.py`, `app_exceptions.py`
+- `utils.py` → `helpers.py`, `utilities.py`, `common.py`
+- `base.py` → `base_classes.py`, `abstract_base.py`
+- `models.py` → `data_models.py`, `domain_models.py`
+
+## ✅ Recommended Alternatives
+
+### For this RAG Construction Materials API:
+```
+core/
+├── config/
+│   ├── app_settings.py      # NOT config.py
+│   ├── database_config.py   # NOT db.py
+│   ├── log_config.py        # NOT logging.py
+│   └── type_definitions.py  # NOT types.py
+├── exceptions/
+│   ├── api_exceptions.py    # NOT exceptions.py
+│   └── database_exceptions.py
+├── models/
+│   ├── material_models.py   # NOT models.py
+│   └── response_models.py
+└── services/
+    ├── material_service.py  # NOT service.py
+    └── search_service.py
+```
+
+## 🔧 Automatic Checks
+
+### Pre-commit Hook Integration
+```yaml
+- repo: local
+  hooks:
+    - id: check-filename-conflicts
+      name: 🚨 Check for filename conflicts with Python stdlib
+      entry: python scripts/check_filename_conflicts.py --strict
+      language: python
+      files: \.py$
+```
+
+### VS Code/Cursor Settings
+```json
+{
+  "files.watcherExclude": {
+    "**/logging.py": true,
+    "**/types.py": true,
+    "**/os.py": true,
+    "**/sys.py": true
+  }
+}
+```
+
+## 📋 File Creation Checklist
+
+Before creating any Python file:
+- [ ] Check filename against forbidden list
+- [ ] Ensure name is descriptive (>3 characters)
+- [ ] Add project prefix if needed
+- [ ] Verify no conflicts with existing files
+- [ ] Run automatic conflict check
+
+## ⚡ Quick Commands
+
+Available tasks in VS Code/Cursor:
+- `Ctrl+Shift+P` → "Tasks: Run Task" → "🚨 Check filename conflicts"
+- `Ctrl+Shift+P` → "Tasks: Run Task" → "⚡ Quick conflict check"
+
+## 🚨 Actions on Conflict Detection
+
+1. **Immediately rename** conflicting file
+2. **Update all imports** in project
+3. **Run tests** to verify correctness
+4. **Update documentation** if necessary
+5. **Add to exclusions** for automatic checks
+
+## 💡 Best Practices
+
+### Use descriptive module names:
+✅ **GOOD:**
+- `core/config/database_config.py`
+- `core/logging/request_logger.py`
+- `services/material_processor.py`
+- `api/routes/material_routes.py`
+
+❌ **BAD:**
+- `core/config/db.py`
+- `core/log.py`
+- `services/proc.py`
+- `api/mat.py`
+
+### Add prefixes to avoid conflicts:
+✅ **GOOD:**
+- `core/config/app_types.py` (instead of types.py)
+- `core/monitoring/log_config.py` (instead of logging.py)
+- `services/custom_exceptions.py` (instead of exceptions.py)
+
+### Use subfolders for grouping:
+✅ **GOOD:**
+- `core/types/database_types.py`
+- `core/types/api_types.py`
+- `core/exceptions/database_exceptions.py`
+- `core/exceptions/api_exceptions.py`
+
+## 🔍 Automatic Detection Script
+
+Run the conflict checker:
+```bash
+# Check for conflicts
+python scripts/check_filename_conflicts.py
+
+# Strict mode (exit with error if conflicts found)
+python scripts/check_filename_conflicts.py --strict
+
+# Show what would be fixed
+python scripts/check_filename_conflicts.py --dry-run
+
+# Auto-fix conflicts
+python scripts/check_filename_conflicts.py --fix
+
+# Generate report
+python scripts/check_filename_conflicts.py --report conflicts_report.json
+```
+
+## 📊 Integration with Development Workflow
+
+### Git Hooks
+- Pre-commit: Block commits with conflicting filenames
+- Pre-push: Final check before pushing to remote
+
+### CI/CD Pipeline
+- Automated conflict detection in build process
+- Fail build if critical conflicts detected
+- Generate conflict reports for review
+
+### IDE Integration
+- Real-time conflict detection
+- Automatic suggestions for safe alternatives
+- Visual indicators for potentially dangerous names
+
+Following these rules will prevent 99% of filename conflicts and ensure stable imports across the project.

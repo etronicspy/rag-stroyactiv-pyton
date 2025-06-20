@@ -13,7 +13,10 @@ from datetime import datetime
 
 from services.materials import MaterialsService
 from core.schemas.materials import MaterialCreate
-from core.database.exceptions import DatabaseError
+from core.database.exceptions import DatabaseError, ConnectionError, ConfigurationError
+from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
+from core.database.factories import DatabaseFactory
+from core.dependencies.database import get_vector_db_dependency, get_ai_client_dependency, clear_dependency_cache
 
 
 class TestCategoryService:
