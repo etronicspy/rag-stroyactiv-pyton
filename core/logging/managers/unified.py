@@ -80,6 +80,10 @@ class UnifiedLoggingManager:
         self.request_logger = RequestLogger()
         self.database_logger = DatabaseLogger("unified")
         
+        # Track active operations
+        self._active_operations: Dict[str, OperationContext] = {}
+        self._operations_lock = threading.Lock()
+        
         # Performance settings
         self.enable_batching = getattr(settings, 'ENABLE_LOG_BATCHING', True) if settings else True
         self.enable_async_processing = getattr(settings, 'ENABLE_ASYNC_LOG_PROCESSING', True) if settings else True
@@ -308,6 +312,9 @@ class UnifiedLoggingManager:
             correlation_id=correlation_id
         )
         
+        # Register the operation
+        self._register_operation(context)
+        
         success = True
         error = None
         record_count = None
@@ -319,6 +326,9 @@ class UnifiedLoggingManager:
             error = str(e)
             raise
         finally:
+            # Unregister the operation
+            self._unregister_operation(operation_id)
+            
             duration_ms = (time.perf_counter() - start_time) * 1000
             
             # Get record count from context if set
@@ -360,11 +370,18 @@ class UnifiedLoggingManager:
         metrics_health = self.metrics_collector.get_health_metrics()
         
         return {
-            "unified_manager": {
+            "unified_logging": {
                 "status": "healthy",
                 "performance_optimization": self.enable_performance_optimization,
                 "batching": self.enable_batching,
-                "async_processing": self.enable_async_processing
+                "async_processing": self.enable_async_processing,
+                "settings": {
+                    "structured_logging": True,
+                    "correlation_tracking": True,
+                    "performance_monitoring": self.enable_performance_optimization,
+                    "async_processing": self.enable_async_processing,
+                    "batching": self.enable_batching
+                }
             },
             "metrics": metrics_health,
             "performance": self.performance_optimizer.get_comprehensive_stats() if self.enable_performance_optimization else {},
@@ -390,6 +407,24 @@ class UnifiedLoggingManager:
         """Get comprehensive logging statistics."""
         return self.get_performance_summary()
     
+    def get_operation_contexts(self) -> Dict[str, Dict[str, Any]]:
+        """Get currently active operation contexts."""
+        with self._operations_lock:
+            return {
+                op_id: context.to_dict() 
+                for op_id, context in self._active_operations.items()
+            }
+    
+    def _register_operation(self, context: OperationContext):
+        """Register an active operation."""
+        with self._operations_lock:
+            self._active_operations[context.operation_id] = context
+    
+    def _unregister_operation(self, operation_id: str):
+        """Unregister an active operation."""
+        with self._operations_lock:
+            self._active_operations.pop(operation_id, None)
+
     # Legacy method for backward compatibility
     def log_operation(self, operation: str, **kwargs):
         """Log operation (backward compatibility)."""

@@ -220,6 +220,10 @@ class LoggingMiddleware:
         self.app = app
         self.settings = get_settings()
         
+        # 🔧 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Принудительная инициализация логирования
+        # Гарантируем, что логирование настроено в процессе uvicorn
+        self._ensure_logging_initialized()
+        
         # 🚀 ЭТАП 4.4: Performance Optimization Integration
         self.enable_performance_optimization = getattr(self.settings, 'ENABLE_PERFORMANCE_OPTIMIZATION', True)
         if self.enable_performance_optimization:
@@ -320,6 +324,11 @@ class LoggingMiddleware:
                     with open('logs/http_debug.log', 'a') as f:
                         f.write(f"HTTP Request: {method} {path} at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
                     
+                    # 🔧 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Прямая запись в app.log
+                    with open('logs/app.log', 'a') as f:
+                        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                        f.write(f"{timestamp} - middleware.http - INFO     - HTTP Request started: {method} {path} (request_id: {request_id})\n")
+                    
                     safe_log(
                         self.app_logger,
                         "INFO",
@@ -364,6 +373,11 @@ class LoggingMiddleware:
                                 ip_address=client_ip,
                                 user_agent=user_agent
                             )
+                            
+                            # 🔧 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Прямая запись в app.log
+                            with open('logs/app.log', 'a') as f:
+                                timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                                f.write(f"{timestamp} - middleware.http - INFO     - {method} {path} - {status_code} ({duration_ms:.2f}ms)\n")
                             
                             # Стандартное логирование через safe_log
                             safe_log(
@@ -504,6 +518,47 @@ class LoggingMiddleware:
             sys.stderr.write(f"[IP-EXTRACTION-CRITICAL] Complete IP extraction failed: {ip_error}\n")
             sys.stderr.flush()
             return "unknown"
+
+    def _ensure_logging_initialized(self):
+        """
+        🔧 КРИТИЧЕСКАЯ ФУНКЦИЯ: Принудительная инициализация логирования.
+        
+        Гарантирует, что логирование настроено в процессе uvicorn,
+        даже если main.py инициализация не сработала.
+        """
+        import logging
+        import sys
+        
+        try:
+            # Проверяем, настроено ли логирование
+            root_logger = logging.getLogger()
+            
+            # Если нет handlers или level слишком высокий - принудительно настраиваем
+            if len(root_logger.handlers) == 0 or root_logger.level > logging.INFO:
+                sys.stderr.write("[MIDDLEWARE-INIT] Logging not configured, initializing...\n")
+                sys.stderr.flush()
+                
+                # Импортируем и настраиваем логирование
+                from core.monitoring import setup_structured_logging
+                
+                setup_structured_logging(
+                    log_level=self.settings.LOG_LEVEL,
+                    enable_structured=self.settings.ENABLE_STRUCTURED_LOGGING,
+                    log_file=self.settings.LOG_FILE,
+                    enable_colors=self.settings.LOG_COLORS,
+                    third_party_level=self.settings.LOG_THIRD_PARTY_LEVEL
+                )
+                
+                sys.stderr.write("[MIDDLEWARE-INIT] ✅ Logging initialized successfully\n")
+                sys.stderr.flush()
+            else:
+                sys.stderr.write("[MIDDLEWARE-INIT] ✅ Logging already configured\n")
+                sys.stderr.flush()
+                
+        except Exception as init_error:
+            # Критический fallback
+            sys.stderr.write(f"[MIDDLEWARE-INIT] ❌ Failed to initialize logging: {init_error}\n")
+            sys.stderr.flush()
 
 
 # 🔧 ELIMINATED: LoggingMiddlewareAdapter removed - single unified LoggingMiddleware only

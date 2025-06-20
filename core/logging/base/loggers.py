@@ -40,12 +40,45 @@ def get_logger(name: str, enable_correlation: bool = True) -> logging.Logger:
     
     # Import here to avoid circular imports
     if enable_correlation:
-        from ..context.adapters import CorrelationLoggingAdapter
-        correlation_logger = CorrelationLoggingAdapter(logger, {})
-        _logger_cache[name] = correlation_logger
-        return correlation_logger
+        try:
+            from ..context.adapters import CorrelationLoggingAdapter
+            correlation_logger = CorrelationLoggingAdapter(logger, {})
+            _logger_cache[name] = correlation_logger
+            return correlation_logger
+        except ImportError:
+            # Fallback to regular logger if correlation adapter is not available
+            pass
     
     _logger_cache[name] = logger
+    return logger
+
+
+def get_safe_logger(name: str) -> logging.Logger:
+    """
+    Get a safe logger that handles closed file errors gracefully.
+    
+    Args:
+        name: Logger name
+        
+    Returns:
+        Logger instance with error protection
+    """
+    logger = logging.getLogger(name)
+    
+    # Add a filter to catch closed file errors
+    class SafeLoggingFilter(logging.Filter):
+        def filter(self, record):
+            try:
+                return True
+            except ValueError as e:
+                if "I/O operation on closed file" in str(e):
+                    # Skip this log record if file is closed
+                    return False
+                raise
+    
+    if not any(isinstance(f, SafeLoggingFilter) for f in logger.filters):
+        logger.addFilter(SafeLoggingFilter())
+    
     return logger
 
 

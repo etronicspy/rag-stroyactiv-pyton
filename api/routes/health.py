@@ -17,7 +17,7 @@ from core.monitoring.logger import get_logger
 from core.config import get_settings, DatabaseType, AIProvider, get_vector_db_client
 from core.monitoring import get_metrics_collector
 from core.monitoring.logger import get_logger
-from core.monitoring.unified_manager import get_unified_logging_manager
+from core.logging.managers.unified import get_unified_logging_manager
 from core.database.factories import DatabaseFactory
 from core.database.exceptions import ConnectionError as DatabaseConnectionError
 from core.database.pool_manager import get_pool_manager

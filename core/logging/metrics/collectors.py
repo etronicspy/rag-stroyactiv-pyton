@@ -315,29 +315,31 @@ class MetricsCollector(MetricsCollectorInterface):
             return lower + (upper - lower) * (index - int(index))
     
     def get_health_metrics(self) -> Dict[str, Any]:
-        """Get system health metrics."""
-        with self._lock:
-            total_metrics = sum(len(values) for values in self._metrics.values())
-            unique_metrics = len(self._metrics)
-            
-            # Calculate recent activity (last 5 minutes)
-            recent_cutoff = datetime.utcnow() - timedelta(minutes=5)
-            recent_metrics = 0
-            
-            for values in self._metrics.values():
-                recent_metrics += sum(
-                    1 for v in values 
-                    if v.timestamp >= recent_cutoff
-                )
-            
-            return {
-                'total_metrics_stored': total_metrics,
-                'unique_metric_names': unique_metrics,
-                'metrics_last_5min': recent_metrics,
-                'performance_tracker': self._performance_tracker.get_database_summary(),
-                'system_health': 'healthy' if recent_metrics > 0 else 'idle',
-                'last_updated': datetime.utcnow().isoformat()
+        """Get health metrics for monitoring."""
+        stats = self.get_stats()
+        total_operations = sum(len(hist) for hist in stats.get('histograms', {}).values())
+        
+        return {
+            'status': 'healthy',
+            'total_counters': len(stats.get('counters', {})),
+            'total_gauges': len(stats.get('gauges', {})),
+            'total_histograms': len(stats.get('histograms', {})),
+            'total_operations': total_operations,
+            'performance_tracker': {
+                'database_summary': self._performance_tracker.get_database_summary()
             }
+        }
+    
+    def get_metrics_summary(self) -> Dict[str, Any]:
+        """Get comprehensive metrics summary for health checks."""
+        stats = self.get_stats()
+        return {
+            'counters': stats.get('counters', {}),
+            'gauges': stats.get('gauges', {}),
+            'histograms': stats.get('histograms', {}),
+            'performance': self._performance_tracker.get_database_summary(),
+            'health': self.get_health_metrics()
+        }
 
 
 # Global metrics collector instance
