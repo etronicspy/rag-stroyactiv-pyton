@@ -19,15 +19,30 @@ import uuid
 import time
 import json
 import logging
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
+import os
+import io
+import sys
+from unittest.mock import Mock, patch, MagicMock, AsyncMock, call
 from contextlib import contextmanager
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Generator, AsyncGenerator
 
 # Core imports
-from core.monitoring.logger import get_logger, StructuredFormatter, DatabaseLogger, RequestLogger
-from core.monitoring.unified_manager import UnifiedLoggingManager, get_unified_logging_manager
-from core.monitoring.context import CorrelationContext, get_correlation_id, set_correlation_id
+from core.logging import (
+    get_logger, 
+    get_unified_logging_manager, 
+    get_metrics_collector,
+    get_performance_optimizer
+)
+from core.logging.context import CorrelationContext, get_correlation_id, set_correlation_id
+from core.logging.base.formatters import StructuredFormatter
+from core.logging.handlers.database import DatabaseLogger
+from core.logging.handlers.request import RequestLogger
+from core.logging.managers.unified import UnifiedLoggingManager
 from core.config import get_settings
+
+# Настройка тестового логгера
+logging.basicConfig(level=logging.INFO)
+logger = get_logger(__name__)
 
 
 class TestUnifiedLoggingSystemStage0:
@@ -175,6 +190,192 @@ def clean_correlation_context():
 def unified_manager():
     """Fixture providing UnifiedLoggingManager instance."""
     return get_unified_logging_manager()
+
+
+class TestUnifiedLogging:
+    """Test suite for unified logging system."""
+    
+    def test_get_logger_basic(self):
+        """Test basic logger creation."""
+        test_logger = get_logger("test.logger")
+        assert test_logger is not None
+        assert test_logger.name == "test.logger"
+    
+    def test_structured_formatter(self):
+        """Test structured formatter."""
+        formatter = StructuredFormatter()
+        record = logging.LogRecord(
+            name="test.logger",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=10,
+            msg="Test message",
+            args=(),
+            exc_info=None
+        )
+        formatted = formatter.format(record)
+        parsed = json.loads(formatted)
+        
+        assert "timestamp" in parsed
+        assert parsed["level"] == "INFO"
+        assert parsed["message"] == "Test message"
+        assert parsed["logger"] == "test.logger"
+    
+    def test_correlation_context(self):
+        """Test correlation context."""
+        # No correlation ID initially
+        assert get_correlation_id() is None
+        
+        # With explicit correlation ID
+        with CorrelationContext.with_correlation_id("test-id"):
+            assert get_correlation_id() == "test-id"
+            
+            # Nested context with same ID
+            with CorrelationContext.with_correlation_id():
+                assert get_correlation_id() == "test-id"
+        
+        # Outside context, no correlation ID
+        assert get_correlation_id() is None
+        
+        # Auto-generated correlation ID
+        with CorrelationContext.with_correlation_id():
+            correlation_id = get_correlation_id()
+            assert correlation_id is not None
+            assert isinstance(correlation_id, str)
+    
+    def test_database_logger(self):
+        """Test database logger."""
+        db_logger = DatabaseLogger("test-db")
+        
+        # Test basic logging
+        with patch.object(db_logger, "_log") as mock_log:
+            db_logger.log_operation(
+                operation="test-operation",
+                duration_ms=100.5,
+                success=True,
+                record_count=5
+            )
+            
+            mock_log.assert_called_once()
+            args, kwargs = mock_log.call_args
+            assert kwargs["level"] == "INFO"
+            assert "test-operation" in kwargs["message"]
+            assert kwargs["extra"]["db_type"] == "test-db"
+            assert kwargs["extra"]["duration_ms"] == 100.5
+            assert kwargs["extra"]["success"] is True
+            assert kwargs["extra"]["record_count"] == 5
+    
+    def test_request_logger(self):
+        """Test request logger."""
+        req_logger = RequestLogger()
+        
+        # Test request logging
+        with patch.object(req_logger, "_log") as mock_log:
+            req_logger.log_request(
+                method="GET",
+                path="/api/test",
+                status_code=200,
+                duration_ms=50.5,
+                request_id="test-req-id"
+            )
+            
+            mock_log.assert_called_once()
+            args, kwargs = mock_log.call_args
+            assert kwargs["level"] == "INFO"
+            assert "GET /api/test" in kwargs["message"]
+            assert kwargs["extra"]["method"] == "GET"
+            assert kwargs["extra"]["path"] == "/api/test"
+            assert kwargs["extra"]["status_code"] == 200
+            assert kwargs["extra"]["duration_ms"] == 50.5
+            assert kwargs["extra"]["request_id"] == "test-req-id"
+    
+    def test_unified_manager_basic(self):
+        """Test unified logging manager basic functionality."""
+        manager = get_unified_logging_manager()
+        assert isinstance(manager, UnifiedLoggingManager)
+        
+        # Get logger through manager
+        test_logger = manager.get_logger("test.unified")
+        assert test_logger is not None
+        assert test_logger.name == "test.unified"
+    
+    def test_log_database_operation(self):
+        """Test database operation logging through unified manager."""
+        manager = get_unified_logging_manager()
+        
+        with patch.object(manager, "_log_db_operation") as mock_log:
+            manager.log_database_operation(
+                db_type="postgresql",
+                operation="select",
+                duration_ms=75.5,
+                success=True,
+                record_count=10
+            )
+            
+            mock_log.assert_called_once()
+            args, kwargs = mock_log.call_args
+            assert kwargs["db_type"] == "postgresql"
+            assert kwargs["operation"] == "select"
+            assert kwargs["duration_ms"] == 75.5
+            assert kwargs["success"] is True
+            assert kwargs["record_count"] == 10
+    
+    def test_log_request(self):
+        """Test request logging through unified manager."""
+        manager = get_unified_logging_manager()
+        
+        with patch.object(manager, "_log_request") as mock_log:
+            manager.log_request(
+                method="POST",
+                path="/api/resource",
+                status_code=201,
+                duration_ms=120.5,
+                request_id="test-post-id"
+            )
+            
+            mock_log.assert_called_once()
+            args, kwargs = mock_log.call_args
+            assert kwargs["method"] == "POST"
+            assert kwargs["path"] == "/api/resource"
+            assert kwargs["status_code"] == 201
+            assert kwargs["duration_ms"] == 120.5
+            assert kwargs["request_id"] == "test-post-id"
+    
+    def test_metrics_collector(self):
+        """Test metrics collector."""
+        metrics = get_metrics_collector()
+        
+        with patch.object(metrics, "_increment_counter") as mock_increment:
+            metrics.increment_counter("test_counter", labels={"test": "value"})
+            mock_increment.assert_called_once_with("test_counter", 1, {"test": "value"})
+        
+        with patch.object(metrics, "_record_histogram") as mock_record:
+            metrics.record_histogram("test_histogram", 42.5, labels={"test": "value"})
+            mock_record.assert_called_once_with("test_histogram", 42.5, {"test": "value"})
+    
+    @pytest.mark.asyncio
+    async def test_performance_optimizer(self):
+        """Test performance optimizer."""
+        optimizer = get_performance_optimizer()
+        
+        # Mock the async processing
+        with patch.object(optimizer, "_process_log_async") as mock_process:
+            mock_process.return_value = asyncio.Future()
+            mock_process.return_value.set_result(None)
+            
+            await optimizer.log_optimized(
+                logger_name="test.perf",
+                level="INFO",
+                message="Optimized log message",
+                extra_data={"test": "value"}
+            )
+            
+            mock_process.assert_called_once()
+            args, kwargs = mock_process.call_args
+            assert args[0]["logger_name"] == "test.perf"
+            assert args[0]["level"] == "INFO"
+            assert args[0]["message"] == "Optimized log message"
+            assert args[0]["extra_data"] == {"test": "value"}
 
 
 if __name__ == "__main__":

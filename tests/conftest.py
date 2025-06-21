@@ -7,7 +7,7 @@ import asyncio
 import os
 import time
 import logging
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import Dict, Any, List
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
@@ -40,7 +40,7 @@ TEST_SETTINGS = {
     "BATCH_SIZE": "50",
     "AUTO_MIGRATE": "false",
     "AUTO_SEED": "false",
-    "LOG_LEVEL": "INFO",
+    "LOG_GENERAL_DEFAULT_LEVEL": "INFO",
     "ENABLE_RATE_LIMITING": "true",
     "RATE_LIMIT_RPM": "60",
     "PROJECT_NAME": "RAG Construction Materials API",
