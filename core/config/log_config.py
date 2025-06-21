@@ -50,7 +50,7 @@ class LoggingConfig(BaseSettings):
     
     # === CORRELATION ID И ТРАССИРОВКА ===
     LOG_CORRELATION_ID: bool = Field(default=True, description="Включить correlation ID")
-    LOG_CORRELATION_ID_HEADER: bool = Field(default=True, description="Передавать correlation ID в заголовках")
+    LOG_CORRELATION_ID_HEADER: str = Field(default="X-Correlation-ID", description="Имя заголовка, в котором передаётся correlation ID")
     
     # === БАЗА ДАННЫХ ЛОГГИРОВАНИЕ ===
     LOG_DATABASE_OPERATIONS: bool = Field(default=True, description="Логгирование операций с БД")
@@ -121,7 +121,14 @@ class LoggingConfig(BaseSettings):
         return v if isinstance(v, list) else []
     
     class Config:
-        env_file = ".env"
+        env_file = [
+            ".env.local",
+            ".env.development",
+            ".env.production",
+            ".env"
+        ]
+        env_file_encoding = "utf-8"
+        extra = "ignore"
         case_sensitive = True
 
 

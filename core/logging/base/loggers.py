@@ -11,6 +11,7 @@ from typing import Optional
 from functools import lru_cache
 
 from core.config import get_settings
+from core.config import get_logging_config
 
 # 🔧 CONSTANTS: Moved hardcoded values to module level
 LOGGER_NAMES_TO_CONFIGURE = ["middleware", "services", "api", "database"]
@@ -141,7 +142,9 @@ class LoggingSetup:
     
     def __init__(self, settings=None):
         """Initialize logging setup with configuration."""
-        self.settings = settings or get_settings()
+        # Use dedicated logging config if explicit settings not provided
+        # This ensures we rely on the unified LoggingConfig with new env variable names.
+        self.settings = settings or get_logging_config()
     
     def _create_console_handler(self, log_level: str, enable_structured: bool, 
                                enable_colors: bool) -> logging.StreamHandler:
@@ -244,8 +247,15 @@ class LoggingSetup:
         # Use settings defaults if not provided
         log_level = log_level or getattr(self.settings, 'LOG_LEVEL', 'INFO')
         enable_structured = enable_structured if enable_structured is not None else getattr(self.settings, 'ENABLE_STRUCTURED_LOGGING', False)
-        enable_colors = enable_colors if enable_colors is not None else getattr(self.settings, 'ENABLE_COLORED_LOGGING', True)
-        third_party_level = third_party_level or getattr(self.settings, 'THIRD_PARTY_LOG_LEVEL', 'WARNING')
+        # Updated attribute names according to LoggingConfig (no legacy prefixes)
+        enable_colors = (
+            enable_colors if enable_colors is not None 
+            else getattr(self.settings, 'LOG_COLORS', True)
+        )
+        third_party_level = (
+            third_party_level 
+            or getattr(self.settings, 'LOG_THIRD_PARTY_LEVEL', 'WARNING')
+        )
         log_file = log_file or getattr(self.settings, 'LOG_FILE', None)
         
         # Clear existing handlers from root logger

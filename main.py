@@ -63,9 +63,8 @@ app.include_router(reference_router, prefix=settings.API_V1_STR, tags=["referenc
 app.include_router(advanced_search_router, prefix=settings.API_V1_STR, tags=["advanced-search"])
 app.include_router(tunnel_router, prefix=settings.API_V1_STR, tags=["tunnel"])
 
-# Настройка структурированного логирования
-if os.getenv("ENABLE_STRUCTURED_LOGGING", "").lower() in ("true", "1", "yes", "y"):
-    setup_structured_logging()
+# Всегда инициализируем систему логирования по конфигурации
+setup_structured_logging()
 
 
 @app.on_event("startup")

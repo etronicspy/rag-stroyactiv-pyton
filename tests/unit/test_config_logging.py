@@ -13,6 +13,7 @@ Created: 2024
 
 import pytest
 import os
+import logging
 from unittest.mock import patch, MagicMock
 from typing import Dict, Any
 
@@ -119,7 +120,7 @@ class TestConfigurationValidator:
     
     def test_validate_configuration_function(self):
         """Test the validate_configuration function."""
-        with patch('core.logging.config.validator.get_logging_settings') as mock_get_settings:
+        with patch('core.logging.config.settings.get_logging_settings') as mock_get_settings:
             mock_get_settings.return_value = LoggingSettings()
             validator = validate_configuration()
             
