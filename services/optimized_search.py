@@ -7,7 +7,7 @@ Optimized Search Service with Parallel Hybrid Search and Advanced Caching.
 import asyncio
 import json
 import time
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import List, Dict, Any, Optional, Tuple, Set, Union
 from dataclasses import dataclass
 from functools import lru_cache

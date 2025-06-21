@@ -1,12 +1,14 @@
-"""Qdrant vector database adapter implementation.
+"""Qdrant vector database adapter for both cloud and local instances.
 
-Адаптер для работы с Qdrant векторной БД.
+Адаптер для Qdrant Vector Database с поддержкой облачной и локальной версий.
 """
 
-from typing import List, Dict, Any, Optional
-from core.monitoring.logger import get_logger
+from typing import List, Dict, Any, Optional, Union, Tuple
+from core.logging import get_logger
 import asyncio
 from datetime import datetime
+import time
+import uuid
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct

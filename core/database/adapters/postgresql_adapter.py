@@ -1,10 +1,10 @@
-"""PostgreSQL relational database adapter implementation.
+"""PostgreSQL database adapter implementation.
 
-Адаптер для работы с PostgreSQL реляционной БД с поддержкой SQLAlchemy 2.0 и async/await.
+Адаптер для работы с PostgreSQL БД.
 """
 
-from typing import List, Dict, Any, Optional, Union
-from core.monitoring.logger import get_logger
+from typing import List, Dict, Any, Optional, Union, AsyncGenerator
+from core.logging import get_logger
 from datetime import datetime
 import uuid
 from contextlib import asynccontextmanager

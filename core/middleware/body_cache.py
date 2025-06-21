@@ -6,7 +6,7 @@ Body Cache Middleware для единого чтения request body.
 """
 
 import json
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import Optional
 
 from starlette.types import ASGIApp, Receive, Scope, Send, Message

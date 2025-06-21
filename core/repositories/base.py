@@ -1,12 +1,13 @@
-"""Base repository class with common functionality.
+"""Base repository for all database operations.
 
-Базовый класс репозитория с общей функциональностью для мульти-БД архитектуры.
+Базовый репозиторий для всех операций с базами данных.
 """
 
 from abc import ABC
-from typing import Dict, Any, Optional
-from core.monitoring.logger import get_logger
+from typing import Dict, Any, Optional, Union
 from datetime import datetime
+import uuid
+from core.logging import get_logger
 
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
 from core.database.exceptions import DatabaseError, QueryError

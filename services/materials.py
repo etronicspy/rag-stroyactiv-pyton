@@ -4,11 +4,10 @@
 """
 
 from typing import List, Optional, Dict, Any
-from core.monitoring.logger import get_logger
-from core.monitoring.unified_manager import get_unified_logging_manager
-from core.monitoring.context import with_correlation_context, get_correlation_id
-from core.monitoring import log_database_operation_optimized  # 🚀 ЭТАП 4.5: Performance-optimized decorator
-from core.monitoring import (  # 🎯 ЭТАП 5.4: Metrics Integration
+from core.logging import get_logger, with_correlation_context, get_correlation_id
+from core.logging.managers.unified import get_unified_logging_manager
+from core.logging import log_database_operation_decorator  # Новый декоратор для логирования операций с БД
+from core.logging.metrics.integration import (  # 🎯 ЭТАП 5.4: Metrics Integration
     get_metrics_integrated_logger,
     log_database_operation_with_metrics
 )
@@ -20,10 +19,10 @@ from core.schemas.materials import (
     Material, MaterialCreate, MaterialUpdate, MaterialBatchResponse, MaterialImportItem,
     Category, Unit
 )
-from core.database.interfaces import IVectorDatabase
+from core.database.interfaces import IVectorDatabase, IRelationalDatabase
 from core.database.exceptions import DatabaseError, ConnectionError, QueryError
 from core.repositories.base import BaseRepository
-from core.monitoring.metrics import get_metrics_collector
+from core.logging.metrics import get_metrics_collector
 
 
 logger = get_logger(__name__)
@@ -132,7 +131,7 @@ class MaterialsService(BaseRepository):
     # === CRUD Operations ===
     
     @with_correlation_context
-    @log_database_operation_optimized("qdrant", "create_material")  # 🚀 ЭТАП 4.5: Performance-optimized
+    @log_database_operation_decorator("qdrant", "create_material")  # Используем новый декоратор
     async def create_material(self, material: MaterialCreate) -> Material:
         """Create a new material with semantic embedding.
         
@@ -340,7 +339,7 @@ class MaterialsService(BaseRepository):
     # === Search Operations ===
     
     @with_correlation_context
-    @log_database_operation_optimized("qdrant", "search_materials")  # 🚀 ЭТАП 4.5: Performance-optimized
+    @log_database_operation_decorator("qdrant", "search_materials")  # Используем новый декоратор
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
         """Search materials using semantic search with fallback.
         
@@ -468,7 +467,7 @@ class MaterialsService(BaseRepository):
     # === Batch Operations ===
     
     @with_correlation_context
-    @log_database_operation_optimized("qdrant", "create_materials_batch")  # 🚀 ЭТАП 4.5: Performance-optimized
+    @log_database_operation_decorator("qdrant", "create_materials_batch")  # Используем новый декоратор
     async def create_materials_batch(self, materials: List[MaterialCreate], batch_size: int = 100) -> MaterialBatchResponse:
         """Create multiple materials in batches with optimized performance.
         

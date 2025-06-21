@@ -2,10 +2,12 @@
 SSH Tunnel Manager for RAG Construction Materials API.
 
 This module provides tunnel lifecycle management, monitoring, and recovery.
+
+Менеджер SSH-туннелей для управления SSH-туннелями.
 """
 
 import asyncio
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 import time
 from typing import Optional, Dict, Any
 

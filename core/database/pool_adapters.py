@@ -5,8 +5,8 @@ Pool adapters for integrating existing database pools with dynamic pool manager.
 """
 
 import asyncio
-from core.monitoring.logger import get_logger
-from typing import Dict, Any, Optional
+from core.logging import get_logger
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from core.database.pool_manager import PoolProtocol

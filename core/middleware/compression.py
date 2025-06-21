@@ -6,7 +6,7 @@ Supports multiple compression algorithms with intelligent selection.
 import gzip
 import zlib
 import time
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import Optional, List, Dict, Any, Callable
 from io import BytesIO
 

@@ -6,8 +6,8 @@ Multi-level caching system for optimized data access.
 
 import asyncio
 import time
-from core.monitoring.logger import get_logger
-from typing import Any, Optional, Dict, List, Union, Callable, TypeVar
+from core.logging import get_logger
+from typing import Any, Optional, Dict, List, Union, Callable, TypeVar, Generic
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum

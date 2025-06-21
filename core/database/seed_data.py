@@ -1,11 +1,13 @@
-"""Seed data for database initialization.
+"""Database seed data module.
 
-Модуль для инициализации справочных данных в БД.
+Модуль для заполнения БД начальными данными.
 Содержит базовые категории материалов и единицы измерения.
 """
 
+import asyncio
+from datetime import datetime
 from typing import List, Dict, Any, Optional
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
 

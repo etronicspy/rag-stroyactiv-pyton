@@ -4,10 +4,11 @@
 """
 
 from typing import List, Optional
-from core.monitoring.logger import get_logger
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query, Path
 from datetime import datetime
+from uuid import UUID
 
+from core.logging import get_logger
 from core.schemas.materials import (
     MaterialCreate, MaterialUpdate, Material, MaterialSearchQuery, 
     MaterialBatchCreate, MaterialBatchResponse, MaterialImportRequest

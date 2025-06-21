@@ -1,21 +1,22 @@
-"""Hybrid Materials Repository using both Vector and Relational databases.
+"""Hybrid materials repository implementation.
 
-Гибридный репозиторий материалов, использующий векторную и реляционную БД для оптимального поиска.
+Реализация гибридного репозитория материалов.
 """
 
 from typing import List, Dict, Any, Optional, Tuple
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from datetime import datetime
 import asyncio
 import uuid
+import time
 
 from core.repositories.base import BaseRepository
 from core.repositories.interfaces import IMaterialsRepository
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase
 from core.database.exceptions import DatabaseError, QueryError
-from core.schemas.materials import Material, MaterialCreate, MaterialUpdate
-from core.monitoring.logger import DatabaseLogger, log_database_operation
-from core.monitoring.metrics import get_metrics_collector
+from core.schemas.materials import Material, MaterialCreate, MaterialUpdate, MaterialSearchQuery
+from core.logging import DatabaseLogger, log_database_operation
+from core.logging.metrics import get_metrics_collector
 
 
 logger = get_logger(__name__)

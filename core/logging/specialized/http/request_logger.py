@@ -7,7 +7,8 @@ This module provides a logger for HTTP requests.
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, Union
+import contextlib
+from typing import Any, Dict, List, Optional, Union, ContextManager
 
 from core.logging.interfaces import IRequestLogger
 from core.logging.core import Logger
@@ -60,6 +61,188 @@ class RequestLogger(Logger, IRequestLogger):
         ]
     
     def log_request(
+        self,
+        method: str,
+        url: str,
+        headers: Optional[Dict[str, str]] = None,
+        body: Optional[Any] = None,
+        **kwargs
+    ) -> None:
+        """
+        Log an HTTP request.
+        
+        Args:
+            method: The HTTP method
+            url: The URL
+            headers: The request headers
+            body: The request body
+            **kwargs: Additional context for the log message
+        """
+        # Build the log message
+        message = f"{method} {url}"
+        
+        # Build the context
+        context = {
+            "method": method,
+            "url": url,
+        }
+        
+        # Add headers if enabled
+        if self._log_headers and headers:
+            context["headers"] = self._process_headers(headers)
+        
+        # Add body if enabled
+        if self._log_request_body and body:
+            context["body"] = self._process_body(body)
+        
+        # Add additional context
+        context.update(kwargs)
+        
+        # Log the message
+        self.info(message, **context)
+    
+    def log_response(
+        self,
+        status_code: int,
+        headers: Optional[Dict[str, str]] = None,
+        body: Optional[Any] = None,
+        duration_ms: Optional[float] = None,
+        **kwargs
+    ) -> None:
+        """
+        Log an HTTP response.
+        
+        Args:
+            status_code: The HTTP status code
+            headers: The response headers
+            body: The response body
+            duration_ms: The request duration in milliseconds
+            **kwargs: Additional context for the log message
+        """
+        # Build the log message
+        message = f"Response - {status_code}"
+        
+        # Build the context
+        context = {
+            "status_code": status_code,
+        }
+        
+        # Add duration if available
+        if duration_ms is not None:
+            context["duration_ms"] = duration_ms
+        
+        # Add headers if enabled
+        if self._log_headers and headers:
+            context["headers"] = self._process_headers(headers)
+        
+        # Add body if enabled
+        if self._log_response_body and body:
+            context["body"] = self._process_body(body)
+        
+        # Add additional context
+        context.update(kwargs)
+        
+        # Determine the log level based on status code
+        if status_code >= 500:
+            level = logging.ERROR
+        elif status_code >= 400:
+            level = logging.WARNING
+        else:
+            level = logging.INFO
+        
+        # Log the message
+        self.log(level, message, **context)
+    
+    def log_error(
+        self,
+        error: Exception,
+        method: Optional[str] = None,
+        url: Optional[str] = None,
+        **kwargs
+    ) -> None:
+        """
+        Log an HTTP error.
+        
+        Args:
+            error: The error
+            method: The HTTP method
+            url: The URL
+            **kwargs: Additional context for the log message
+        """
+        # Build the log message
+        message = f"HTTP Error: {type(error).__name__}"
+        if method and url:
+            message = f"{method} {url} - {message}"
+        
+        # Build the context
+        context = {
+            "error": str(error),
+            "error_type": type(error).__name__,
+        }
+        
+        # Add method and url if available
+        if method:
+            context["method"] = method
+        if url:
+            context["url"] = url
+        
+        # Add additional context
+        context.update(kwargs)
+        
+        # Log the message
+        self.error(message, **context)
+    
+    @contextlib.contextmanager
+    def request_context(
+        self,
+        method: str,
+        url: str,
+        **kwargs
+    ) -> ContextManager[Dict[str, Any]]:
+        """
+        Context manager for HTTP requests.
+        
+        Args:
+            method: The HTTP method
+            url: The URL
+            **kwargs: Additional context for the log message
+            
+        Returns:
+            A context manager that logs the request and response
+        """
+        # Log the request
+        self.log_request(method, url, **kwargs)
+        
+        # Create the context
+        context = {
+            "method": method,
+            "url": url,
+            "start_time": time.time(),
+        }
+        context.update(kwargs)
+        
+        try:
+            # Yield the context
+            yield context
+            
+            # Calculate duration
+            duration_ms = (time.time() - context["start_time"]) * 1000
+            
+            # Log the response if status_code is in the context
+            if "status_code" in context:
+                self.log_response(
+                    context["status_code"],
+                    headers=context.get("response_headers"),
+                    body=context.get("response_body"),
+                    duration_ms=duration_ms,
+                    **kwargs
+                )
+        except Exception as e:
+            # Log the error
+            self.log_error(e, method, url, **kwargs)
+            raise
+
+    def log_http_request(
         self,
         method: str,
         url: str,
@@ -201,6 +384,7 @@ class RequestLogger(Logger, IRequestLogger):
         status_code: int,
         response_headers: Optional[Dict[str, str]] = None,
         response_body: Optional[Any] = None,
+        error: Optional[Exception] = None,
         **kwargs
     ) -> None:
         """
@@ -211,6 +395,7 @@ class RequestLogger(Logger, IRequestLogger):
             status_code: The status code
             response_headers: The response headers
             response_body: The response body
+            error: The error, if any
             **kwargs: Additional context for the log message
         """
         # Extract request information
@@ -236,6 +421,11 @@ class RequestLogger(Logger, IRequestLogger):
         # Add response body if enabled
         if self._log_response_body and response_body:
             context["response_body"] = self._process_body(response_body)
+            
+        # Add error information if available
+        if error:
+            context["error"] = str(error)
+            context["error_type"] = type(error).__name__
         
         # Add additional context
         context.update(kwargs)
@@ -256,7 +446,7 @@ class RequestLogger(Logger, IRequestLogger):
         Process headers for logging.
         
         Args:
-            headers: The headers
+            headers: The headers to process
             
         Returns:
             The processed headers
@@ -264,44 +454,51 @@ class RequestLogger(Logger, IRequestLogger):
         if not self._mask_sensitive_headers:
             return headers
         
-        # Create a copy of the headers
-        processed_headers = {}
+        # Clone the headers
+        processed_headers = headers.copy()
         
         # Mask sensitive headers
-        for name, value in headers.items():
-            if name.lower() in self._sensitive_headers:
-                processed_headers[name] = "********"
-            else:
-                processed_headers[name] = value
+        for header in self._sensitive_headers:
+            for key in processed_headers:
+                if header.lower() in key.lower():
+                    processed_headers[key] = "***MASKED***"
         
         return processed_headers
     
     def _process_body(self, body: Any) -> Any:
         """
-        Process a body for logging.
+        Process body for logging.
         
         Args:
-            body: The body
+            body: The body to process
             
         Returns:
             The processed body
         """
-        # Convert the body to a string
+        # Convert to string if not already
         if isinstance(body, (dict, list)):
-            body_str = json.dumps(body)
-        else:
+            try:
+                body_str = json.dumps(body)
+            except:
+                body_str = str(body)
+        elif not isinstance(body, str):
             body_str = str(body)
+        else:
+            body_str = body
         
-        # Truncate the body if it's too long
+        # Truncate if too large
         if len(body_str) > self._max_body_size:
-            return f"{body_str[:self._max_body_size]}... [truncated]"
+            return body_str[:self._max_body_size] + "... [truncated]"
         
-        # Return the original body
-        return body
+        # Return the original body if it's a dict or list
+        if isinstance(body, (dict, list)):
+            return body
+        
+        return body_str
 
 
 class AsyncRequestLogger(RequestLogger):
-    """Asynchronous logger for HTTP requests."""
+    """Async logger for HTTP requests."""
     
     async def alog_request(
         self,
@@ -331,9 +528,8 @@ class AsyncRequestLogger(RequestLogger):
             error: The error, if any
             **kwargs: Additional context for the log message
         """
-        # For now, just call the synchronous method
-        # In a real implementation, this would use an async queue
-        self.log_request(
+        # Use the sync method for now
+        self.log_http_request(
             method=method,
             url=url,
             status_code=status_code,
@@ -367,8 +563,7 @@ class AsyncRequestLogger(RequestLogger):
         Returns:
             A request context for the response logger
         """
-        # For now, just call the synchronous method
-        # In a real implementation, this would use an async queue
+        # Use the sync method for now
         return self.log_incoming_request(
             method=method,
             path=path,
@@ -383,6 +578,7 @@ class AsyncRequestLogger(RequestLogger):
         status_code: int,
         response_headers: Optional[Dict[str, str]] = None,
         response_body: Optional[Any] = None,
+        error: Optional[Exception] = None,
         **kwargs
     ) -> None:
         """
@@ -393,14 +589,15 @@ class AsyncRequestLogger(RequestLogger):
             status_code: The status code
             response_headers: The response headers
             response_body: The response body
+            error: The error, if any
             **kwargs: Additional context for the log message
         """
-        # For now, just call the synchronous method
-        # In a real implementation, this would use an async queue
+        # Use the sync method for now
         self.log_incoming_response(
             request_context=request_context,
             status_code=status_code,
             response_headers=response_headers,
             response_body=response_body,
+            error=error,
             **kwargs
         ) 

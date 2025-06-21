@@ -6,7 +6,8 @@ Dynamic Connection Pool Manager for optimal database performance.
 
 import asyncio
 import time
-from core.monitoring.logger import get_logger
+from functools import lru_cache
+from core.logging import get_logger
 import threading
 from typing import Dict, Any, Optional, Protocol, List
 from dataclasses import dataclass, field

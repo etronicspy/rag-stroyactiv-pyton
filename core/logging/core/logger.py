@@ -101,7 +101,17 @@ class Logger(ILogger):
             handler.emit(record)
         
         # Also log using the standard logger
-        self._logger.log(level, message, **kwargs)
+        # Pass extra context safely to the standard logger. The built-in logging API
+        # accepts only a fixed set of keyword arguments, but allows a single
+        # "extra" dictionary to augment the log record with custom fields. Any
+        # additional context we receive is therefore wrapped into this dict to
+        # avoid TypeError: Logger._log() got an unexpected keyword argument X.
+        if kwargs:
+            # Preserve existing fields under a dedicated attribute to avoid
+            # clashing with built-in record attributes.
+            self._logger.log(level, message, extra={"context": kwargs})
+        else:
+            self._logger.log(level, message)
     
     def add_handler(self, handler: IHandler) -> None:
         """

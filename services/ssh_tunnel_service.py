@@ -1,14 +1,17 @@
 """
-SSH Tunnel Service for RAG Construction Materials API.
+SSH Tunnel Service for secure database connections.
+
+Сервис SSH-туннеля для безопасного подключения к базам данных.
 
 This module provides the main SSH tunnel service that manages tunnel lifecycle,
 monitoring, and automatic reconnection.
 """
 
 import asyncio
-from core.monitoring.logger import get_logger
+from functools import lru_cache
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
+from core.logging import get_logger
 
 from core.config import get_settings
 from .tunnel.ssh_tunnel import SSHTunnel

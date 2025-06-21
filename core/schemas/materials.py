@@ -2,6 +2,7 @@ from typing import Optional, List, Dict, Any, Union
 from pydantic import BaseModel, Field, ConfigDict, field_serializer
 from datetime import datetime, date
 from decimal import Decimal
+from enum import Enum
 
 class MaterialBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=200)
@@ -34,6 +35,36 @@ class RawProductBase(BaseModel):
     # Date information
     date_price_change: Optional[date] = None
 
+class PriceProcessingStatus(str, Enum):
+    """Status of price list processing."""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+class PriceUploadResponse(BaseModel):
+    """Response for price list upload."""
+    status: PriceProcessingStatus
+    message: str
+    task_id: Optional[str] = None
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    file_name: Optional[str] = None
+    upload_time: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "pending",
+                "message": "Price list upload started",
+                "task_id": "12345678-1234-5678-1234-567812345678",
+                "supplier_id": "12345678-1234-5678-1234-567812345678",
+                "supplier_name": "ООО Стройматериалы",
+                "file_name": "price_list.csv",
+                "upload_time": "2023-01-01T12:00:00"
+            }
+        }
+
 class MaterialCreate(MaterialBase):
     pass
 
@@ -46,14 +77,15 @@ class MaterialUpdate(BaseModel):
 
 class Material(MaterialBase):
     id: str
-    embedding: Optional[List[float]] = None
+    # Hybrid list: first elements are floats, last element is a preview string
+    embedding: Optional[List[Union[float, str]]] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
     
     @field_serializer('embedding')
-    def serialize_embedding(self, value: Optional[List[float]]) -> Union[List[float], List[str]]:
+    def serialize_embedding(self, value: Optional[List[Union[float, str]]]) -> List[Union[float, str]]:
         """Format embeddings for display - show preview instead of null."""
         if value is not None and len(value) > 0:
             # Show first 5 values, then ellipsis with dimension count

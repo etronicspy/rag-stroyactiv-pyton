@@ -5,7 +5,7 @@ Includes request size limits, security headers, and input validation.
 
 import re
 import time
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import Dict, List, Optional, Callable, Any
 from urllib.parse import unquote
 

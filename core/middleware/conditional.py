@@ -3,7 +3,7 @@ Conditional middleware wrapper for optimized performance.
 Allows middleware to be applied only to specific routes or conditions.
 """
 
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 import time
 from typing import Callable, Optional, List, Union, Pattern
 import re

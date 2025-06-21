@@ -9,13 +9,18 @@ Advanced Search API Routes (Simplified)
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from core.monitoring.logger import get_logger
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
 
 from core.schemas.materials import Material
 from services.materials import MaterialsService
+from core.config import get_settings
+from core.schemas.materials import (
+    MaterialSearchQuery, SearchResponse
+)
+from core.logging import get_logger
+from services.advanced_search import AdvancedSearchService
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/search", tags=["search"])

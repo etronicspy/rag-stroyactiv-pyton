@@ -5,7 +5,7 @@
 
 from functools import lru_cache
 from typing import Optional, Dict, Any
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from enum import Enum
 
 from core.config import settings, DatabaseType, AIProvider

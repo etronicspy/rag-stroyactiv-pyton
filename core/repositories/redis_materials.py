@@ -1,10 +1,10 @@
-"""Redis Materials Repository for caching and session management.
+"""Redis materials repository implementation.
 
-Репозиторий материалов для Redis с поддержкой кеширования и управления сессиями.
+Реализация репозитория материалов с использованием Redis.
 """
 
 import json
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import List, Optional, Dict, Any
 from datetime import timedelta
 

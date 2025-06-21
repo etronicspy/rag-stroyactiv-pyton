@@ -19,7 +19,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple, Set
 from difflib import SequenceMatcher
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 
 from core.schemas.materials import (
     AdvancedSearchQuery, MaterialFilterOptions, SortOption, PaginationOptions,

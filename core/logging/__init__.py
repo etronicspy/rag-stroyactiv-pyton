@@ -134,6 +134,20 @@ check_env_configuration()
 get_logger_with_metrics = get_unified_logging_manager().get_logger
 log_database_operation_optimized = log_database_operation
 
+# Create a decorator function for database operations
+def log_database_operation_decorator(db_type: str, operation: str = None):
+    """Decorator for automatic database operation logging.
+    
+    Args:
+        db_type: Database type (e.g., "postgresql", "qdrant", "redis")
+        operation: Operation name (defaults to function name if not provided)
+        
+    Returns:
+        Decorator function that wraps the original function with database operation logging
+    """
+    manager = get_unified_logging_manager()
+    return manager.log_database_operation_decorator(db_type, operation)
+
 # Import interfaces
 from core.logging.interfaces.core import ILogger, IFormatter, IHandler
 from core.logging.interfaces.factories import ILoggerFactory, IFormatterFactory, IHandlerFactory
@@ -215,6 +229,7 @@ __all__ = [
     "UnifiedLoggingManager",
     "get_unified_logging_manager",
     "log_database_operation",
+    "log_database_operation_decorator",
     
     # Backward compatibility
     "get_logger_with_metrics",

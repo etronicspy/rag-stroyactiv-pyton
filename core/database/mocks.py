@@ -1,8 +1,8 @@
+"""Mock database clients and adapters for testing and fallback.
+
+Мок-клиенты и адаптеры для тестирования и fallback стратегий.
 """
-Mock implementations for missing databases
-Заглушки для отсутствующих баз данных
-"""
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 import asyncio

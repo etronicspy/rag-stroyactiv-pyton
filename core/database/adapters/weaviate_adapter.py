@@ -3,7 +3,7 @@
 Адаптер для работы с Weaviate векторной базой данных с поддержкой всех обязательных методов.
 """
 
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import List, Dict, Any, Optional
 import uuid
 from datetime import datetime

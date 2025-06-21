@@ -12,18 +12,15 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import httpx
-from core.monitoring.logger import get_logger
 
 from core.config import get_settings, DatabaseType, AIProvider, get_vector_db_client
-from core.monitoring import get_metrics_collector
-from core.monitoring.logger import get_logger
+from core.logging import get_logger, get_metrics_collector, CorrelationContext, get_correlation_id, with_correlation_context
 from core.logging.managers.unified import get_unified_logging_manager
+from core.logging.metrics.performance import get_performance_optimizer
+from core.logging.metrics.integration import get_metrics_integrated_logger, get_global_metrics_logger
 from core.database.factories import DatabaseFactory
 from core.database.exceptions import ConnectionError as DatabaseConnectionError
 from core.database.pool_manager import get_pool_manager
-from core.monitoring.context import CorrelationContext, get_correlation_id, with_correlation_context
-from core.monitoring.performance_optimizer import get_performance_optimizer
-from core.monitoring.metrics_integration import get_metrics_integrated_logger, get_global_metrics_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -1090,7 +1087,7 @@ async def _test_logger_caching() -> Dict[str, Any]:
     """Test logger instance caching performance."""
     try:
         import time
-        from core.monitoring.performance_optimizer import get_performance_optimizer
+        from core.logging.metrics.performance import get_performance_optimizer
         
         optimizer = get_performance_optimizer()
         
@@ -1110,7 +1107,7 @@ async def _test_logger_caching() -> Dict[str, Any]:
         
         traditional_loggers = []
         for i in range(100):
-            from core.monitoring.logger import get_logger
+            from core.logging import get_logger
             logger = get_logger(f"test.traditional.{i}")
             traditional_loggers.append(logger)
         
@@ -1139,7 +1136,7 @@ async def _test_batch_processing(performance_optimizer) -> Dict[str, Any]:
     try:
         import time
         import asyncio
-        from core.monitoring.performance_optimizer import LogEntry, MetricEntry
+        from core.logging.metrics.performance import LogEntry, MetricEntry
         
         # Test log batching
         start_time = time.time()
@@ -1194,8 +1191,8 @@ async def _test_correlation_optimization() -> Dict[str, Any]:
     """Test correlation ID optimization."""
     try:
         import time
-        from core.monitoring.performance_optimizer import get_cached_correlation_id
-        from core.monitoring.context import get_correlation_id, generate_correlation_id
+        from core.logging.metrics.performance import get_cached_correlation_id
+        from core.logging import get_correlation_id, generate_correlation_id
         
         # Test cached correlation ID performance
         start_time = time.time()
@@ -1241,7 +1238,7 @@ async def _test_json_serialization() -> Dict[str, Any]:
     try:
         import time
         import json
-        from core.monitoring.performance_optimizer import OptimizedJSONEncoder
+        from core.logging.metrics.performance import OptimizedJSONEncoder
         
         # Test data
         test_data = {

@@ -12,7 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from core.logging.interfaces import IRequestLogger
-from core.logging.specialized.http.request_logger import RequestLogger
+from core.logging.specialized.http.request_logger import AsyncRequestLogger
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -41,7 +41,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             log_health_checks: Whether to log health check requests
         """
         super().__init__(app)
-        self._request_logger = request_logger or RequestLogger("request")
+        self._request_logger = request_logger or AsyncRequestLogger("request")
         self._exclude_paths = exclude_paths or []
         self._exclude_methods = exclude_methods or []
         self._log_request_body = log_request_body
@@ -79,15 +79,31 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if self._log_request_body:
             request_body = await self._get_request_body(request)
         
-        # Log the request
-        request_context = await self._request_logger.alog_incoming_request(
-            method=request.method,
-            path=request.url.path,
-            request_headers=dict(request.headers),
-            request_body=request_body,
-            query_params=dict(request.query_params),
-            client_host=request.client.host if request.client else None,
-        )
+        # Prefer async logging if available, otherwise use sync method in thread executor
+        if hasattr(self._request_logger, "alog_incoming_request"):
+            request_context = await self._request_logger.alog_incoming_request(
+                method=request.method,
+                path=request.url.path,
+                request_headers=dict(request.headers),
+                request_body=request_body,
+                query_params=dict(request.query_params),
+                client_host=request.client.host if request.client else None,
+            )
+        else:
+            # Fallback to synchronous logger in a background thread to avoid blocking event loop
+            from functools import partial
+            import anyio
+
+            sync_func = partial(
+                self._request_logger.log_incoming_request,
+                method=request.method,
+                path=request.url.path,
+                request_headers=dict(request.headers),
+                request_body=request_body,
+                query_params=dict(request.query_params),
+                client_host=request.client.host if request.client else None,
+            )
+            request_context = await anyio.to_thread.run_sync(sync_func)
         
         # Process the request
         start_time = time.time()
@@ -97,11 +113,25 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             return await self._log_response(response, request_context)
         except Exception as e:
             # Log the error
-            await self._request_logger.alog_incoming_response(
-                request_context=request_context,
-                status_code=500,
-                error=e,
-            )
+            if hasattr(self._request_logger, "alog_incoming_response"):
+                await self._request_logger.alog_incoming_response(
+                    request_context=request_context,
+                    status_code=500,
+                    error=e,
+                )
+            else:
+                from functools import partial
+                import anyio
+
+                sync_err = partial(
+                    self._request_logger.log_incoming_response,
+                    request_context,
+                    500,
+                    None,
+                    None,
+                    e,
+                )
+                await anyio.to_thread.run_sync(sync_err)
             raise
     
     async def _log_response(self, response: Response, request_context: Dict[str, Any]) -> Response:
@@ -121,12 +151,25 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response_body = await self._get_response_body(response)
         
         # Log the response
-        await self._request_logger.alog_incoming_response(
-            request_context=request_context,
-            status_code=response.status_code,
-            response_headers=dict(response.headers),
-            response_body=response_body,
-        )
+        if hasattr(self._request_logger, "alog_incoming_response"):
+            await self._request_logger.alog_incoming_response(
+                request_context=request_context,
+                status_code=response.status_code,
+                response_headers=dict(response.headers),
+                response_body=response_body,
+            )
+        else:
+            from functools import partial
+            import anyio
+
+            sync_resp = partial(
+                self._request_logger.log_incoming_response,
+                request_context,
+                response.status_code,
+                dict(response.headers),
+                response_body,
+            )
+            await anyio.to_thread.run_sync(sync_resp)
         
         return response
     
@@ -228,7 +271,7 @@ class AsyncRequestLoggingMiddleware:
             log_health_checks: Whether to log health check requests
         """
         self.app = app
-        self._request_logger = request_logger or RequestLogger("request")
+        self._request_logger = request_logger or AsyncRequestLogger("request")
         self._exclude_paths = exclude_paths or []
         self._exclude_methods = exclude_methods or []
         self._log_request_body = log_request_body
@@ -275,15 +318,31 @@ class AsyncRequestLoggingMiddleware:
         if self._log_request_body:
             request_body = await self._get_request_body(receive)
         
-        # Log the request
-        request_context = await self._request_logger.alog_incoming_request(
-            method=method,
-            path=path,
-            request_headers=headers,
-            request_body=request_body,
-            query_params=dict(scope["query_string"]),
-            client_host=scope["client"][0] if "client" in scope else None,
-        )
+        # Prefer async logging if available, otherwise use sync method in thread executor
+        if hasattr(self._request_logger, "alog_incoming_request"):
+            request_context = await self._request_logger.alog_incoming_request(
+                method=method,
+                path=path,
+                request_headers=headers,
+                request_body=request_body,
+                query_params=dict(scope["query_string"]),
+                client_host=scope["client"][0] if "client" in scope else None,
+            )
+        else:
+            # Fallback to synchronous logger in a background thread to avoid blocking event loop
+            from functools import partial
+            import anyio
+
+            sync_func = partial(
+                self._request_logger.log_incoming_request,
+                method=method,
+                path=path,
+                request_headers=headers,
+                request_body=request_body,
+                query_params=dict(scope["query_string"]),
+                client_host=scope["client"][0] if "client" in scope else None,
+            )
+            request_context = await anyio.to_thread.run_sync(sync_func)
         
         # Process the request
         start_time = time.time()
@@ -316,11 +375,25 @@ class AsyncRequestLoggingMiddleware:
             await self.app(scope, receive, send_wrapper)
         except Exception as e:
             # Log the error
-            await self._request_logger.alog_incoming_response(
-                request_context=request_context,
-                status_code=500,
-                error=e,
-            )
+            if hasattr(self._request_logger, "alog_incoming_response"):
+                await self._request_logger.alog_incoming_response(
+                    request_context=request_context,
+                    status_code=500,
+                    error=e,
+                )
+            else:
+                from functools import partial
+                import anyio
+
+                sync_err = partial(
+                    self._request_logger.log_incoming_response,
+                    request_context,
+                    500,
+                    None,
+                    None,
+                    e,
+                )
+                await anyio.to_thread.run_sync(sync_err)
             raise
     
     def _should_log_request(self, method: str, path: str) -> bool:
@@ -385,7 +458,7 @@ def get_request_logging_middleware(
     log_health_checks: bool = False
 ) -> Callable[[ASGIApp], BaseHTTPMiddleware]:
     """
-    Get a request logging middleware.
+    Get a request logging middleware factory.
     
     Args:
         request_logger: The request logger to use
@@ -396,14 +469,17 @@ def get_request_logging_middleware(
         log_health_checks: Whether to log health check requests
         
     Returns:
-        A request logging middleware
+        A middleware factory function
     """
-    return lambda app: RequestLoggingMiddleware(
-        app,
-        request_logger=request_logger,
-        exclude_paths=exclude_paths,
-        exclude_methods=exclude_methods,
-        log_request_body=log_request_body,
-        log_response_body=log_response_body,
-        log_health_checks=log_health_checks
-    ) 
+    def middleware_factory(app: ASGIApp) -> BaseHTTPMiddleware:
+        return RequestLoggingMiddleware(
+            app=app,
+            request_logger=request_logger,
+            exclude_paths=exclude_paths,
+            exclude_methods=exclude_methods,
+            log_request_body=log_request_body,
+            log_response_body=log_response_body,
+            log_health_checks=log_health_checks,
+        )
+    
+    return middleware_factory 

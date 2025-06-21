@@ -8,6 +8,8 @@ from typing import Any
 
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
 from core.database.factories import DatabaseFactory, AIClientFactory
+from core.repositories.interfaces import IMaterialsRepository
+from core.repositories.hybrid_materials import HybridMaterialsRepository
 
 
 @lru_cache(maxsize=1)
@@ -74,6 +76,24 @@ def get_cache_db_dependency() -> ICacheDatabase:
     return DatabaseFactory.create_cache_database()
 
 
+@lru_cache(maxsize=1)
+def get_materials_repository() -> IMaterialsRepository:
+    """Dependency injection function for materials repository.
+    
+    Используется как dependency в FastAPI роутах:
+    
+    @app.get("/endpoint")
+    async def endpoint(repository: IMaterialsRepository = Depends(get_materials_repository)):
+        ...
+    
+    Returns:
+        Materials repository instance
+    """
+    vector_db = get_vector_db_dependency()
+    relational_db = get_relational_db_dependency()
+    return HybridMaterialsRepository(vector_db=vector_db, relational_db=relational_db)
+
+
 def clear_dependency_cache() -> None:
     """Clear all dependency caches.
     
@@ -83,6 +103,7 @@ def clear_dependency_cache() -> None:
     get_ai_client_dependency.cache_clear()
     get_relational_db_dependency.cache_clear()
     get_cache_db_dependency.cache_clear()
+    get_materials_repository.cache_clear()
     
     # Also clear factory caches
     DatabaseFactory.clear_cache()

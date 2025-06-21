@@ -4,7 +4,8 @@ SSH Tunnel implementation for secure database connections.
 Updated to use proven sshtunnel library based on internet research.
 """
 
-from core.monitoring.logger import get_logger
+import asyncio
+from core.logging import get_logger
 import time
 import threading
 from typing import Optional, Dict, Any
@@ -134,7 +135,11 @@ class SSHTunnel:
                 self.tunnel_forwarder = None
             
             logger.error(f"Failed to establish SSH tunnel: {e}")
-            raise SSHTunnelConnectionError(f"SSH tunnel connection failed: {e}")
+            raise SSHTunnelConnectionError(
+                f"SSH tunnel connection failed: {e}",
+                host=self.config.remote_host,
+                port=22,
+            )
     
     async def disconnect(self) -> None:
         """Disconnect SSH tunnel."""

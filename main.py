@@ -24,12 +24,12 @@ from api.routes import (
 )
 
 # Импорт конфигурации
-from core.config.base import settings
-from core.middleware.factory import create_middleware_stack
-from core.dependencies.tunnel import get_ssh_tunnel_service
+from core.config import get_settings
+from core.middleware.factory import setup_middleware
 
-# Инициализация логирования
+# Инициализация логирования и конфигурации
 logger = get_logger(__name__)
+settings = get_settings()
 
 # Создание приложения FastAPI
 app = FastAPI(
@@ -52,12 +52,12 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 # Применение middleware
-create_middleware_stack(app)
+setup_middleware(app, settings)
 
 # Регистрация роутеров
 app.include_router(health_router, prefix=settings.API_V1_STR, tags=["health"])
 app.include_router(search_router, prefix=settings.API_V1_STR, tags=["search"])
-app.include_router(materials_router, prefix=settings.API_V1_STR, tags=["materials"])
+app.include_router(materials_router, prefix=f"{settings.API_V1_STR}/materials", tags=["materials"])
 app.include_router(prices_router, prefix=settings.API_V1_STR, tags=["prices"])
 app.include_router(reference_router, prefix=settings.API_V1_STR, tags=["reference"])
 app.include_router(advanced_search_router, prefix=settings.API_V1_STR, tags=["advanced-search"])
@@ -80,9 +80,13 @@ async def startup_event():
     # Инициализация SSH туннеля
     if settings.ENABLE_SSH_TUNNEL:
         try:
-            tunnel_service = get_ssh_tunnel_service()
-            await tunnel_service.start()
-            logger.info("SSH туннель успешно запущен")
+            from services.ssh_tunnel_service import initialize_tunnel_service
+
+            tunnel_service = await initialize_tunnel_service()
+            if tunnel_service:
+                logger.info("SSH туннель успешно запущен")
+            else:
+                logger.warning("SSH туннель сервис отключён в конфигурации или не инициализирован")
         except Exception as e:
             logger.error(f"Ошибка при запуске SSH туннеля: {e}")
 
@@ -95,8 +99,9 @@ async def shutdown_event():
     # Остановка SSH туннеля
     if settings.ENABLE_SSH_TUNNEL:
         try:
-            tunnel_service = get_ssh_tunnel_service()
-            await tunnel_service.stop()
+            from services.ssh_tunnel_service import shutdown_tunnel_service
+
+            await shutdown_tunnel_service()
             logger.info("SSH туннель успешно остановлен")
         except Exception as e:
             logger.error(f"Ошибка при остановке SSH туннеля: {e}")

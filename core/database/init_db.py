@@ -4,7 +4,7 @@
 """
 
 import asyncio
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import Dict, Any, Optional
 import subprocess
 import sys

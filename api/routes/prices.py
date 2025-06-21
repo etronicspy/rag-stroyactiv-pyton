@@ -11,7 +11,7 @@ import tempfile
 import os
 from uuid import UUID
 from core.logging import get_logger
-from core.config.base import settings
+from core.config import get_settings
 from core.schemas.materials import PriceUploadResponse, PriceProcessingStatus
 from services.price_processor import PriceProcessor
 from core.dependencies.database import get_materials_repository
@@ -21,6 +21,7 @@ from datetime import datetime
 
 router = APIRouter()
 logger = get_logger(__name__)
+settings = get_settings()
 
 async def get_qdrant_client():
     """Get Qdrant client instance using centralized configuration"""

@@ -5,7 +5,7 @@ Provides distributed rate limiting with minimal race conditions.
 
 import asyncio
 import time
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import Optional, Dict, Any, Callable, Tuple
 from datetime import datetime, timedelta
 

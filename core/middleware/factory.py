@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import Settings
-from core.middleware.request_logging import LoggingMiddleware
+from core.middleware import LoggingMiddleware
 from core.middleware.security import SecurityMiddleware
 from core.middleware.compression import CompressionMiddleware
 from core.middleware.rate_limiting import RateLimitMiddleware
@@ -164,12 +164,12 @@ def setup_middleware(app: FastAPI, settings: Settings) -> None:
             else:
                 app.add_middleware(middleware_class, **middleware_config)
             # Log successful initialization
-            from core.monitoring.logger import get_logger
+            from core.logging import get_logger
             logger = get_logger(__name__)
             logger.info(f"✅ {middleware_class.__name__} initialized")
         except Exception as e:
             # Log initialization failure but continue
-            from core.monitoring.logger import get_logger
+            from core.logging import get_logger
             logger = get_logger(__name__)
             logger.warning(f"Failed to initialize {middleware_class.__name__}: {e}")
 

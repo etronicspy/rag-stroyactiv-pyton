@@ -5,7 +5,7 @@
 
 import json
 import hashlib
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import Any, Dict, List, Optional, Tuple, Union
 from datetime import datetime, timedelta
 import asyncio

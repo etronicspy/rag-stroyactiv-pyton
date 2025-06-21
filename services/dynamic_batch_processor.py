@@ -7,7 +7,7 @@ Dynamic Batch Processor for optimized data processing.
 import asyncio
 import psutil
 import time
-from core.monitoring.logger import get_logger
+from core.logging import get_logger
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic, Union
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
