@@ -1,14 +1,7 @@
 """
-Configuration package for RAG Construction Materials API.
+Core configuration module for RAG Construction Materials API.
 
-This package provides modular configuration management with separation of concerns:
-- base: Core application settings
-- database: Database configurations (Vector, PostgreSQL, Redis)
-- ai: AI provider configurations
-- security: Security and middleware settings  
-- logging: Logging configuration
-- factories: Client factory functions
-- constants: Application constants
+This module provides a centralized access point to all configuration settings.
 """
 
 from functools import lru_cache
@@ -28,7 +21,7 @@ from .constants import (
 )
 from .database import DatabaseConfig
 from .ai import AIConfig
-from .factories import get_vector_db_client, get_ai_client, get_relational_db_client, get_redis_client
+from .factories import get_vector_db_client, get_ai_client, get_redis_client, get_postgresql_engine
 from .type_definitions import DatabaseType, AIProvider, LogLevel
 from .log_config import LoggingConfig
 
@@ -48,25 +41,25 @@ def get_logging_config() -> LoggingConfig:
 logging_config = get_logging_config()
 
 __all__ = [
-    # Main configuration
-    "Settings",
-    "get_settings", 
+    # Main settings
     "settings",
+    "get_settings",
     
-    # Configuration factories
-    "DatabaseConfig",
-    "AIConfig",
-    
-    # Client factories
+    # Factories
     "get_vector_db_client",
     "get_ai_client",
-    "get_relational_db_client",
     "get_redis_client",
+    "get_postgresql_engine",
     
     # Types and enums
     "DatabaseType",
-    "AIProvider", 
+    "AIProvider",
     "LogLevel",
+    
+    # Configuration classes
+    "Settings",
+    "DatabaseConfig",
+    "AIConfig",
     
     # Constants
     "VectorSize",
