@@ -137,7 +137,7 @@ log_database_operation_optimized = log_database_operation
 # Import interfaces
 from core.logging.interfaces.core import ILogger, IFormatter, IHandler
 from core.logging.interfaces.factories import ILoggerFactory, IFormatterFactory, IHandlerFactory
-from core.logging.interfaces.context import ILoggingContext, ICorrelationProvider, IContextProvider
+from core.logging.interfaces.context import ICorrelationProvider, IContextProvider
 from core.logging.interfaces.database import IDatabaseLogger
 from core.logging.interfaces.http import IRequestLogger
 from core.logging.interfaces.metrics import IMetricsCollector, IPerformanceTracker
@@ -223,7 +223,7 @@ __all__ = [
     # Interfaces
     "LoggerInterface",
     "ILogger", "IFormatter", "IHandler", "ILoggerFactory", "IFormatterFactory", "IHandlerFactory",
-    "ILoggingContext", "ICorrelationProvider", "IContextProvider",
+    "ICorrelationProvider", "IContextProvider",
     "IDatabaseLogger", "IRequestLogger", "IMetricsCollector", "IPerformanceTracker",
     
     # Core
@@ -248,5 +248,5 @@ __all__ = [
     "MetricsCollector", "AsyncMetricsCollector",
     "Counter", "Gauge", "Histogram",
     "PerformanceTracker", "AsyncPerformanceTracker",
-    "MetricsExporter", "AsyncMetricsExporter",
+    "MetricsExporter", "AsyncMetricsExporter"
 ] 
