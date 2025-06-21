@@ -4,12 +4,17 @@ Comprehensive Price Lists Management API.
 API для управления прайс-листами поставщиков с поддержкой различных форматов данных.
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
-from services.price_processor import PriceProcessor
-from core.config import get_vector_db_client
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, Query, BackgroundTasks
+from fastapi.responses import JSONResponse
+from typing import List, Optional
 import tempfile
 import os
-from core.monitoring.logger import get_logger
+from uuid import UUID
+from core.logging import get_logger
+from core.config.base import settings
+from core.schemas.materials import PriceUploadResponse, PriceProcessingStatus
+from services.price_processor import PriceProcessor
+from core.dependencies.database import get_materials_repository
 import traceback
 import time
 from datetime import datetime
@@ -632,4 +637,103 @@ async def mark_product_as_processed(
         raise
     except Exception as e:
         logger.error(f"Error marking product as processed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.post("/upload", response_model=PriceUploadResponse)
+async def upload_price_file(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    supplier_id: Optional[UUID] = Query(None, description="ID поставщика"),
+    supplier_name: Optional[str] = Query(None, description="Название поставщика"),
+    process_async: bool = Query(True, description="Обработать асинхронно")
+):
+    """
+    Загрузка прайс-листа материалов в формате CSV или Excel.
+    
+    Файл будет обработан и данные загружены в систему.
+    
+    - **file**: Файл прайс-листа (CSV или Excel)
+    - **supplier_id**: ID поставщика (опционально)
+    - **supplier_name**: Название поставщика (опционально)
+    - **process_async**: Обработать асинхронно (по умолчанию True)
+    """
+    # Проверка расширения файла
+    filename = file.filename
+    if not filename:
+        raise HTTPException(status_code=400, detail="Имя файла отсутствует")
+    
+    # Получаем расширение файла
+    file_ext = os.path.splitext(filename)[1].lower()
+    if file_ext not in ['.csv', '.xlsx', '.xls']:
+        raise HTTPException(
+            status_code=400, 
+            detail="Неподдерживаемый формат файла. Поддерживаются только CSV и Excel (.xlsx, .xls)"
+        )
+    
+    # Проверка размера файла
+    file_size = 0
+    contents = await file.read()
+    file_size = len(contents)
+    await file.seek(0)  # Сбрасываем указатель чтения в начало
+    
+    if file_size > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Размер файла превышает максимально допустимый ({settings.MAX_UPLOAD_SIZE // (1024*1024)} МБ)"
+        )
+    
+    # Создаем процессор для обработки прайс-листа
+    processor = PriceProcessor()
+    
+    try:
+        # Если асинхронная обработка
+        if process_async:
+            # Сохраняем файл во временную директорию
+            temp_file_path = f"temp/{filename}"
+            os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
+            
+            with open(temp_file_path, "wb") as buffer:
+                buffer.write(contents)
+            
+            # Добавляем задачу в фоновые задачи
+            background_tasks.add_task(
+                processor.process_file_async,
+                file_path=temp_file_path,
+                supplier_id=supplier_id,
+                supplier_name=supplier_name
+            )
+            
+            logger.info(f"Файл {filename} добавлен в очередь на асинхронную обработку")
+            
+            return PriceUploadResponse(
+                filename=filename,
+                size=file_size,
+                status=PriceProcessingStatus.QUEUED,
+                message="Файл добавлен в очередь на обработку"
+            )
+        
+        # Синхронная обработка
+        result = await processor.process_file(
+            file=file,
+            supplier_id=supplier_id,
+            supplier_name=supplier_name
+        )
+        
+        logger.info(f"Файл {filename} успешно обработан. Загружено {result.processed_count} материалов")
+        
+        return PriceUploadResponse(
+            filename=filename,
+            size=file_size,
+            status=PriceProcessingStatus.COMPLETED,
+            message=f"Файл успешно обработан. Загружено {result.processed_count} материалов",
+            processed_count=result.processed_count,
+            error_count=result.error_count,
+            duplicate_count=result.duplicate_count
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обработке файла {filename}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при обработке файла: {str(e)}"
+        ) 
