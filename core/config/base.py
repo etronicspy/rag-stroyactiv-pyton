@@ -26,7 +26,7 @@ from .database import DatabaseConfig
 from .ai import AIConfig
 from .log_config import LoggingConfig
 
-class Settings(LoggingConfig, BaseSettings):
+class Settings(BaseSettings):
     """Main application settings with modular configuration."""
     
     # === PROJECT SETTINGS ===
@@ -285,9 +285,6 @@ class Settings(LoggingConfig, BaseSettings):
         default=RateLimits.BURST_LIMIT,
         description="Burst requests limit"
     )
-    
-    # === LOGGING SETTINGS ===
-    # 🔧 UNIFIED: All logging settings now inherited from LoggingConfig
     
     # === MODEL CONFIGURATION ===
     model_config = ConfigDict(
