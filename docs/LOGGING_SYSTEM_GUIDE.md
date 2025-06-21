@@ -248,75 +248,257 @@ logger.error("Ошибка создания пользователя", extra={
 
 ### 1. Основные настройки
 
-```python
-from core.logging import LoggingConfig, LogLevel
-
-config = LoggingConfig(
-    LOG_LEVEL=LogLevel.INFO,
-    ENABLE_STRUCTURED_LOGGING=True,
-    LOG_CORRELATION_ID=True,
-    LOG_DATABASE_OPERATIONS=True,
-    LOG_PERFORMANCE_METRICS=True
-)
+```bash
+# .env файл - основные настройки
+LOG_GENERAL_DEFAULT_LEVEL=INFO
+LOG_GENERAL_THIRD_PARTY_LEVEL=WARNING
+LOG_GENERAL_PROPAGATE=false
+LOG_GENERAL_ENABLE_ASYNC_LOGGING=true
+LOG_GENERAL_WORKER_COUNT=2
+LOG_GENERAL_FLUSH_INTERVAL=0.5
+LOG_GENERAL_BATCH_SIZE=100
+LOG_GENERAL_QUEUE_SIZE=1000
 ```
 
-### 2. Переменные окружения
+### 2. Настройки форматирования
 
 ```bash
-# Основные настройки
-LOG_LEVEL=INFO                          # Уровень логирования
-ENABLE_STRUCTURED_LOGGING=true          # JSON формат для продакшн
-LOG_COLORS=true                         # Цветное логирование в консоли
-LOG_FILE=/var/log/app.log              # Файл для записи логов
-
-# HTTP логирование
-ENABLE_REQUEST_LOGGING=true             # Логирование HTTP запросов
-LOG_REQUEST_BODY=false                  # Логирование тел запросов
-LOG_RESPONSE_BODY=false                 # Логирование тел ответов
-LOG_REQUEST_HEADERS=true                # Логирование заголовков
-LOG_MAX_BODY_SIZE=65536                 # Максимальный размер тела (байт)
-
-# Correlation ID
-LOG_CORRELATION_ID=true                 # Включить correlation ID
-LOG_CORRELATION_ID_HEADER=true          # Передавать в заголовках
-
-# База данных
-LOG_DATABASE_OPERATIONS=true            # Логирование операций БД
-LOG_SQL_QUERIES=false                   # Логирование SQL запросов
-LOG_VECTOR_OPERATIONS=true              # Логирование векторных операций
-
-# Производительность
-LOG_PERFORMANCE_METRICS=true            # Метрики производительности
-LOG_TIMING_DETAILS=true                 # Детальные метрики времени
-LOG_SLOW_OPERATION_THRESHOLD_MS=1000    # Порог медленных операций
-
-# Безопасность
-LOG_SECURITY_EVENTS=true                # События безопасности
-LOG_BLOCKED_REQUESTS=true               # Заблокированные запросы
-
-# Исключения
-LOG_EXCLUDE_PATHS=["/health","/metrics","/docs"]  # Исключить пути
-LOG_EXCLUDE_HEADERS=["user-agent","accept-encoding"] # Исключить заголовки
+# .env файл - настройки форматирования
+LOG_FORMATTER_DEFAULT_TYPE=colored  # text, json, colored
+LOG_FORMATTER_TIMESTAMP_FORMAT=%Y-%m-%d %H:%M:%S
+LOG_FORMATTER_ENABLE_SOURCE_INFO=true
+LOG_FORMATTER_ENABLE_COLORS=true
+LOG_FORMATTER_JSON_ENSURE_ASCII=false
+LOG_FORMATTER_JSON_SORT_KEYS=true
 ```
 
-### 3. Программная конфигурация
+### 3. Настройки обработчиков
+
+```bash
+# .env файл - настройки обработчиков
+LOG_HANDLER_DEFAULT_TYPES=console  # console, file, rotating_file, timed_rotating_file
+LOG_HANDLER_CONSOLE_STREAM=stdout
+LOG_HANDLER_FILE_PATH=logs/app.log
+LOG_HANDLER_FILE_MODE=a
+LOG_HANDLER_FILE_ENCODING=utf-8
+LOG_HANDLER_ROTATING_FILE_MAX_BYTES=10485760  # 10 MB
+LOG_HANDLER_ROTATING_FILE_BACKUP_COUNT=5
+LOG_HANDLER_TIMED_ROTATING_FILE_WHEN=midnight
+LOG_HANDLER_TIMED_ROTATING_FILE_INTERVAL=1
+LOG_HANDLER_TIMED_ROTATING_FILE_BACKUP_COUNT=7
+```
+
+### 4. Настройки контекста
+
+```bash
+# .env файл - настройки контекста
+LOG_CONTEXT_ENABLE_CORRELATION_ID=true
+LOG_CONTEXT_CORRELATION_ID_HEADER=X-Correlation-ID
+LOG_CONTEXT_CORRELATION_ID_GENERATOR=uuid4  # uuid4 или timestamp
+LOG_CONTEXT_ENABLE_CONTEXT_POOL=true
+LOG_CONTEXT_CONTEXT_POOL_SIZE=100
+```
+
+### 5. Настройки оптимизации памяти
+
+```bash
+# .env файл - настройки оптимизации памяти
+LOG_MEMORY_ENABLE_LOGGER_POOL=true
+LOG_MEMORY_LOGGER_POOL_SIZE=100
+LOG_MEMORY_ENABLE_MESSAGE_CACHE=true
+LOG_MEMORY_MESSAGE_CACHE_SIZE=1000
+LOG_MEMORY_MESSAGE_CACHE_TTL=300.0
+LOG_MEMORY_ENABLE_STRUCTURED_LOG_CACHE=true
+LOG_MEMORY_STRUCTURED_LOG_CACHE_SIZE=1000
+LOG_MEMORY_STRUCTURED_LOG_CACHE_TTL=300.0
+```
+
+### 6. Настройки HTTP логирования
+
+```bash
+# .env файл - настройки HTTP логирования
+LOG_HTTP_ENABLE_REQUEST_LOGGING=true
+LOG_HTTP_LOG_REQUEST_BODY=true
+LOG_HTTP_LOG_RESPONSE_BODY=true
+LOG_HTTP_LOG_REQUEST_HEADERS=true
+LOG_HTTP_LOG_RESPONSE_HEADERS=true
+LOG_HTTP_MASK_SENSITIVE_HEADERS=true
+LOG_HTTP_SENSITIVE_HEADERS=Authorization,Cookie,Set-Cookie
+LOG_HTTP_MAX_BODY_SIZE=10240  # 10 KB
+```
+
+### 7. Настройки логирования БД
+
+```bash
+# .env файл - настройки логирования БД
+LOG_DATABASE_ENABLE_DATABASE_LOGGING=true
+LOG_DATABASE_LOG_SQL_QUERIES=true
+LOG_DATABASE_LOG_SQL_PARAMETERS=true
+LOG_DATABASE_LOG_VECTOR_OPERATIONS=true
+LOG_DATABASE_LOG_CACHE_OPERATIONS=true
+LOG_DATABASE_SLOW_QUERY_THRESHOLD_MS=1000
+```
+
+### 8. Настройки метрик
+
+```bash
+# .env файл - настройки метрик
+LOG_METRICS_ENABLE_METRICS=true
+LOG_METRICS_LOG_PERFORMANCE_METRICS=true
+LOG_METRICS_LOG_TIMING_DETAILS=true
+LOG_METRICS_SLOW_OPERATION_THRESHOLD_MS=1000
+```
+
+### 9. Программный доступ к конфигурации
 
 ```python
-from core.logging import LoggingConfig
-from core.config import get_settings
+from core.logging.config import get_configuration
 
 # Получение конфигурации
-settings = get_settings()
-logging_config = settings.logging  # Если интегрировано в основную конфигурацию
+config = get_configuration()
 
-# Или создание отдельной конфигурации
-from core.config.logging import LoggingConfig
+# Получение настроек
+log_level = config.get_log_level("my_module")
+formatter_settings = config.get_formatter_settings()
+handler_settings = config.get_handler_settings()
+context_settings = config.get_context_settings()
+memory_settings = config.get_memory_settings()
+http_settings = config.get_http_settings()
+database_settings = config.get_database_settings()
+metrics_settings = config.get_metrics_settings()
+async_logging_settings = config.get_async_logging_settings()
 
-config = LoggingConfig(
-    LOG_LEVEL="DEBUG",
-    ENABLE_STRUCTURED_LOGGING=False,
-    LOG_DATABASE_OPERATIONS=True
-)
+# Получение отдельных значений
+enable_async_logging = config.get_value("GENERAL.ENABLE_ASYNC_LOGGING", False)
+max_body_size = config.get_value("HTTP.MAX_BODY_SIZE", 10240)
+```
+
+## 🔌 Интеграции
+
+### 1. Интеграция с FastAPI
+
+```python
+from fastapi import FastAPI
+from core.logging.integration import setup_fastapi_logging
+
+# Создание FastAPI приложения
+app = FastAPI()
+
+# Настройка логирования
+setup_fastapi_logging(app, exclude_paths=["/health", "/metrics"], exclude_methods=["OPTIONS"])
+
+# Логирование отдельных маршрутов
+from fastapi import FastAPI, Depends
+from core.logging.integration import LoggingRoute
+
+@app.get("/users/{user_id}", dependencies=[Depends(LoggingRoute())])
+async def get_user(user_id: int):
+    return {"user_id": user_id, "name": "John Doe"}
+```
+
+### 2. Интеграция с SQLAlchemy
+
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from core.logging.integration import setup_sqlalchemy_logging, session_logging
+
+# Настройка логирования для движка
+engine = create_engine("postgresql://user:password@localhost/db")
+setup_sqlalchemy_logging(engine)
+
+# Настройка логирования для сессии
+Session = sessionmaker(bind=engine)
+session = Session()
+session_ext = session_logging(session)
+
+# Теперь все операции с движком и сессией будут логироваться
+```
+
+### 3. Интеграция с векторными БД
+
+#### Qdrant
+
+```python
+from qdrant_client import QdrantClient
+from core.logging.integration import QdrantLoggerMixin
+
+# Создание клиента с логированием
+class LoggedQdrantClient(QdrantLoggerMixin, QdrantClient):
+    pass
+
+client = LoggedQdrantClient(url="http://localhost:6333")
+
+# Теперь все операции с Qdrant будут логироваться
+```
+
+#### Weaviate
+
+```python
+import weaviate
+from core.logging.integration import WeaviateLoggerMixin
+
+# Создание клиента с логированием
+class LoggedWeaviateClient(WeaviateLoggerMixin, weaviate.Client):
+    pass
+
+client = LoggedWeaviateClient(url="http://localhost:8080")
+
+# Теперь все операции с Weaviate будут логироваться
+```
+
+#### Pinecone
+
+```python
+import pinecone
+from core.logging.integration import PineconeLoggerMixin
+
+# Создание клиента с логированием
+class LoggedPineconeIndex(PineconeLoggerMixin, pinecone.Index):
+    pass
+
+pinecone.init(api_key="your-api-key")
+index = LoggedPineconeIndex("your-index-name")
+
+# Теперь все операции с Pinecone будут логироваться
+```
+
+#### Декоратор для отдельных операций
+
+```python
+from core.logging.integration import log_vector_db_operation
+
+# Логирование отдельной функции
+@log_vector_db_operation(db_type="qdrant", operation="custom_search")
+async def search_documents(query: str, limit: int = 10):
+    # Выполнение поиска
+    results = await client.search(
+        collection_name="documents",
+        query_vector=get_embedding(query),
+        limit=limit
+    )
+    return results
+```
+
+## 🔍 Валидация конфигурации
+
+```python
+from core.logging.config import validate_configuration
+
+# Валидация конфигурации
+validator = validate_configuration()
+
+# Проверка результатов валидации
+if validator.validate():
+    print("Конфигурация валидна")
+else:
+    print("Ошибки конфигурации:")
+    for error in validator.get_errors():
+        print(f"- {error}")
+    
+    print("\nПредупреждения:")
+    for warning in validator.get_warnings():
+        print(f"- {warning}")
 ```
 
 ## 📝 Форматирование логов

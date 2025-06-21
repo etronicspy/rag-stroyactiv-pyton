@@ -247,165 +247,363 @@ logger.addHandler(color_handler)
 #### Диагностика
 ```python
 from core.logging import DatabaseLogger, get_unified_logging_manager
+from core.logging.config import get_configuration
 
-# Проверка DatabaseLogger
+# Проверка конфигурации БД
+config = get_configuration()
+db_settings = config.get_database_settings()
+print(f"Database logging enabled: {db_settings['enable_database_logging']}")
+print(f"SQL queries logging: {db_settings['log_sql_queries']}")
+print(f"Vector operations logging: {db_settings['log_vector_operations']}")
+
+# Проверка логгера БД
 try:
     db_logger = DatabaseLogger("postgresql")
-    print(f"DatabaseLogger создан: {db_logger is not None}")
+    print("DatabaseLogger создан успешно")
 except Exception as e:
     print(f"Ошибка создания DatabaseLogger: {e}")
 
-# Проверка UnifiedLoggingManager
+# Проверка унифицированного менеджера
 try:
     manager = get_unified_logging_manager()
-    health = manager.get_health_status()
-    print(f"Manager health: {health}")
+    print("UnifiedLoggingManager создан успешно")
 except Exception as e:
-    print(f"Ошибка UnifiedLoggingManager: {e}")
+    print(f"Ошибка создания UnifiedLoggingManager: {e}")
 ```
 
 #### Решения
 ```bash
-# 1. Включить логирование БД
-LOG_DATABASE_OPERATIONS=true
-LOG_SQL_QUERIES=false  # Включить только для отладки
-LOG_VECTOR_OPERATIONS=true
+# 1. Включить логирование БД в .env
+LOG_DATABASE_ENABLE_DATABASE_LOGGING=true
+LOG_DATABASE_LOG_SQL_QUERIES=true
+LOG_DATABASE_LOG_SQL_PARAMETERS=true
+LOG_DATABASE_LOG_VECTOR_OPERATIONS=true
 ```
 
 ```python
-# 2. Правильное использование DatabaseLogger
-from core.logging import DatabaseLogger, CorrelationContext
+# 2. Использование интеграции с SQLAlchemy
+from sqlalchemy import create_engine
+from core.logging.integration import setup_sqlalchemy_logging
 
-with CorrelationContext.with_correlation_id():
-    db_logger = DatabaseLogger("postgresql")
-    
-    # Правильно - все обязательные параметры
-    db_logger.log_operation(
-        operation="select_users",
-        duration_ms=25.5,
-        success=True,
-        record_count=10
-    )
-    
-    # Неправильно - отсутствуют обязательные параметры
-    # db_logger.log_operation("select_users")  # Ошибка!
+engine = create_engine("postgresql://user:password@localhost/db")
+setup_sqlalchemy_logging(engine)
 
-# 3. Использование контекстного менеджера
-from core.logging import get_unified_logging_manager
+# 3. Использование интеграции с векторными БД
+from qdrant_client import QdrantClient
+from core.logging.integration import QdrantLoggerMixin
 
-manager = get_unified_logging_manager()
+class LoggedQdrantClient(QdrantLoggerMixin, QdrantClient):
+    pass
 
-# Автоматическое логирование с контекстом
-with manager.database_operation_context("postgresql", "select_operation"):
-    result = await database.select_users()
-    # Операция автоматически логируется
+client = LoggedQdrantClient(url="http://localhost:6333")
 ```
 
 ---
 
-### 7. Проблемы с совместимостью со старым кодом
+### 7. Проблемы с интеграцией FastAPI
 
 #### Проблема
-Старый код с импортами из `core.monitoring` не работает.
+Middleware логирования не работает или вызывает ошибки в FastAPI приложении.
 
 #### Диагностика
 ```python
-# Проверка доступности старых импортов
-try:
-    from core.monitoring.logger import get_logger
-    print("✅ Старые импорты работают")
-except ImportError as e:
-    print(f"❌ Ошибка импорта: {e}")
+from fastapi import FastAPI
+from core.logging.config import get_configuration
+from core.logging.integration import LoggingMiddleware
+import logging
 
-# Проверка новых импортов
+# Проверка конфигурации HTTP
+config = get_configuration()
+http_settings = config.get_http_settings()
+print(f"Request logging enabled: {http_settings['enable_request_logging']}")
+print(f"Log request body: {http_settings['log_request_body']}")
+
+# Проверка логгера HTTP
+http_logger = logging.getLogger("http")
+print(f"HTTP logger level: {http_logger.level}")
+print(f"HTTP logger handlers: {[h.__class__.__name__ for h in http_logger.handlers]}")
+
+# Тестирование middleware напрямую
 try:
-    from core.logging import get_logger
-    print("✅ Новые импорты работают")
-except ImportError as e:
-    print(f"❌ Ошибка импорта: {e}")
+    app = FastAPI()
+    middleware = LoggingMiddleware(app)
+    print("LoggingMiddleware создан успешно")
+except Exception as e:
+    print(f"Ошибка создания LoggingMiddleware: {e}")
 ```
 
 #### Решения
+```bash
+# 1. Включить логирование HTTP в .env
+LOG_HTTP_ENABLE_REQUEST_LOGGING=true
+LOG_HTTP_LOG_REQUEST_BODY=true
+LOG_HTTP_LOG_RESPONSE_BODY=true
+LOG_HTTP_LOG_REQUEST_HEADERS=true
+```
+
 ```python
-# 1. Использование новых импортов (рекомендуется)
-from core.logging import (
-    get_logger,
-    CorrelationContext,
-    DatabaseLogger,
-    get_unified_logging_manager
+# 2. Правильная настройка FastAPI
+from fastapi import FastAPI
+from core.logging.integration import setup_fastapi_logging
+
+app = FastAPI()
+
+# Добавление middleware с правильными параметрами
+setup_fastapi_logging(
+    app, 
+    exclude_paths=["/health", "/metrics"], 
+    exclude_methods=["OPTIONS"]
 )
 
-# 2. Если старые импорты не работают, проверьте наличие файлов
-import os
-monitoring_path = "core/monitoring"
-if os.path.exists(monitoring_path):
-    print("✅ core/monitoring существует")
-else:
-    print("❌ core/monitoring отсутствует - используйте core.logging")
+# 3. Использование декоратора для отдельных маршрутов
+from fastapi import Depends
+from core.logging.integration import LoggingRoute
 
-# 3. Постепенная миграция
-# Этап 1: Замена импортов
-# - from core.monitoring.logger import get_logger
-# + from core.logging import get_logger
-
-# Этап 2: Добавление новых возможностей
-from core.logging import get_performance_optimizer, get_metrics_collector
-
-optimizer = get_performance_optimizer()
-metrics = get_metrics_collector()
+@app.get("/users/{user_id}", dependencies=[Depends(LoggingRoute())])
+async def get_user(user_id: int):
+    return {"user_id": user_id, "name": "John Doe"}
 ```
 
 ---
 
-### 8. Ошибки конфигурации
+### 8. Проблемы с валидацией конфигурации
 
 #### Проблема
-Ошибки при загрузке или валидации конфигурации логирования.
+Ошибки валидации конфигурации логирования.
 
 #### Диагностика
 ```python
-from core.logging import LoggingConfig
-from pydantic import ValidationError
+from core.logging.config import validate_configuration
 
+# Валидация конфигурации
+validator = validate_configuration()
+is_valid = validator.validate()
+
+if not is_valid:
+    print("Ошибки конфигурации:")
+    for error in validator.get_errors():
+        print(f"- {error}")
+    
+    print("\nПредупреждения:")
+    for warning in validator.get_warnings():
+        print(f"- {warning}")
+else:
+    print("Конфигурация валидна")
+
+# Проверка доступа к конфигурации
+from core.logging.config import get_configuration
 try:
-    config = LoggingConfig()
-    print("✅ Конфигурация загружена успешно")
-    print(f"LOG_LEVEL: {config.LOG_LEVEL}")
-    print(f"STRUCTURED_LOGGING: {config.ENABLE_STRUCTURED_LOGGING}")
-except ValidationError as e:
-    print(f"❌ Ошибка валидации конфигурации: {e}")
+    config = get_configuration()
+    print("Доступ к конфигурации успешен")
 except Exception as e:
-    print(f"❌ Ошибка загрузки конфигурации: {e}")
+    print(f"Ошибка доступа к конфигурации: {e}")
 ```
 
 #### Решения
 ```bash
-# 1. Проверить формат переменных окружения
-LOG_LEVEL=INFO                    # Не "info"
-ENABLE_STRUCTURED_LOGGING=true    # Не "True"
-LOG_EXCLUDE_PATHS=["health","docs"]  # JSON формат для списков
-
-# 2. Проверить допустимые значения
-LOG_LEVEL=DEBUG|INFO|WARNING|ERROR|CRITICAL
-LOG_TIMESTAMP_FORMAT=ISO8601|RFC3339|timestamp
+# 1. Исправление некорректных значений в .env
+LOG_GENERAL_DEFAULT_LEVEL=INFO  # Вместо неправильного значения
+LOG_GENERAL_WORKER_COUNT=1  # Минимум 1
+LOG_HANDLER_CONSOLE_STREAM=stdout  # Только stdout или stderr
 ```
 
 ```python
-# 3. Создание конфигурации с валидацией
-from core.logging import LoggingConfig, LogLevel
+# 2. Программная настройка конфигурации
+import os
+
+# Установка корректных значений
+os.environ["LOG_GENERAL_DEFAULT_LEVEL"] = "INFO"
+os.environ["LOG_GENERAL_WORKER_COUNT"] = "1"
+os.environ["LOG_HANDLER_CONSOLE_STREAM"] = "stdout"
+
+# 3. Создание файла логов, если директория не существует
+import os
+from pathlib import Path
+
+log_dir = Path("logs")
+if not log_dir.exists():
+    log_dir.mkdir(parents=True)
+```
+
+---
+
+### 9. Проблемы с асинхронным логированием
+
+#### Проблема
+Асинхронное логирование не работает или вызывает ошибки.
+
+#### Диагностика
+```python
+from core.logging.config import get_configuration
+import asyncio
+
+# Проверка конфигурации асинхронного логирования
+config = get_configuration()
+async_settings = config.get_async_logging_settings()
+print(f"Async logging enabled: {async_settings['enable_async_logging']}")
+print(f"Worker count: {async_settings['worker_count']}")
+print(f"Batch size: {async_settings['batch_size']}")
+
+# Проверка оптимизированного логирования
+from core.logging.optimized.async_logging import AsyncLogger
+try:
+    logger = AsyncLogger("test")
+    print("AsyncLogger создан успешно")
+    
+    # Проверка инициализации
+    async def test_async_logger():
+        await logger.initialize()
+        await logger.log("INFO", "Test message")
+        await logger.shutdown()
+    
+    asyncio.run(test_async_logger())
+    print("Асинхронное логирование работает")
+except Exception as e:
+    print(f"Ошибка асинхронного логирования: {e}")
+```
+
+#### Решения
+```bash
+# 1. Настройка асинхронного логирования в .env
+LOG_GENERAL_ENABLE_ASYNC_LOGGING=true
+LOG_GENERAL_WORKER_COUNT=2
+LOG_GENERAL_FLUSH_INTERVAL=0.5
+LOG_GENERAL_BATCH_SIZE=100
+LOG_GENERAL_QUEUE_SIZE=1000
+```
+
+```python
+# 2. Правильная инициализация и завершение
+from core.logging.optimized.async_logging import AsyncLogger
+import asyncio
+
+async def main():
+    # Создание и инициализация логгера
+    logger = AsyncLogger("my_service")
+    await logger.initialize()
+    
+    try:
+        # Использование логгера
+        await logger.log("INFO", "Сообщение 1")
+        await logger.log("ERROR", "Сообщение 2", {"error_code": "E123"})
+    finally:
+        # Важно: корректное завершение
+        await logger.shutdown()
+
+# Запуск в асинхронном контексте
+asyncio.run(main())
+
+# 3. Использование в FastAPI
+from fastapi import FastAPI
+from core.logging.optimized.async_logging import AsyncLogger
+
+app = FastAPI()
+logger = None
+
+@app.on_event("startup")
+async def startup_event():
+    global logger
+    logger = AsyncLogger("api")
+    await logger.initialize()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global logger
+    if logger:
+        await logger.shutdown()
+```
+
+---
+
+### 10. Проблемы с интеграцией векторных БД
+
+#### Проблема
+Логирование операций с векторными БД не работает или вызывает ошибки.
+
+#### Диагностика
+```python
+from core.logging.config import get_configuration
+
+# Проверка конфигурации БД
+config = get_configuration()
+db_settings = config.get_database_settings()
+print(f"Database logging enabled: {db_settings['enable_database_logging']}")
+print(f"Vector operations logging: {db_settings['log_vector_operations']}")
+
+# Проверка интеграции с Qdrant
+try:
+    from qdrant_client import QdrantClient
+    from core.logging.integration import QdrantLoggerMixin
+    
+    class TestQdrantClient(QdrantLoggerMixin, QdrantClient):
+        pass
+    
+    client = TestQdrantClient(location=":memory:")
+    print("QdrantLoggerMixin интегрирован успешно")
+except Exception as e:
+    print(f"Ошибка интеграции с Qdrant: {e}")
+
+# Проверка декоратора
+from core.logging.integration import log_vector_db_operation
+
+@log_vector_db_operation(db_type="test", operation="test_op")
+def test_function():
+    return "test"
 
 try:
-    config = LoggingConfig(
-        LOG_LEVEL=LogLevel.DEBUG,
-        ENABLE_STRUCTURED_LOGGING=True,
-        LOG_CORRELATION_ID=True
-    )
-    print("✅ Конфигурация создана")
+    result = test_function()
+    print(f"Декоратор log_vector_db_operation работает: {result}")
 except Exception as e:
-    print(f"❌ Ошибка создания конфигурации: {e}")
-    
-    # Создание с минимальными настройками
-    config = LoggingConfig(LOG_LEVEL=LogLevel.INFO)
+    print(f"Ошибка декоратора: {e}")
+```
+
+#### Решения
+```bash
+# 1. Включить логирование векторных БД в .env
+LOG_DATABASE_ENABLE_DATABASE_LOGGING=true
+LOG_DATABASE_LOG_VECTOR_OPERATIONS=true
+LOG_DATABASE_SLOW_QUERY_THRESHOLD_MS=1000
+```
+
+```python
+# 2. Правильная интеграция с Qdrant
+from qdrant_client import QdrantClient
+from core.logging.integration import QdrantLoggerMixin
+
+# Создание подкласса с правильным порядком наследования
+class LoggedQdrantClient(QdrantLoggerMixin, QdrantClient):
+    pass
+
+# Создание клиента
+client = LoggedQdrantClient(url="http://localhost:6333")
+
+# 3. Правильное использование декоратора
+from core.logging.integration import log_vector_db_operation
+
+# Декоратор для функции
+@log_vector_db_operation(db_type="qdrant", operation="search")
+async def search_documents(query: str, limit: int = 10):
+    # Код функции
+    pass
+
+# 4. Ручное логирование операций
+from core.logging.specialized.database import VectorDbLogger
+import logging
+
+logger = logging.getLogger("vector_db")
+vector_db_logger = VectorDbLogger(
+    logger=logger,
+    db_type="qdrant",
+    log_operations=True,
+    slow_query_threshold_ms=1000
+)
+
+# Логирование операции
+vector_db_logger.log_operation(
+    operation="search",
+    params={"collection": "documents", "limit": 10},
+    duration_ms=45.5
+)
 ```
 
 ---
