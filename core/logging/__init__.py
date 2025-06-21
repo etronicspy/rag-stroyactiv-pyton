@@ -123,6 +123,12 @@ from .base.loggers import setup_structured_logging
 # Configuration integration
 from core.config.log_config import LoggingConfig, LogLevel, LogTimestampFormat
 
+# Import migration check
+from .config.migration import check_env_configuration
+
+# Check for legacy environment variables
+check_env_configuration()
+
 # Backward compatibility aliases for core.monitoring imports
 # These ensure existing code continues to work without changes
 get_logger_with_metrics = get_unified_logging_manager().get_logger
