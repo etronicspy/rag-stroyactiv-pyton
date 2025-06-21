@@ -128,6 +128,40 @@ from core.config.log_config import LoggingConfig, LogLevel, LogTimestampFormat
 get_logger_with_metrics = get_unified_logging_manager().get_logger
 log_database_operation_optimized = log_database_operation
 
+# Import interfaces
+from core.logging.interfaces.core import ILogger, IFormatter, IHandler
+from core.logging.interfaces.factories import ILoggerFactory, IFormatterFactory, IHandlerFactory
+from core.logging.interfaces.context import ILoggingContext, ICorrelationProvider, IContextProvider
+from core.logging.interfaces.database import IDatabaseLogger
+from core.logging.interfaces.http import IRequestLogger
+from core.logging.interfaces.metrics import IMetricsCollector, IPerformanceTracker
+
+# Import core implementations
+from core.logging.core.logger import Logger
+from core.logging.core.formatter import JsonFormatter, TextFormatter
+from core.logging.core.handler import ConsoleHandler, FileHandler
+
+# Import specialized implementations
+from core.logging.specialized.context.contextual_logger import ContextualLogger, AsyncContextualLogger
+from core.logging.specialized.context.correlation_middleware import CorrelationMiddleware, AsyncCorrelationMiddleware, get_correlation_middleware
+from core.logging.specialized.context.correlation_provider import CorrelationProvider
+from core.logging.specialized.context.context_provider import ContextProvider
+
+# Import database loggers
+from core.logging.specialized.database.database_logger import DatabaseLogger, AsyncDatabaseLogger
+from core.logging.specialized.database.sql_logger import SqlLogger, AsyncSqlLogger
+from core.logging.specialized.database.vector_db_logger import VectorDbLogger, AsyncVectorDbLogger
+from core.logging.specialized.database.redis_logger import RedisLogger, AsyncRedisLogger
+
+# Import HTTP loggers
+from core.logging.specialized.http.request_logger import RequestLogger, AsyncRequestLogger
+from core.logging.specialized.http.request_logging_middleware import RequestLoggingMiddleware, AsyncRequestLoggingMiddleware, get_request_logging_middleware
+
+# Import metrics
+from core.logging.specialized.metrics.metrics_collector import MetricsCollector, AsyncMetricsCollector, Counter, Gauge, Histogram
+from core.logging.specialized.metrics.performance_tracker import PerformanceTracker, AsyncPerformanceTracker
+from core.logging.specialized.metrics.metrics_exporter import MetricsExporter, AsyncMetricsExporter
+
 __all__ = [
     # Core functions
     "get_logger",
@@ -181,5 +215,32 @@ __all__ = [
     "log_database_operation_optimized",
     
     # Interfaces
-    "LoggerInterface"
+    "LoggerInterface",
+    "ILogger", "IFormatter", "IHandler", "ILoggerFactory", "IFormatterFactory", "IHandlerFactory",
+    "ILoggingContext", "ICorrelationProvider", "IContextProvider",
+    "IDatabaseLogger", "IRequestLogger", "IMetricsCollector", "IPerformanceTracker",
+    
+    # Core
+    "Logger", "JsonFormatter", "TextFormatter", "ConsoleHandler", "FileHandler",
+    
+    # Context
+    "ContextualLogger", "AsyncContextualLogger",
+    "CorrelationMiddleware", "AsyncCorrelationMiddleware", "get_correlation_middleware",
+    "CorrelationProvider", "ContextProvider",
+    
+    # Database
+    "DatabaseLogger", "AsyncDatabaseLogger",
+    "SqlLogger", "AsyncSqlLogger",
+    "VectorDbLogger", "AsyncVectorDbLogger",
+    "RedisLogger", "AsyncRedisLogger",
+    
+    # HTTP
+    "RequestLogger", "AsyncRequestLogger",
+    "RequestLoggingMiddleware", "AsyncRequestLoggingMiddleware", "get_request_logging_middleware",
+    
+    # Metrics
+    "MetricsCollector", "AsyncMetricsCollector",
+    "Counter", "Gauge", "Histogram",
+    "PerformanceTracker", "AsyncPerformanceTracker",
+    "MetricsExporter", "AsyncMetricsExporter",
 ] 
