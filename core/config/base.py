@@ -297,7 +297,7 @@ class Settings(BaseSettings):
         ],
         env_file_encoding='utf-8',
         validate_assignment=True,
-        extra='forbid'
+        extra='allow'
     )
     
     # === FIELD VALIDATORS ===
