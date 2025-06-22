@@ -1,28 +1,26 @@
-import importlib
-from types import ModuleType
-from typing import Any
+"""High-level re-exports for metrics utilities.
 
-try:
-    # Prefer new metrics from core.logging
-    from core.logging import MetricsCollector, PerformanceTracker
-    # DatabaseMetrics may not exist in new module, fallback to backup
-    try:
-        from core.logging import DatabaseMetrics  # type: ignore
-    except ImportError:  # pragma: no cover
-        _backup_metrics: ModuleType = importlib.import_module("backup.core.monitoring.metrics")
-        DatabaseMetrics = getattr(_backup_metrics, "DatabaseMetrics")  # type: ignore
-except ImportError:  # pragma: no cover
-    # Fallback entirely to backup implementation
-    _backup_metrics: ModuleType = importlib.import_module("backup.core.monitoring.metrics")
-    MetricsCollector = getattr(_backup_metrics, "MetricsCollector")  # type: ignore
-    PerformanceTracker = getattr(_backup_metrics, "PerformanceTracker")  # type: ignore
-    DatabaseMetrics = getattr(_backup_metrics, "DatabaseMetrics")  # type: ignore
+This module previously contained dynamic fallbacks to the legacy implementation in
+``backup.core.monitoring.metrics``.  The project has fully migrated to the new
+implementation under ``core.logging.metrics``.  All legacy fallbacks have been
+removed to simplify the dependency graph and eliminate obsolete code paths.
+
+See also: ``PLAN_DOCS/LEGACY_CODE_REMOVAL_PLAN.md``.
+"""
+
+# NOTE: No runtime fallbacks – rely exclusively on the canonical metrics module.
+from core.logging.metrics import (
+    MetricsCollector,
+    PerformanceTracker,
+    DatabaseMetrics,
+    get_metrics_collector as _get_collector,
+)
 
 # Re-export helper
 
 def get_metrics_collector() -> "MetricsCollector":
-    """Return a global metrics collector instance (singleton-like)."""
-    return MetricsCollector()
+    """Return the shared metrics collector instance exposed by the new module."""
+    return _get_collector()
 
 __all__ = [
     "MetricsCollector",
