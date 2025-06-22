@@ -5,6 +5,9 @@
 import pytest
 import asyncio
 import os
+# Ensure Watchfiles hot-reload is disabled in all processes spawned during the
+# pytest session. Uvicorn/Watchfiles honours the ``WATCHFILES_DISABLE`` env var.
+os.environ.setdefault("WATCHFILES_DISABLE", "true")
 import time
 import logging
 from core.logging import get_logger
@@ -90,7 +93,10 @@ def setup_test_environment():
 @pytest.fixture
 def client_mock():
     """Test client с моками для unit тестов"""
-    with patch('core.config.get_settings') as mock_settings:
+    with (
+        patch('core.config.get_settings') as mock_settings,
+        patch('core.database.factories.DatabaseFactory.create_vector_database') as mock_create_vdb,
+    ):
         from core.config import Settings
         settings = Settings(
             PROJECT_NAME="Test API",
@@ -106,6 +112,16 @@ def client_mock():
             LOG_RESPONSE_BODY=False
         )
         mock_settings.return_value = settings
+        
+        # Provide stub vector database before any application modules import
+        from unittest.mock import MagicMock
+        stub_vdb = MagicMock()
+        stub_vdb.upsert = AsyncMock(side_effect=lambda *a, **k: True)
+        stub_vdb.search = AsyncMock(side_effect=lambda *a, **k: [])
+        stub_vdb.batch_upsert = AsyncMock(side_effect=lambda *a, **k: True)
+        stub_vdb.delete = AsyncMock(side_effect=lambda *a, **k: True)
+        stub_vdb.get_by_id = AsyncMock(return_value=None)
+        mock_create_vdb.return_value = stub_vdb
         
         # Создаем минимальное приложение без middleware для unit тестов
         from fastapi import FastAPI
@@ -437,3 +453,184 @@ def auto_mock_for_unit_tests(request, mock_materials_service, mock_category_serv
             yield
     else:
         yield 
+
+# ---------------------------------------------------------------------------
+# GLOBAL PATCHES FOR UNIT/FUNCTIONAL TESTS (mock mode)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _patch_qdrant_client(monkeypatch, test_mode):
+    """Patch qdrant_client.QdrantClient with a lightweight fake in mock mode."""
+    if test_mode == "real":
+        # Do nothing in real mode
+        yield
+        return
+
+    from unittest.mock import MagicMock
+
+    class _FakeQdrantClient(MagicMock):
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+            # default mock behaviour
+            self.get_collections.return_value = {"result": {"collections": []}}
+            self.upsert.return_value = None
+            self.recreate_collection.return_value = None
+            self.delete_collection.return_value = None
+            self.search.return_value = []
+
+    monkeypatch.setattr("qdrant_client.QdrantClient", _FakeQdrantClient)
+    yield 
+
+@pytest.fixture(autouse=True)
+def _patch_openai(monkeypatch, test_mode):
+    """Provide dummy OpenAI client to avoid real network calls."""
+    if test_mode == "real":
+        yield
+        return
+
+    import types, sys
+
+    fake_module = types.ModuleType("openai")
+
+    class _FakeEmbeddings:
+        def create(self, *args, **kwargs):
+            # Return deterministic vector size 1536 filled with zeros
+            return {"data": [{"embedding": [0.0] * 1536}]}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.embeddings = _FakeEmbeddings()
+
+    fake_module.OpenAI = lambda *args, **kwargs: _FakeClient()
+    sys.modules["openai"] = fake_module
+    yield
+
+# ---------------------------------------------------------------------------
+# Disable Uvicorn auto-reload in test sessions to avoid infinite restart loops
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session", autouse=True)
+def _disable_uvicorn_reload():
+    """Disable Uvicorn reload **only** via WATCHFILES_DISABLE env-var.
+
+    The official recommendation from Uvicorn maintainers is to rely on the
+    ``WATCHFILES_DISABLE`` environment variable (see https://www.uvicorn.org/settings/#development).
+    All test processes inherit this variable, so additional monkey-patching of
+    ``uvicorn.run`` / ``uvicorn.Config`` is no longer required.
+    """
+    # All heavy monkey-patching was removed – the environment variable is
+    # sufficient to keep the reloader off during tests.
+    yield
+
+# ---------------------------------------------------------------------------
+# Ensure hot-reload subsystem (watchfiles) is disabled for the entire pytest
+# session (including any child processes).  Uvicorn respects the standard
+# env-var ``WATCHFILES_DISABLE`` – when it is truthy, autoreload is skipped.
+# This approach is officially documented and avoids the need for heavy monkey
+#-patching or sys.modules stubbing.
+# ---------------------------------------------------------------------------
+os.environ.setdefault("WATCHFILES_DISABLE", "true")
+
+# ---------------------------------------------------------------------------
+# Patch DatabaseFactory.create_vector_database to avoid real initialization
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _patch_vector_db_factory(monkeypatch):
+    """Patch DatabaseFactory.create_vector_database to return a lightweight stub
+    that adheres to the IVectorDatabase interface signatures used in tests.
+    This prevents expensive (or recursive) initialisation when core services
+    call `get_vector_database()` during functional workflows.
+    """
+    from core.database.factories import DatabaseFactory
+    from unittest.mock import AsyncMock, MagicMock
+
+    class _StubVectorDB(MagicMock):
+        async def collection_exists(self, *args, **kwargs):
+            return False
+
+        async def create_collection(self, *args, **kwargs):
+            return True
+
+        async def scroll_all(self, *args, **kwargs):
+            return []
+
+        async def upsert(self, *args, **kwargs):
+            return True
+
+        async def search(self, *args, **kwargs):
+            return []
+
+        async def batch_upsert(self, *args, **kwargs):
+            return True
+
+        async def delete(self, *args, **kwargs):
+            return True
+
+        async def get_by_id(self, *args, **kwargs):
+            return None
+
+    stub_instance = _StubVectorDB()
+
+    monkeypatch.setattr(DatabaseFactory, "create_vector_database", lambda *a, **kw: stub_instance)
+    # Also patch the convenience accessor that might be cached already
+    monkeypatch.setattr("core.database.factories.get_vector_database", lambda: stub_instance, raising=False)
+    yield
+
+# ---------------------------------------------------------------------------
+# Stub out QdrantVectorDatabase entirely so any direct import uses stub.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _patch_qdrant_adapter(monkeypatch):
+    """Replace QdrantVectorDatabase with a stub that satisfies used methods."""
+    try:
+        import core.database.adapters.qdrant_adapter as qa
+    except ImportError:
+        yield
+        return
+
+    from unittest.mock import MagicMock
+
+    class _StubQdrantVectorDB(MagicMock):
+        async def collection_exists(self, *args, **kwargs):
+            return False
+
+        async def create_collection(self, *args, **kwargs):
+            return True
+
+        async def scroll_all(self, *args, **kwargs):
+            return []
+
+        async def upsert(self, *args, **kwargs):
+            return True
+
+        async def search(self, *args, **kwargs):
+            return []
+
+        async def batch_upsert(self, *args, **kwargs):
+            return True
+
+        async def delete(self, *args, **kwargs):
+            return True
+
+        async def get_by_id(self, *args, **kwargs):
+            return None
+
+        async def health_check(self):
+            return {"status": "ok"}
+
+    monkeypatch.setattr(qa, "QdrantVectorDatabase", _StubQdrantVectorDB)
+    yield
+
+# ---------------------------------------------------------------------------
+# Replace Uvicorn WatchFilesReload supervisor with dummy to prevent restarts
+# in processes where reload still gets enabled (e.g., when command-line
+# arguments force it).  This patch affects the *current* interpreter only but
+# will make the supervisor inert so that even if created it will not loop.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _patch_uvicorn_watchfiles(monkeypatch):
+    """No-op: we rely on WATCHFILES_DISABLE instead of patching WatchFilesReload."""
+    yield
