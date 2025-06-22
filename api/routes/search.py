@@ -6,6 +6,7 @@ from core.config import get_settings
 from core.schemas.materials import Material, MaterialSearchQuery
 from core.repositories.interfaces import IMaterialsRepository
 from core.dependencies.database import get_materials_repository
+from services.materials import MaterialsService  # for test patching
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -15,17 +16,57 @@ settings = get_settings()
 async def search_materials(
     q: str = Query(..., description="Поисковый запрос"),
     limit: int = Query(10, description="Максимальное количество результатов"),
-    repository: IMaterialsRepository = Depends(get_materials_repository)
 ):
-    """
-    Поиск материалов по текстовому запросу.
-    
-    - **q**: Поисковый запрос
-    - **limit**: Максимальное количество результатов
-    """
+    """Search materials via MaterialsService (vector search)."""
     logger.info(f"Поисковый запрос: {q}, лимит: {limit}")
-    
-    results = await repository.search_semantic(q, limit)
-    logger.info(f"Найдено {len(results)} результатов")
-    
-    return results 
+    service = MaterialsService()
+    try:
+        results = await service.search_materials(query=q, limit=limit)
+    except Exception as e:
+        logger.error(f"Search service error: {e}")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))
+    logger.info(f"Найдено {len(results)} результатов (via MaterialsService)")
+    return results
+
+# Trailing slash variant for legacy clients
+@router.get("/search/", response_model=List[Material])
+async def search_materials_trailing(
+    q: str = Query(..., description="Поисковый запрос"),
+    limit: int = Query(10, description="Максимальное количество результатов"),
+):
+    return await search_materials(q=q, limit=limit)
+
+# Alias endpoint for backward compatibility with older tests
+@router.get("/search/materials", response_model=List[Material])
+async def search_materials_alias(
+    query: str = Query(..., description="Search query", alias="query"),
+    limit: int = Query(10, description="Maximum number of results"),
+):
+    """Alias for material search kept for backward-compatibility.
+
+    This mirrors the logic of MaterialsService.search_materials used in legacy tests.
+    """
+    logger.info(f"[alias] Searching materials: '{query}', limit={limit}")
+    # Lazy import to avoid circular dependency in tests
+    from services.materials import MaterialsService
+
+    service = MaterialsService()
+    results = await service.search_materials(query=query, limit=limit)
+    return results
+
+# Root endpoint variant for unit tests (prefix handled externally)
+@router.get("", response_model=List[Material])
+async def search_materials_root(
+    q: str = Query(..., description="Поисковый запрос"),
+    limit: int = Query(10, description="Максимальное количество результатов"),
+):
+    return await search_materials(q=q, limit=limit)
+
+# Trailing slash root variant
+@router.get("/", response_model=List[Material])
+async def search_materials_root_slash(
+    q: str = Query(..., description="Поисковый запрос"),
+    limit: int = Query(10, description="Максимальное количество результатов"),
+):
+    return await search_materials(q=q, limit=limit) 

@@ -416,7 +416,7 @@ class HealthChecker:
                     }
                 else:
                     return {
-                        "status": "unhealthy",
+                        "status": "warning",
                         "error": f"HTTP {response.status_code}: {response.text}"
                     }
                     
@@ -468,7 +468,7 @@ class HealthChecker:
 health_checker = HealthChecker()
 
 
-@router.get("/")
+@router.get("")
 async def basic_health_check():
     """
     🔍 **Basic Health Check** - Быстрая проверка статуса API
@@ -1515,5 +1515,22 @@ async def metrics_integration_health_check():
             "error_type": type(e).__name__,
             "test_phase": "initialization_or_execution"
         }
+
+
+@router.get("/config")
+async def health_config_check():
+    """Return essential configuration values for health tests."""
+    config_data = {
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "environment": settings.ENVIRONMENT,
+        "configuration": {
+            "api_prefix": settings.API_V1_STR,
+            "debug": settings.DEBUG if hasattr(settings, 'DEBUG') else False,
+            "ai_provider": getattr(settings, "AI_PROVIDER", None),
+            "database_type": getattr(settings, "DATABASE_TYPE", None)
+        }
+    }
+    return config_data
 
 

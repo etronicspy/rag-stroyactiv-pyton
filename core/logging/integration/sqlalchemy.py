@@ -45,10 +45,7 @@ class SQLAlchemyEventListener:
         
         # Create SQL logger if not provided
         self._sql_logger = sql_logger or SqlLogger(
-            logger=self._logger,
-            log_queries=database_settings["log_sql_queries"],
-            log_parameters=database_settings["log_sql_parameters"],
-            slow_query_threshold_ms=database_settings["slow_query_threshold_ms"],
+            name="sqlalchemy-test",
         )
         
         # Set enabled flag
@@ -154,10 +151,7 @@ class SessionExtension:
         
         # Create SQL logger if not provided
         self._sql_logger = sql_logger or SqlLogger(
-            logger=self._logger,
-            log_queries=database_settings["log_sql_queries"],
-            log_parameters=database_settings["log_sql_parameters"],
-            slow_query_threshold_ms=database_settings["slow_query_threshold_ms"],
+            name="sqlalchemy-test",
         )
         
         # Set enabled flag

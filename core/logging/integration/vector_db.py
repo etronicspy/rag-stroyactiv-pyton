@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Union, cast, TypeVar, Pa
 
 from core.logging.config import get_configuration
 from core.logging.interfaces import ILogger
-from core.logging.specialized.database import VectorDbLogger
+from core.logging.specialized.database.vector_db_logger import VectorDbLogger
 
 
 T = TypeVar('T')
@@ -52,12 +52,7 @@ class QdrantLoggerMixin:
         self._logger = logger or logging.getLogger("qdrant")
         
         # Create vector database logger if not provided
-        self._vector_db_logger = vector_db_logger or VectorDbLogger(
-            logger=self._logger,
-            db_type="qdrant",
-            log_operations=database_settings["log_vector_operations"],
-            slow_query_threshold_ms=database_settings["slow_query_threshold_ms"],
-        )
+        self._vector_db_logger = vector_db_logger or VectorDbLogger(name="qdrant", db_type="qdrant")
         
         # Set enabled flag
         self._enabled = database_settings["enable_database_logging"]
@@ -160,12 +155,7 @@ class WeaviateLoggerMixin:
         self._logger = logger or logging.getLogger("weaviate")
         
         # Create vector database logger if not provided
-        self._vector_db_logger = vector_db_logger or VectorDbLogger(
-            logger=self._logger,
-            db_type="weaviate",
-            log_operations=database_settings["log_vector_operations"],
-            slow_query_threshold_ms=database_settings["slow_query_threshold_ms"],
-        )
+        self._vector_db_logger = vector_db_logger or VectorDbLogger(name="weaviate", db_type="weaviate")
         
         # Set enabled flag
         self._enabled = database_settings["enable_database_logging"]
@@ -262,12 +252,7 @@ class PineconeLoggerMixin:
         self._logger = logger or logging.getLogger("pinecone")
         
         # Create vector database logger if not provided
-        self._vector_db_logger = vector_db_logger or VectorDbLogger(
-            logger=self._logger,
-            db_type="pinecone",
-            log_operations=database_settings["log_vector_operations"],
-            slow_query_threshold_ms=database_settings["slow_query_threshold_ms"],
-        )
+        self._vector_db_logger = vector_db_logger or VectorDbLogger(name="pinecone", db_type="pinecone")
         
         # Set enabled flag
         self._enabled = database_settings["enable_database_logging"]
@@ -353,22 +338,17 @@ def log_vector_db_operation(
     # Create logger if not provided
     logger = logger or logging.getLogger(f"vector_db.{db_type}")
     
-    # Create vector database logger
-    vector_db_logger = VectorDbLogger(
-        logger=logger,
-        db_type=db_type,
-        log_operations=database_settings["log_vector_operations"],
-        slow_query_threshold_ms=database_settings["slow_query_threshold_ms"],
-    )
-    
-    # Set enabled flag
-    enabled = database_settings["enable_database_logging"]
-    
+    # VectorDB logger will be instantiated lazily on first use to allow tests to patch
+    _enabled = database_settings["enable_database_logging"]
+
+    def _get_logger() -> VectorDbLogger:
+        return VectorDbLogger(name=f"vector-db.{db_type}", db_type=db_type)
+
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             # Skip logging if disabled
-            if not enabled:
+            if not _enabled:
                 return func(*args, **kwargs)
             
             # Start timer
@@ -382,7 +362,7 @@ def log_vector_db_operation(
                 duration_ms = (time.time() - start_time) * 1000
                 
                 # Log operation
-                vector_db_logger.log_operation(operation, kwargs, duration_ms)
+                _get_logger().log_operation(operation, kwargs, duration_ms)
                 
                 return result
             except Exception as e:
@@ -390,11 +370,14 @@ def log_vector_db_operation(
                 duration_ms = (time.time() - start_time) * 1000
                 
                 # Log exception
-                vector_db_logger.log_exception(operation, kwargs, e, duration_ms)
+                _get_logger().log_exception(operation, kwargs, e, duration_ms)
                 
                 # Re-raise exception
                 raise
         
         return wrapper
     
-    return decorator 
+    return decorator
+
+
+# Removed lightweight compatibility logger – using full-featured VectorDbLogger 

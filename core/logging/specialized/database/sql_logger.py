@@ -222,6 +222,29 @@ class SqlLogger(DatabaseLogger):
         else:
             return "SQL"
 
+    def log_connection(
+        self,
+        duration_ms: float = 0.0,
+        success: bool = True,
+        error: Optional[Exception] = None,
+        **kwargs
+    ) -> None:
+        """Log the establishment of a database connection.
+
+        Args:
+            duration_ms: The duration in milliseconds it took to establish the connection.
+            success: Whether the connection was successful.
+            error: The error, if any.
+            **kwargs: Additional context for the log message.
+        """
+        self.log_operation(
+            operation="connect",
+            duration_ms=duration_ms,
+            success=success,
+            error=error,
+            **kwargs,
+        )
+
 
 class AsyncSqlLogger(AsyncDatabaseLogger, SqlLogger):
     """Asynchronous logger for SQL operations."""

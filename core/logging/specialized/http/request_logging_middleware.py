@@ -6,6 +6,7 @@ This module provides a middleware for logging HTTP requests.
 
 import time
 from typing import Any, Callable, Dict, Optional
+import uuid
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -26,7 +27,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         exclude_methods: Optional[list[str]] = None,
         log_request_body: bool = True,
         log_response_body: bool = True,
-        log_health_checks: bool = False
+        log_health_checks: bool = False,
     ):
         """
         Initialize a new request logging middleware.
@@ -79,6 +80,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if self._log_request_body:
             request_body = await self._get_request_body(request)
         
+        # Generate or extract correlation ID
+        correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
         # Prefer async logging if available, otherwise use sync method in thread executor
         if hasattr(self._request_logger, "alog_incoming_request"):
             request_context = await self._request_logger.alog_incoming_request(
@@ -88,7 +91,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 request_body=request_body,
                 query_params=dict(request.query_params),
                 client_host=request.client.host if request.client else None,
+                correlation_id=correlation_id,
             )
+            # Ensure correlation ID is preserved for later use in response logging
+            request_context["correlation_id"] = correlation_id
         else:
             # Fallback to synchronous logger in a background thread to avoid blocking event loop
             from functools import partial
@@ -102,6 +108,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 request_body=request_body,
                 query_params=dict(request.query_params),
                 client_host=request.client.host if request.client else None,
+                correlation_id=correlation_id,
             )
             request_context = await anyio.to_thread.run_sync(sync_func)
         
@@ -170,6 +177,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 response_body,
             )
             await anyio.to_thread.run_sync(sync_resp)
+        
+        # Add correlation ID header if present
+        if correlation_id := request_context.get("correlation_id"):
+            response.headers["X-Correlation-ID"] = correlation_id
         
         return response
     
@@ -244,6 +255,43 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         except:
             return None
 
+    # ---------------------------------------------------------------------
+    # Public helpers
+    # ---------------------------------------------------------------------
+
+    @staticmethod
+    def mask_sensitive_data(headers: Dict[str, str], mask: str = "***") -> Dict[str, str]:
+        """Mask potentially sensitive header values.
+
+        Args:
+            headers: Original headers dictionary.
+            mask: Replacement for masked values.
+
+        Returns:
+            Dict[str, str]: New dictionary with sensitive values masked.
+        """
+        sensitive_keywords = [
+            "authorization",
+            "token",
+            "secret",
+            "api-key",
+            "x-api-key",
+            "key",
+        ]
+
+        masked_headers: Dict[str, str] = {}
+        for k, v in headers.items():
+            if any(keyword in k.lower() for keyword in sensitive_keywords):
+                # Preserve scheme if present (e.g., "Bearer abc")
+                parts = v.split(" ", 1)
+                if len(parts) == 2:
+                    masked_headers[k] = f"{parts[0]} {mask}"
+                else:
+                    masked_headers[k] = mask
+            else:
+                masked_headers[k] = v
+        return masked_headers
+
 
 class AsyncRequestLoggingMiddleware:
     """Async middleware for logging HTTP requests."""
@@ -256,7 +304,7 @@ class AsyncRequestLoggingMiddleware:
         exclude_methods: Optional[list[str]] = None,
         log_request_body: bool = True,
         log_response_body: bool = True,
-        log_health_checks: bool = False
+        log_health_checks: bool = False,
     ):
         """
         Initialize a new async request logging middleware.
@@ -318,6 +366,8 @@ class AsyncRequestLoggingMiddleware:
         if self._log_request_body:
             request_body = await self._get_request_body(receive)
         
+        # Generate or extract correlation ID
+        correlation_id = headers.get("X-Correlation-ID") or str(uuid.uuid4())
         # Prefer async logging if available, otherwise use sync method in thread executor
         if hasattr(self._request_logger, "alog_incoming_request"):
             request_context = await self._request_logger.alog_incoming_request(
@@ -327,6 +377,7 @@ class AsyncRequestLoggingMiddleware:
                 request_body=request_body,
                 query_params=dict(scope["query_string"]),
                 client_host=scope["client"][0] if "client" in scope else None,
+                correlation_id=correlation_id,
             )
         else:
             # Fallback to synchronous logger in a background thread to avoid blocking event loop
@@ -341,8 +392,12 @@ class AsyncRequestLoggingMiddleware:
                 request_body=request_body,
                 query_params=dict(scope["query_string"]),
                 client_host=scope["client"][0] if "client" in scope else None,
+                correlation_id=correlation_id,
             )
             request_context = await anyio.to_thread.run_sync(sync_func)
+        
+        # Preserve correlation ID for response logging
+        request_context["correlation_id"] = correlation_id
         
         # Process the request
         start_time = time.time()

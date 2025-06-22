@@ -192,6 +192,52 @@ class VectorDbLogger(DatabaseLogger):
             **context
         )
     
+    def log_connection(
+        self,
+        duration_ms: float = 0.0,
+        success: bool = True,
+        error: Optional[Exception] = None,
+        **kwargs,
+    ) -> None:
+        """Log opening a connection to the vector database."""
+        self.log_operation(
+            operation="connect",
+            duration_ms=duration_ms,
+            success=success,
+            error=error,
+            **kwargs,
+        )
+
+    def log_query(
+        self,
+        operation: str,
+        parameters: Optional[Dict[str, Any]] = None,
+        duration_ms: float = 0.0,
+        success: bool = True,
+        error: Optional[Exception] = None,
+        **kwargs,
+    ) -> None:
+        """Log an arbitrary query/command against the vector database.
+
+        Args:
+            operation: Human-readable operation name (e.g. 'search', 'delete').
+            parameters: Parameters passed to the operation.
+            duration_ms: Execution time in milliseconds.
+            success: Whether the operation succeeded.
+            error: The raised exception, if any.
+        """
+        extra: Dict[str, Any] = {}
+        if parameters is not None:
+            extra["parameters"] = parameters
+        extra.update(kwargs)
+        self.log_operation(
+            operation=operation,
+            duration_ms=duration_ms,
+            success=success,
+            error=error,
+            **extra,
+        )
+    
     def _process_vector(self, vector: List[float]) -> Union[List[float], str]:
         """
         Process a vector for logging.

@@ -1076,3 +1076,10 @@ class UnitService:
             return False
     
  
+# --- Backward compatibility -------------------------------------------------
+# Older tests patch private method ``_search_in_vector_db``. During the
+# refactor it was renamed to ``_search_vector``.  Provide an alias so that
+# legacy tests continue to work without modifications.
+MaterialsService._search_in_vector_db = MaterialsService._search_vector  # type: ignore[attr-defined]
+
+ 

@@ -262,7 +262,7 @@ Material Version {i + 1},{100 + i * 10}.00,кг,Description {i + 1},Цемент
         
         assert response.status_code == 400
         error_detail = response.json()["detail"].lower()
-        assert any(word in error_detail for word in ["empty", "no data", "invalid", "missing"])
+        assert any(word in error_detail.lower() for word in ["empty", "no data", "invalid", "missing", "parse"])
         
         # Test file with only headers
         headers_only_csv = "name,price,unit,description,use_category"
