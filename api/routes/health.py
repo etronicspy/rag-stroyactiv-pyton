@@ -861,7 +861,11 @@ async def database_health_check():
     }
 
 
-@router.get("/unified-logging")
+@router.get(
+    "/unified-logging",
+    summary="📚 Unified Logging Health – Проверка системы логгирования",
+    response_description="Статус единой системы логгирования и метрик"
+)
 async def unified_logging_health_check():
     """
     🎯 **Unified Logging System Health Check** - ЭТАП 2.2 ИНТЕГРАЦИЯ
@@ -983,7 +987,11 @@ async def unified_logging_health_check():
         )
 
 
-@router.get("/correlation-tracing")
+@router.get(
+    "/correlation-tracing",
+    summary="🪢 Correlation Tracing – Тест трассировки correlation ID",
+    response_description="Результаты теста end-to-end трассировки"
+)
 @with_correlation_context
 async def test_correlation_tracing():
     """
@@ -1044,7 +1052,11 @@ async def test_correlation_tracing():
         }
 
 
-@router.get("/performance-optimization")
+@router.get(
+    "/performance-optimization",
+    summary="⚡ Performance Optimization – Проверка оптимизаций",
+    response_description="Отчет о производительности и оптимизациях"
+)
 async def performance_optimization_health_check():
     """🚀 Performance Optimization System Health Check - ЭТАП 4.6"""
     
@@ -1301,7 +1313,11 @@ async def _test_json_serialization() -> Dict[str, Any]:
         }
 
 
-@router.get("/metrics-integration")
+@router.get(
+    "/metrics-integration",
+    summary="📈 Metrics Integration – Интеграция метрик",
+    response_description="Сводка по интеграции системы метрик"
+)
 @with_correlation_context
 async def metrics_integration_health_check():
     """
@@ -1531,7 +1547,11 @@ async def metrics_integration_health_check():
         }
 
 
-@router.get("/config")
+@router.get(
+    "/config",
+    summary="⚙️ Health Config – Конфигурация health-чеков",
+    response_description="Текущая конфигурация health-системы"
+)
 async def health_config_check():
     """Return essential configuration values for health tests."""
     config_data = {
