@@ -38,7 +38,12 @@ class MessageResponse(BaseModel):
     success: bool
 
 
-@router.get("/status", response_model=TunnelStatusResponse)
+@router.get(
+    "/status",
+    response_model=TunnelStatusResponse,
+    summary="🔌 Tunnel Status – Статус SSH туннеля",
+    response_description="Информация о состоянии SSH туннеля"
+)
 async def get_tunnel_status(tunnel_service: TunnelService):
     """Get SSH tunnel service status.
     
@@ -55,7 +60,11 @@ async def get_tunnel_status(tunnel_service: TunnelService):
     return TunnelStatusResponse(**status_data)
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="🩺 Tunnel Health – Проверка здоровья SSH туннеля",
+    response_description="Простая проверка состояния туннеля"
+)
 async def tunnel_health_check(tunnel_service: TunnelService):
     """Health check endpoint for SSH tunnel.
     
@@ -77,7 +86,12 @@ async def tunnel_health_check(tunnel_service: TunnelService):
     }
 
 
-@router.get("/metrics", response_model=TunnelMetricsResponse)
+@router.get(
+    "/metrics",
+    response_model=TunnelMetricsResponse,
+    summary="📊 Tunnel Metrics – Метрики SSH туннеля",
+    response_description="Детальные метрики и статистика туннеля"
+)
 async def get_tunnel_metrics(tunnel_service: RequiredTunnelService):
     """Get detailed SSH tunnel metrics and statistics.
     
@@ -88,7 +102,12 @@ async def get_tunnel_metrics(tunnel_service: RequiredTunnelService):
     return TunnelMetricsResponse(**metrics_data)
 
 
-@router.post("/restart", response_model=MessageResponse)
+@router.post(
+    "/restart",
+    response_model=MessageResponse,
+    summary="🔄 Restart Tunnel – Перезагрузка туннеля",
+    response_description="Статус перезапуска туннеля"
+)
 async def restart_tunnel(tunnel_service: RequiredTunnelService):
     """Restart SSH tunnel service.
     
@@ -116,7 +135,12 @@ async def restart_tunnel(tunnel_service: RequiredTunnelService):
         )
 
 
-@router.post("/start", response_model=MessageResponse)
+@router.post(
+    "/start",
+    response_model=MessageResponse,
+    summary="▶️ Start Tunnel – Запуск туннеля",
+    response_description="Статус запуска туннеля"
+)
 async def start_tunnel(tunnel_service: RequiredTunnelService):
     """Start SSH tunnel service.
     
@@ -150,7 +174,12 @@ async def start_tunnel(tunnel_service: RequiredTunnelService):
         )
 
 
-@router.post("/stop", response_model=MessageResponse)
+@router.post(
+    "/stop",
+    response_model=MessageResponse,
+    summary="⏹️ Stop Tunnel – Остановка туннеля",
+    response_description="Статус остановки туннеля"
+)
 async def stop_tunnel(tunnel_service: RequiredTunnelService):
     """Stop SSH tunnel service.
     
@@ -171,7 +200,11 @@ async def stop_tunnel(tunnel_service: RequiredTunnelService):
         )
 
 
-@router.get("/config")
+@router.get(
+    "/config",
+    summary="⚙️ Tunnel Config – Конфигурация туннеля",
+    response_description="Конфигурация туннеля без чувствительных данных"
+)
 async def get_tunnel_config(tunnel_service: RequiredTunnelService):
     """Get SSH tunnel configuration (without sensitive data).
     
