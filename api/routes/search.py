@@ -4,7 +4,7 @@ from typing import List
 from core.logging import get_logger
 from core.config import get_settings
 from core.schemas.materials import Material
-from services.materials import MaterialsService  # for test patching
+from services.materials import MaterialsService
 from core.schemas.response_models import ERROR_RESPONSES
 
 router = APIRouter(responses=ERROR_RESPONSES)
@@ -84,77 +84,4 @@ async def search_materials(
     logger.info(f"Found {len(results)} results (via MaterialsService)")
     return results
 
-# Alternative endpoint path for backward compatibility
-@router.get("/search/materials", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
-async def search_materials_alias(
-    q: str = Query(..., description="Search query string"),
-    limit: int = Query(10, description="Maximum number of results to return"),
-):
-    """Alternative endpoint path for material search - alias for backward compatibility.
-
-    This endpoint provides an alternative URL structure for clients that expect
-    a more explicit "/search/materials" path. Functionality is identical to the main
-    search endpoint.
-
-    **Why this alias exists:**
-    - Some clients expect explicit resource naming
-    - Migration from older API versions
-    - Different client SDK expectations
-    - URL consistency with other endpoints
-
-    Args:
-        q (str): Search query string - same as main search endpoint
-        limit (int): Maximum results to return - same as main search endpoint
-
-    Returns:
-        List[Material]: Identical response to main search endpoint
-
-    Note:
-        This is a convenience alias. For new integrations, use `/search` directly.
-    """
-    return await search_materials(q=q, limit=limit)
-
-# Trailing slash variant for legacy clients
-@router.get("/search/", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
-async def search_materials_trailing(
-    q: str = Query(..., description="Search query string"),
-    limit: int = Query(10, description="Maximum number of results to return"),
-):
-    """Legacy endpoint with trailing slash kept for backward-compatibility.
-
-    This route is maintained for legacy clients/scripts that accessed "/search/" with
-    a trailing slash. Completely delegates execution to the main endpoint
-    :func:`search_materials` without changing logic.
-
-    Args:
-        q (str): Search query.
-        limit (int): Results limit.
-
-    Returns:
-        List[Material]: List of found materials (identical to `/search`).
-    """
-    return await search_materials(q=q, limit=limit)
-
-# Root endpoint variant for unit tests (prefix handled externally)
-@router.get("", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
-async def search_materials_root(
-    q: str = Query(..., description="Search query string"),
-    limit: int = Query(10, description="Maximum number of results to return"),
-):
-    """Root search endpoint alias for convenience access.
-
-    Provides search functionality at the root level of the search router.
-    This allows for shorter URLs in some client configurations.
-    Used primarily in unit tests where the router is mounted without prefix.
-
-    Args:
-        q (str): Search query string
-        limit (int): Maximum results to return
-
-    Returns:
-        List[Material]: Search results identical to main search endpoint
-    """
-    return await search_materials(q=q, limit=limit)
-
-# Note: FastAPI automatically handles trailing slash redirects
-# Removed redundant slash endpoints to follow REST API standards 
+# Clean REST API - single endpoint following OpenAPI standards 
