@@ -176,9 +176,11 @@ async def process_price_list(
         except Exception as e:
             logger.warning(f"Could not delete temp file {temp_path}: {e}")
 
-@router.get("/{supplier_id}/latest",
-           summary="📋 Get Latest Price List - Получение актуального прайс-листа",
-           response_description="Последний загруженный прайс-лист поставщика")
+@router.get(
+    "/{supplier_id}/latest",
+    summary="📋 Get Latest Price List – Актуальный прайс-лист",
+    response_description="Последний загруженный прайс-лист поставщика"
+)
 async def get_latest_price_list(
     supplier_id: str,
     price_processor: PriceProcessor = Depends(get_price_processor)
@@ -275,9 +277,11 @@ async def get_latest_price_list(
         logger.error(f"Error getting latest price list: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.get("/{supplier_id}/all",
-           summary="📚 Get All Price Lists - Получение всех прайс-листов поставщика",
-           response_description="Все прайс-листы поставщика, сгруппированные по дате загрузки")
+@router.get(
+    "/{supplier_id}/all",
+    summary="📚 All Price Lists – Все прайс-листы поставщика",
+    response_description="Все прайс-листы поставщика, сгруппированные по дате загрузки"
+)
 async def get_all_price_lists(
     supplier_id: str,
     price_processor: PriceProcessor = Depends(get_price_processor)
@@ -364,9 +368,11 @@ async def get_all_price_lists(
         logger.error(f"Error getting all price lists: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.delete("/{supplier_id}",
-              summary="🗑️ Delete Supplier Price Lists - Удаление всех прайс-листов поставщика",
-              response_description="Подтверждение удаления")
+@router.delete(
+    "/{supplier_id}",
+    summary="🗑️ Delete Supplier Lists – Удаление прайс-листов",
+    response_description="Подтверждение удаления"
+)
 async def delete_supplier_price_list(
     supplier_id: str,
     price_processor: PriceProcessor = Depends(get_price_processor)
@@ -444,9 +450,11 @@ async def delete_supplier_price_list(
         logger.error(f"Error deleting price list: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.get("/{supplier_id}/pricelist/{pricelistid}",
-           summary="📋 Get Products by Price List ID - Получение продуктов по ID прайс-листа",
-           response_description="Продукты из конкретного прайс-листа")
+@router.get(
+    "/{supplier_id}/pricelist/{pricelistid}",
+    summary="📋 Price List Products – Продукты по ID прайс-листа",
+    response_description="Продукты из конкретного прайс-листа"
+)
 async def get_raw_products_by_pricelist(
     supplier_id: str,
     pricelistid: int,
@@ -556,9 +564,11 @@ async def get_raw_products_by_pricelist(
         logger.error(f"Error getting raw products by pricelist: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.patch("/{supplier_id}/product/{product_id}/process",
-              summary="✅ Mark Product as Processed - Отметить продукт как обработанный",
-              response_description="Подтверждение обработки продукта")
+@router.patch(
+    "/{supplier_id}/product/{product_id}/process",
+    summary="✅ Process Product – Отметить продукт обработанным",
+    response_description="Подтверждение обработки продукта"
+)
 async def mark_product_as_processed(
     supplier_id: str,
     product_id: str,
