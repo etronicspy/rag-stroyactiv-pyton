@@ -45,7 +45,13 @@ class AdvancedSearchResponse(BaseModel):
     query_used: str
     search_type_used: str
 
-@router.post("/advanced", response_model=AdvancedSearchResponse, responses=ERROR_RESPONSES)
+@router.post(
+    "/advanced",
+    response_model=AdvancedSearchResponse,
+    responses=ERROR_RESPONSES,
+    summary="🚀 Advanced Search – Продвинутый поиск материалов",
+    response_description="Результаты продвинутого поиска материалов"
+)
 async def advanced_search(request: AdvancedSearchRequest):
     """
     🚀 **Advanced Material Search** - Продвинутый поиск с настройками
@@ -187,7 +193,13 @@ async def advanced_search(request: AdvancedSearchRequest):
         logger.error(f"Advanced search failed: {e}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
-@router.get("/suggestions", response_model=List[SearchSuggestion], responses=ERROR_RESPONSES)
+@router.get(
+    "/suggestions",
+    response_model=List[SearchSuggestion],
+    responses=ERROR_RESPONSES,
+    summary="💡 Search Suggestions – Предложения автодополнения",
+    response_description="Список поисковых подсказок"
+)
 async def get_search_suggestions(
     q: str = Query(..., min_length=1, description="Search query for suggestions"),
     limit: int = Query(8, ge=1, le=20, description="Maximum number of suggestions")
@@ -287,7 +299,13 @@ async def get_search_suggestions(
         logger.error(f"Failed to get suggestions: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get suggestions: {str(e)}")
 
-@router.get("/categories", response_model=List[str], responses=ERROR_RESPONSES)
+@router.get(
+    "/categories",
+    response_model=List[str],
+    responses=ERROR_RESPONSES,
+    summary="🏷️ Available Categories – Список категорий",
+    response_description="Список доступных категорий материалов"
+)
 async def get_available_categories():
     """
     🏷️ **Available Categories** - Доступные категории для фильтрации
@@ -344,7 +362,13 @@ async def get_available_categories():
         # Return mock categories if service fails
         return ["Цемент", "Бетон", "Кирпич", "Песок", "Щебень", "Арматура", "Гипс", "Краска"]
 
-@router.get("/units", response_model=List[str], responses=ERROR_RESPONSES)
+@router.get(
+    "/units",
+    response_model=List[str],
+    responses=ERROR_RESPONSES,
+    summary="📏 Available Units – Список единиц измерения",
+    response_description="Список доступных единиц измерения"
+)
 async def get_available_units():
     """
     📏 **Available Units** - Доступные единицы измерения для фильтрации

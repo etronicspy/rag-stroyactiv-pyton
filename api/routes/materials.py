@@ -44,7 +44,11 @@ def get_materials_service(
         return None
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="Materials Health – Статус сервиса материалов",
+    response_description="Информация о состоянии сервиса материалов"
+)
 async def health_check(
     service: MaterialsService = Depends(get_materials_service)
 ):
@@ -139,7 +143,13 @@ async def health_check(
     return health_status
 
 
-@router.post("/", response_model=Material, responses=ERROR_RESPONSES)
+@router.post(
+    "/",
+    response_model=Material,
+    responses=ERROR_RESPONSES,
+    summary="➕ Create Material – Создание материала",
+    response_description="Созданный материал"
+)
 async def create_material(
     material: MaterialCreate,
     service: MaterialsService = Depends(get_materials_service)
@@ -215,7 +225,13 @@ async def create_material(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.get("/{material_id}", response_model=Material, responses=ERROR_RESPONSES)
+@router.get(
+    "/{material_id}",
+    response_model=Material,
+    responses=ERROR_RESPONSES,
+    summary="🔍 Get Material – Получение материала по ID",
+    response_description="Данные материала"
+)
 async def get_material(
     material_id: str,
     service: MaterialsService = Depends(get_materials_service)
@@ -272,7 +288,13 @@ async def get_material(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/search", response_model=List[Material], responses=ERROR_RESPONSES)
+@router.post(
+    "/search",
+    response_model=List[Material],
+    responses=ERROR_RESPONSES,
+    summary="🔎 Search Materials – Поиск материалов",
+    response_description="Результаты поиска материалов"
+)
 async def search_materials(
     query: MaterialSearchQuery,
     service: MaterialsService = Depends(get_materials_service)
@@ -286,7 +308,7 @@ async def search_materials(
     
     **🔄 Fallback Strategy:**
     1. **Vector Search**: Семантический поиск по embedding
-    2. **SQL LIKE Search**: Текстовый поиск при 0 результатах
+    2. **SQL LIKE Search**: Текстовый поиск при 0 результатов
     3. **Fuzzy Matching**: Поиск с учетом опечаток
     
     **Особенности:**
@@ -404,7 +426,12 @@ async def search_materials(
         }]
 
 
-@router.get("/", response_model=List[Material])
+@router.get(
+    "/",
+    response_model=List[Material],
+    summary="📋 List Materials – Список материалов",
+    response_description="Список материалов с поддержкой фильтрации"
+)
 async def get_materials(
     skip: int = 0, 
     limit: int = 10, 
@@ -468,7 +495,12 @@ async def get_materials(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.put("/{material_id}", response_model=Material)
+@router.put(
+    "/{material_id}",
+    response_model=Material,
+    summary="✏️ Update Material – Обновление материала",
+    response_description="Обновлённый материал"
+)
 async def update_material(
     material_id: str,
     material: MaterialUpdate,
@@ -551,7 +583,11 @@ async def update_material(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.delete("/{material_id}")
+@router.delete(
+    "/{material_id}",
+    summary="🗑️ Delete Material – Удаление материала",
+    response_description="Результат удаления"
+)
 async def delete_material(
     material_id: str,
     service: MaterialsService = Depends(get_materials_service)
@@ -624,7 +660,12 @@ async def delete_material(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/batch", response_model=MaterialBatchResponse)
+@router.post(
+    "/batch",
+    response_model=MaterialBatchResponse,
+    summary="📦 Batch Create Materials – Массовое создание материалов",
+    response_description="Результаты пакетного создания материалов"
+)
 async def create_materials_batch(
     batch_data: MaterialBatchCreate,
     service: MaterialsService = Depends(get_materials_service)
@@ -732,7 +773,12 @@ async def create_materials_batch(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/import", response_model=MaterialBatchResponse)
+@router.post(
+    "/import",
+    response_model=MaterialBatchResponse,
+    summary="📥 Import Materials – Импорт материалов из JSON/CSV",
+    response_description="Результат импорта материалов"
+)
 async def import_materials_from_json(
     import_data: MaterialImportRequest,
     service: MaterialsService = Depends(get_materials_service)
