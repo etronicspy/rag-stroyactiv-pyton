@@ -11,12 +11,65 @@ router = APIRouter(responses=ERROR_RESPONSES)
 logger = get_logger(__name__)
 settings = get_settings()
 
-@router.get("/search", response_model=List[Material], responses=ERROR_RESPONSES)
+@router.get("/search", response_model=List[Material], responses=ERROR_RESPONSES, summary="🔎 Material Search – Семантический поиск материалов", response_description="Список материалов, удовлетворяющих поисковому запросу")
 async def search_materials(
-    q: str = Query(..., description="Поисковый запрос"),
-    limit: int = Query(10, description="Максимальное количество результатов"),
+    q: str = Query(..., description="Search query string", alias="q"),
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of results to return"),
 ):
-    """Search materials via MaterialsService (vector search)."""
+    """Search construction materials by text query using semantic vector search.
+
+    Делает семантический (vector) поиск материалов по текстовому запросу.
+    Использует :class:`services.materials.MaterialsService` с векторной БД (Qdrant/Weaviate/Pinecone)
+    для получения наиболее релевантных результатов.
+
+    Args:
+        q (str): User search query.
+        limit (int): Upper bound for the amount of materials returned (1-100).
+
+    Returns:
+        List[Material]: Sorted list of materials matching the query ordered by similarity score.
+
+    Raises:
+        HTTPException: 500 if underlying service raises an exception.
+
+    Example:
+        ```shell
+        curl -X GET "https://api.example.com/api/v1/search?q=цемент+М500&limit=20"
+        ```
+
+        Example response (HTTP 200):
+        ```json
+        [
+          {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "Портландцемент М500 Д0",
+            "use_category": "Цемент",
+            "unit": "мешок",
+            "sku": "CEM500-001",
+            "description": "Высокопрочный цемент для конструкционного бетона",
+            "embedding": null,
+            "created_at": "2025-06-16T16:46:29.421964Z",
+            "updated_at": "2025-06-16T16:46:29.421964Z"
+          },
+          {
+            "id": "550e8400-e29b-41d4-a716-446655440001",
+            "name": "Портландцемент М400",
+            "use_category": "Цемент",
+            "unit": "мешок",
+            "sku": "CEM400-007",
+            "description": "Цемент общего назначения",
+            "embedding": null,
+            "created_at": "2025-06-16T16:46:29.421964Z",
+            "updated_at": "2025-06-16T16:46:29.421964Z"
+          }
+        ]
+        ```
+
+    Response Codes:
+        200: Successful search.
+        400: Validation error (e.g., empty query, invalid limit).
+        500: Internal server error / search backend failure.
+    """
     logger.info(f"Поисковый запрос: {q}, лимит: {limit}")
     service = MaterialsService()
     try:
