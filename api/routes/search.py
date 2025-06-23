@@ -84,28 +84,7 @@ async def search_materials(
     logger.info(f"Found {len(results)} results (via MaterialsService)")
     return results
 
-# Trailing slash variant for legacy clients
-@router.get("/search/", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
-async def search_materials_trailing(
-    q: str = Query(..., description="Search query string"),
-    limit: int = Query(10, description="Maximum number of results to return"),
-):
-    """Legacy endpoint with trailing slash kept for backward-compatibility.
-
-    This route is maintained for legacy clients/scripts that accessed "/search/" with
-    a trailing slash. Completely delegates execution to the main endpoint
-    :func:`search_materials` without changing logic.
-
-    Args:
-        q (str): Search query.
-        limit (int): Results limit.
-
-    Returns:
-        List[Material]: List of found materials (identical to `/search`).
-    """
-    return await search_materials(q=q, limit=limit)
-
-# Alias endpoint for backward compatibility with older tests
+# Alternative endpoint path for backward compatibility
 @router.get("/search/materials", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
 async def search_materials_alias(
     q: str = Query(..., description="Search query string"),
@@ -135,6 +114,27 @@ async def search_materials_alias(
     """
     return await search_materials(q=q, limit=limit)
 
+# Trailing slash variant for legacy clients
+@router.get("/search/", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
+async def search_materials_trailing(
+    q: str = Query(..., description="Search query string"),
+    limit: int = Query(10, description="Maximum number of results to return"),
+):
+    """Legacy endpoint with trailing slash kept for backward-compatibility.
+
+    This route is maintained for legacy clients/scripts that accessed "/search/" with
+    a trailing slash. Completely delegates execution to the main endpoint
+    :func:`search_materials` without changing logic.
+
+    Args:
+        q (str): Search query.
+        limit (int): Results limit.
+
+    Returns:
+        List[Material]: List of found materials (identical to `/search`).
+    """
+    return await search_materials(q=q, limit=limit)
+
 # Root endpoint variant for unit tests (prefix handled externally)
 @router.get("", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
 async def search_materials_root(
@@ -145,6 +145,7 @@ async def search_materials_root(
 
     Provides search functionality at the root level of the search router.
     This allows for shorter URLs in some client configurations.
+    Used primarily in unit tests where the router is mounted without prefix.
 
     Args:
         q (str): Search query string
@@ -155,34 +156,5 @@ async def search_materials_root(
     """
     return await search_materials(q=q, limit=limit)
 
-# Trailing slash root variant
-@router.get("/", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
-async def search_materials_root_slash(
-    q: str = Query(..., description="Search query string"),
-    limit: int = Query(10, description="Maximum number of results to return"),
-):
-    """Root-level alias with trailing slash (`/`).
-
-    Omitted for compatibility with environments that automatically add
-    a slash after the base path. Delegates to :func:`search_materials`.
-    """
-    return await search_materials(q=q, limit=limit)
-
-@router.get("//", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
-async def search_double_slash_alias(
-    q: str = Query(..., description="Search query string"),
-    limit: int = Query(10, description="Maximum number of results to return"),
-):
-    """Double slash endpoint to handle URL parsing edge cases.
-
-    Some HTTP clients or proxies might create double slashes in URLs.
-    This endpoint ensures these requests are handled gracefully.
-
-    Args:
-        q (str): Search query string
-        limit (int): Maximum results to return
-
-    Returns:
-        List[Material]: Search results identical to main search endpoint
-    """
-    return await search_materials(q=q, limit=limit) 
+# Note: FastAPI automatically handles trailing slash redirects
+# Removed redundant slash endpoints to follow REST API standards 
