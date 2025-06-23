@@ -20,7 +20,12 @@ def get_unit_service(
     """Get UnitService with dependency injection."""
     return UnitService(vector_db=vector_db)
 
-@router.post("/categories/", response_model=Category)
+@router.post(
+    "/categories/",
+    response_model=Category,
+    summary="🏷️ Create Category – Создание категории",
+    response_description="Созданная категория"
+)
 async def create_category(
     category: Category,
     service: CategoryService = Depends(get_category_service)
@@ -81,7 +86,12 @@ async def create_category(
     """
     return await service.create_category(category.name, category.description)
 
-@router.get("/categories/", response_model=List[Category])
+@router.get(
+    "/categories/",
+    response_model=List[Category],
+    summary="📋 List Categories – Список категорий",
+    response_description="Список категорий материалов"
+)
 async def get_categories(
     service: CategoryService = Depends(get_category_service)
 ):
@@ -138,7 +148,11 @@ async def get_categories(
     """
     return await service.get_categories()
 
-@router.delete("/categories/{category_id}")
+@router.delete(
+    "/categories/{category_id}",
+    summary="🗑️ Delete Category – Удаление категории",
+    response_description="Результат удаления категории"
+)
 async def delete_category(
     category_id: str,
     service: CategoryService = Depends(get_category_service)
@@ -187,9 +201,12 @@ async def delete_category(
     success = await service.delete_category(category_id)
     return {"success": success}
 
-
-
-@router.post("/units/", response_model=Unit)
+@router.post(
+    "/units/",
+    response_model=Unit,
+    summary="📏 Create Unit – Создание единицы измерения",
+    response_description="Созданная единица измерения"
+)
 async def create_unit(
     unit: Unit,
     service: UnitService = Depends(get_unit_service)
@@ -253,7 +270,12 @@ async def create_unit(
     """
     return await service.create_unit(unit.name, unit.description)
 
-@router.get("/units/", response_model=List[Unit])
+@router.get(
+    "/units/",
+    response_model=List[Unit],
+    summary="📐 List Units – Список единиц измерения",
+    response_description="Список единиц измерения"
+)
 async def get_units(
     service: UnitService = Depends(get_unit_service)
 ):
@@ -317,7 +339,11 @@ async def get_units(
     """
     return await service.get_units()
 
-@router.delete("/units/{unit_id}")
+@router.delete(
+    "/units/{unit_id}",
+    summary="🗑️ Delete Unit – Удаление единицы измерения",
+    response_description="Результат удаления единицы"
+)
 async def delete_unit(
     unit_id: str,
     service: UnitService = Depends(get_unit_service)
