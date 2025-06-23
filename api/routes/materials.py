@@ -4,7 +4,7 @@
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
 from datetime import datetime
 
 from core.logging import get_logger
@@ -288,142 +288,7 @@ async def get_material(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post(
-    "/search",
-    response_model=List[Material],
-    responses=ERROR_RESPONSES,
-    summary="🔎 Search Materials – Поиск материалов",
-    response_description="Результаты поиска материалов"
-)
-async def search_materials(
-    query: MaterialSearchQuery,
-    service: MaterialsService = Depends(get_materials_service)
-):
-    """
-    🔍 **Semantic Material Search** - Семантический поиск материалов
-    
-    Выполняет интеллектуальный поиск строительных материалов с использованием 
-    векторных embeddings и семантического анализа. Поддерживает fallback-стратегию
-    при отсутствии результатов.
-    
-    **🔄 Fallback Strategy:**
-    1. **Vector Search**: Семантический поиск по embedding
-    2. **SQL LIKE Search**: Текстовый поиск при 0 результатов
-    3. **Fuzzy Matching**: Поиск с учетом опечаток
-    
-    **Особенности:**
-    - 🧠 AI-powered семантический поиск
-    - 🔍 Поиск синонимов и похожих терминов
-    - 📊 Ранжирование по релевантности
-    - ⚡ Быстрый отклик (< 300ms)
-    - 🛡️ Graceful degradation при ошибках
-    
-    **Request Body Example:**
-    ```json
-    {
-        "query": "цемент портландский высокой прочности",
-        "limit": 20
-    }
-    ```
-    
-    **Response Example:**
-    ```json
-    [
-        {
-            "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "Портландцемент М500 Д0",
-            "use_category": "Цемент",
-            "unit": "мешок",
-            "sku": "CEM500-001",
-            "description": "Высокопрочный цемент для конструкционного бетона",
-            "embedding": null, // Hidden in search results
-            "created_at": "2025-06-16T16:46:29.421964Z",
-            "updated_at": "2025-06-16T16:46:29.421964Z"
-        },
-        {
-            "id": "550e8400-e29b-41d4-a716-446655440001",
-            "name": "Цемент М400 быстротвердеющий",
-            "use_category": "Цемент",
-            "unit": "т",
-            "sku": "CEM400-BT",
-            "description": "Быстротвердеющий портландцемент для срочных работ",
-            "embedding": null,
-            "created_at": "2025-06-16T16:46:29.421964Z",
-            "updated_at": "2025-06-16T16:46:29.421964Z"
-        }
-    ]
-    ```
-    
-    **Query Parameters:**
-    - `query`: Поисковый запрос (min: 1 символ, max: 500 символов)
-    - `limit`: Максимальное количество результатов (1-100, default: 10)
-    
-    **Response Status Codes:**
-    - **200 OK**: Поиск выполнен успешно (может быть пустой список)
-    - **400 Bad Request**: Некорректные параметры запроса
-    - **500 Internal Server Error**: Ошибка выполнения поиска
-    
-    **Search Examples:**
-    - `"цемент М500"` → найдет все цементы марки М500
-    - `"арматура стальная"` → найдет стальную арматуру всех видов
-    - `"утеплитель минеральный"` → найдет минеральные утеплители
-    - `"кирпич красный лицевой"` → найдет лицевой красный кирпич
-    
-    **Use Cases:**
-    - Поиск материалов для строительных проектов
-    - Подбор аналогов и заменителей
-    - Создание спецификаций и смет
-    - API для мобильных приложений
-    """
-    try:
-        # Check if service initialization failed
-        if service is None:
-            logger.warning("MaterialsService initialization failed, returning mock response")
-            return [{
-                "id": "fallback-1",
-                "name": f"Fallback result for '{query.query}'",
-                "sku": "FB-001",
-                "description": f"Fallback search result for query: {query.query} (service unavailable)",
-                "use_category": "Fallback",
-                "unit": "шт",
-                "embedding": None,
-                "created_at": None,
-                "updated_at": None
-            }]
-        
-        logger.info(f"Searching materials: '{query.query}' (limit: {query.limit})")
-        results = await service.search_materials(query.query, query.limit)
-        logger.info(f"Search returned {len(results)} results")
-        return results
-        
-    except DatabaseError as e:
-        logger.error(f"Database error searching materials: {e}")
-        # Return fallback instead of HTTP error
-        return [{
-            "id": "error-fallback-1",
-            "name": f"Search temporarily unavailable for '{query.query}'",
-            "sku": "ERR-001", 
-            "description": f"Database error occurred, please try again later",
-            "use_category": "System",
-            "unit": "шт",
-            "embedding": None,
-            "created_at": None,
-            "updated_at": None
-        }]
-    except Exception as e:
-        logger.error(f"Unexpected error searching materials: {e}")
-        # Return fallback instead of HTTP error for better UX
-        return [{
-            "id": "exception-fallback-1",
-            "name": f"Search error for '{query.query}'",
-            "sku": "EXC-001",
-            "description": f"An error occurred during search, please try again",
-            "use_category": "System", 
-            "unit": "шт",
-            "embedding": None,
-            "created_at": None,
-            "updated_at": None
-        }]
+# 🛈 Deprecated: material-level search endpoint removed. See unified search router.
 
 
 @router.get(
@@ -894,5 +759,328 @@ async def import_materials_from_json(
     except Exception as e:
         logger.error(f"Unexpected error in import: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post(
+    "/upload",
+    response_model=MaterialBatchResponse,
+    summary="📤 Upload Materials – File-based Material Upload",
+    response_description="File processing and material upload results"
+)
+async def upload_materials(
+    file: UploadFile = File(..., description="CSV/Excel file with materials"),
+):
+    """
+    📤 **Upload Materials** - Bulk material upload from file
+    
+    Uploads and processes files containing construction material data. Supports
+    CSV and Excel formats with automatic structure detection and data validation.
+    
+    **Supported Formats:**
+    - 📊 **CSV**: Delimiters (,;|), encodings (UTF-8, Windows-1251)
+    - 📋 **Excel**: .xlsx, .xls files with multiple sheets
+    - 🔍 **Auto-detection**: Automatic format and structure detection
+    
+    **Required Fields:**
+    - `name`: Material name (1-500 characters)
+    - `description`: Material description (optional)
+    - `use_category`: Usage category
+    - `unit`: Measurement unit
+    - `sku`: Stock keeping unit (optional, unique)
+    
+    **Processing Features:**
+    - 🧠 AI-powered data analysis and enrichment
+    - 🔍 Automatic category and unit detection
+    - 📊 Data validation and cleaning
+    - ⚡ Batch processing for large files
+    - 🔄 Deduplication by name and SKU
+    - 📈 Embedding generation for search
+     
+    **Request Example:**
+    ```bash
+    curl -X POST -F "file=@materials.csv" http://localhost:8000/api/v1/materials/upload
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: File processed successfully (may have warnings)
+    - **400 Bad Request**: Unsupported format or empty file
+    - **413 Request Entity Too Large**: File size exceeded (50MB)
+    - **422 Unprocessable Entity**: Data validation errors
+    - **500 Internal Server Error**: File processing error
+    
+    **File Requirements:**
+    - **Size**: Maximum 50MB
+    - **Encoding**: UTF-8 (recommended), Windows-1251
+    - **Structure**: First row contains column headers
+    - **Data**: Minimum 1 data row required
+    
+    **Processing Statistics:**
+    - `total_processed`: Total number of processed records
+    - `successful`: Successfully uploaded materials
+    - `failed`: Number of errors
+    - `duplicates`: Found duplicates
+    - `enriched`: AI-enriched records
+    
+    **Use Cases:**
+    - Supplier catalog import
+    - Data migration from other systems
+    - Bulk material updates
+    - ERP system synchronization
+    - Initial database population
+    """
+
+@router.get(
+    "",
+    response_model=List[Material],
+    summary="📋 List Materials – Complete Materials Catalog",
+    response_description="Complete materials list with pagination and filtering"
+)
+async def list_materials(
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records"),
+    category: Optional[str] = Query(None, description="Filter by material category"),
+    unit: Optional[str] = Query(None, description="Filter by measurement unit"),
+):
+    """
+    📋 **List Materials** - Retrieve complete materials catalog with filtering
+    
+    Returns complete construction materials catalog with filtering capabilities
+    by categories, measurement units, and result pagination.
+    
+    **Features:**
+    - 📄 Pagination for large catalogs (default: 100 records)
+    - 🔍 Filtering by categories and measurement units
+    - 📊 Complete information for each material
+    - ⚡ Optimized database queries
+    - 🔄 Caching for frequently requested data
+    
+    **Query Parameters:**
+    - `skip`: Number of records to skip (pagination)
+    - `limit`: Maximum number of records (1-1000)
+    - `category`: Filter by material category
+    - `unit`: Filter by measurement unit
+    
+    **Response Example:**
+    ```json
+    [
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "name": "Portland Cement PC 500-D0",
+            "use_category": "Cement",
+            "unit": "kg",
+            "sku": "CEM-PC500-001",
+            "description": "Portland cement without mineral additives",
+            "embedding": null,
+            "created_at": "2025-06-16T16:46:29.421964Z",
+            "updated_at": "2025-06-16T16:46:29.421964Z"
+        }
+    ]
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Materials list returned successfully
+    - **400 Bad Request**: Invalid filtering parameters
+    - **500 Internal Server Error**: Data retrieval error
+    
+    **Filtering Examples:**
+    - `/materials?category=Cement` - cement materials only
+    - `/materials?unit=kg&limit=50` - materials in kilograms, 50 records
+    - `/materials?skip=100&limit=50` - records 101-150
+    
+    **Performance Notes:**
+    - Pagination recommended for large catalogs
+    - Filtering performed at database level
+    - Results cached for repeated requests
+    
+    **Use Cases:**
+    - Complete materials catalog browsing
+    - Creating dropdown lists in UI
+    - Data export for analysis
+    - External system synchronization
+    - Materials reporting
+    """
+
+@router.get(
+    "/{material_id}",
+    response_model=Material,
+    summary="🔍 Get Material – Retrieve Material by ID",
+    response_description="Detailed information about specific material"
+)
+async def get_material(material_id: str):
+    """
+    🔍 **Get Material by ID** - Retrieve detailed material information
+    
+    Returns complete information about specific construction material by its
+    unique identifier.
+    
+    **Features:**
+    - 📊 Complete material information
+    - 🔍 Search by UUID or SKU
+    - ⚡ Fast access via indexed fields
+    - 🔄 Caching for frequently requested materials
+    
+    **Path Parameters:**
+    - `material_id`: Material UUID or SKU
+    
+    **Response Example:**
+    ```json
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "Portland Cement PC 500-D0",
+        "use_category": "Cement",
+        "unit": "kg",
+        "sku": "CEM-PC500-001",
+        "description": "Portland cement without mineral additives grade 500",
+        "embedding": null,
+        "created_at": "2025-06-16T16:46:29.421964Z",
+        "updated_at": "2025-06-16T16:46:29.421964Z"
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Material found and returned
+    - **404 Not Found**: Material with specified ID not found
+    - **400 Bad Request**: Invalid ID format
+    - **500 Internal Server Error**: Data retrieval error
+    
+    **ID Formats:**
+    - **UUID**: `550e8400-e29b-41d4-a716-446655440000`
+    - **SKU**: `CEM-PC500-001` (if unique)
+    
+    **Use Cases:**
+    - Material details display in interface
+    - Material existence verification
+    - Data retrieval for editing
+    - API integration with external systems
+    - Material validation in orders
+    """
+
+@router.put(
+    "/{material_id}",
+    response_model=Material,
+    summary="✏️ Update Material – Material Update Operation",
+    response_description="Updated material information"
+)
+async def update_material(
+    material_id: str,
+    material_data: MaterialCreate
+):
+    """
+    ✏️ **Update Material** - Material information update
+    
+    Updates existing construction material data. Supports partial and complete
+    updates with data validation.
+    
+    **Features:**
+    - 📝 Partial and complete updates
+    - 🔍 SKU uniqueness validation
+    - 🧠 AI-enrichment of updated data
+    - 📈 Automatic embedding updates
+    - 📊 Change logging
+    - 🔄 Automatic timestamp updates
+    
+    **Request Body Example:**
+    ```json
+    {
+        "name": "Portland Cement PC 500-D0 Premium",
+        "description": "High-quality Portland cement without additives",
+        "use_category": "Cement",
+        "unit": "kg",
+        "sku": "CEM-PC500-PREM-001"
+    }
+    ```
+    
+    **Response Example:**
+    ```json
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "Portland Cement PC 500-D0 Premium",
+        "use_category": "Cement",
+        "unit": "kg",
+        "sku": "CEM-PC500-PREM-001",
+        "description": "High-quality Portland cement without additives",
+        "embedding": null,
+        "created_at": "2025-06-16T16:46:29.421964Z",
+        "updated_at": "2025-06-16T18:15:42.123456Z"
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Material successfully updated
+    - **404 Not Found**: Material with specified ID not found
+    - **400 Bad Request**: Invalid data or duplicate SKU
+    - **422 Unprocessable Entity**: Data validation errors
+    - **500 Internal Server Error**: Update error
+    
+    **Validation Rules:**
+    - `name`: 1-500 characters, required field
+    - `sku`: Unique if specified
+    - `use_category`: Must exist in reference catalog
+    - `unit`: Must exist in reference catalog
+    
+    **Automatic Processing:**
+    - New embedding generation when name/description changes
+    - AI analysis and categorization of updated data
+    - Related records and indexes update
+    
+    **Use Cases:**
+    - Data error corrections
+    - Description and characteristics updates
+    - Material categorization changes
+    - External catalog synchronization
+    - Bulk updates via API
+    """
+
+@router.delete(
+    "/{material_id}",
+    summary="🗑️ Delete Material – Material Deletion Operation",
+    response_description="Material deletion confirmation"
+)
+async def delete_material(material_id: str):
+    """
+    🗑️ **Delete Material** - Remove material from catalog
+    
+    Removes construction material from database. Operation is irreversible
+    and requires confirmation for critical data.
+    
+    **Features:**
+    - 🗑️ Permanent record deletion
+    - 🔍 Related data verification before deletion
+    - 📊 Deletion operation logging
+    - 🧹 Related embeddings and indexes cleanup
+    - ⚠️ Related records warnings
+    
+    **Response Example:**
+    ```json
+    {
+        "message": "Material successfully deleted",
+        "deleted_id": "550e8400-e29b-41d4-a716-446655440000"
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Material successfully deleted
+    - **404 Not Found**: Material with specified ID not found
+    - **409 Conflict**: Material is used in other records
+    - **500 Internal Server Error**: Deletion error
+    
+    **⚠️ Warnings:**
+    - Operation is irreversible - recovery impossible
+    - Check related data before deletion
+    - Backup recommended before bulk deletion
+    
+    **Cleanup Operations:**
+    - Vector embeddings removal from vector DB
+    - Search indexes cleanup
+    - Cached data removal
+    - Catalog statistics update
+    
+    **Use Cases:**
+    - Outdated materials removal
+    - Duplicate records cleanup
+    - Erroneously created materials removal
+    - Bulk catalog cleanup
+    - GDPR compliance requirements
+    """
 
  

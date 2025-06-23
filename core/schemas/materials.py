@@ -5,11 +5,41 @@ from decimal import Decimal
 from enum import Enum
 
 class MaterialBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=200)
-    use_category: str = Field(..., max_length=200)  # Renamed from category
-    unit: str
-    sku: Optional[str] = Field(None, min_length=3, max_length=50)
-    description: Optional[str] = None
+    """Base model for construction materials.
+    
+    Fundamental material properties used across all material-related operations.
+    Provides the core structure for material data with validation and standardization.
+    """
+    name: str = Field(
+        ..., 
+        min_length=2, 
+        max_length=200,
+        description="Material name (2-200 characters)",
+        example="Portland Cement M500"
+    )
+    use_category: str = Field(
+        ..., 
+        max_length=200,
+        description="Material category for classification",
+        example="Cement"
+    )
+    unit: str = Field(
+        ...,
+        description="Measurement unit for the material",
+        example="bag"
+    )
+    sku: Optional[str] = Field(
+        None, 
+        min_length=3, 
+        max_length=50,
+        description="Stock Keeping Unit (SKU) identifier",
+        example="CEM500-001"
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Detailed material description",
+        example="High-strength Portland cement for structural concrete applications"
+    )
 
 # Extended schema for raw products from supplier price lists
 class RawProductBase(BaseModel):
@@ -52,8 +82,8 @@ class PriceUploadResponse(BaseModel):
     file_name: Optional[str] = None
     upload_time: datetime = Field(default_factory=datetime.utcnow)
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "status": "pending",
                 "message": "Price list upload started",
@@ -64,6 +94,7 @@ class PriceUploadResponse(BaseModel):
                 "upload_time": "2023-01-01T12:00:00"
             }
         }
+    )
 
 class MaterialCreate(MaterialBase):
     pass
@@ -76,13 +107,49 @@ class MaterialUpdate(BaseModel):
     description: Optional[str] = None
 
 class Material(MaterialBase):
-    id: str
+    """Complete material model with system metadata.
+    
+    Comprehensive material representation including all properties, embeddings,
+    and system-generated metadata for full material lifecycle management.
+    """
+    id: str = Field(
+        ...,
+        description="Unique material identifier (UUID)",
+        example="550e8400-e29b-41d4-a716-446655440000"
+    )
     # Hybrid list: first elements are floats, last element is a preview string
-    embedding: Optional[List[Union[float, str]]] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    embedding: Optional[List[Union[float, str]]] = Field(
+        None,
+        description="AI embedding vector for semantic search (1536 dimensions)",
+        example=["... (embeddings available, total: 1536 dimensions)"]
+    )
+    created_at: Optional[datetime] = Field(
+        None,
+        description="Material creation timestamp",
+        example="2025-06-16T16:46:29.421964Z"
+    )
+    updated_at: Optional[datetime] = Field(
+        None,
+        description="Last update timestamp",
+        example="2025-06-16T16:46:29.421964Z"
+    )
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Portland Cement M500",
+                "use_category": "Cement",
+                "unit": "bag",
+                "sku": "CEM500-001",
+                "description": "High-strength Portland cement for structural concrete applications",
+                "embedding": ["... (embeddings available, total: 1536 dimensions)"],
+                "created_at": "2025-06-16T16:46:29.421964Z",
+                "updated_at": "2025-06-16T16:46:29.421964Z"
+            }
+        }
+    )
     
     @field_serializer('embedding')
     def serialize_embedding(self, value: Optional[List[Union[float, str]]]) -> List[Union[float, str]]:
@@ -102,7 +169,7 @@ class MaterialSearchQuery(BaseModel):
 class MaterialFilterOptions(BaseModel):
     """Advanced filtering options for materials search.
     
-    Расширенные опции фильтрации для поиска материалов.
+    Comprehensive filtering capabilities for precise material discovery.
     """
     # Category filters
     categories: Optional[List[str]] = Field(
@@ -158,8 +225,8 @@ class MaterialFilterOptions(BaseModel):
         description="Minimum similarity threshold for fuzzy search"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "categories": ["Цемент", "Кирпич"],
                 "units": ["кг", "м³"],
@@ -169,11 +236,12 @@ class MaterialFilterOptions(BaseModel):
                 "min_similarity": 0.5
             }
         }
+    )
 
 class SortOption(BaseModel):
     """Sorting option for search results.
     
-    Опция сортировки результатов поиска.
+    Flexible sorting configuration for result ordering.
     """
     field: str = Field(
         ...,
@@ -186,18 +254,19 @@ class SortOption(BaseModel):
         description="Sort direction: asc or desc"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "field": "created_at",
                 "direction": "desc"
             }
         }
+    )
 
 class PaginationOptions(BaseModel):
     """Pagination options for search results.
     
-    Опции пагинации результатов поиска.
+    Flexible pagination with support for both offset and cursor-based approaches.
     """
     page: int = Field(
         default=1,
@@ -215,19 +284,21 @@ class PaginationOptions(BaseModel):
         description="Cursor for cursor-based pagination"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "page": 1,
                 "page_size": 20,
                 "cursor": "eyJpZCI6InRlc3QtaWQiLCJzY29yZSI6MC44NX0="
             }
         }
+    )
 
 class AdvancedSearchQuery(BaseModel):
     """Advanced search query with comprehensive filtering and sorting.
     
-    Продвинутый поисковый запрос с комплексной фильтрацией и сортировкой.
+    Powerful search interface supporting multiple search types, complex filtering,
+    and flexible result customization for professional material discovery.
     """
     # Main search query
     query: Optional[str] = Field(
@@ -278,16 +349,15 @@ class AdvancedSearchQuery(BaseModel):
         description="Highlight matching text in results"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
-                "query": "цемент портландский",
+                "query": "портландцемент М400",
                 "search_type": "hybrid",
                 "filters": {
                     "categories": ["Цемент"],
-                    "units": ["кг"],
-                    "created_after": "2024-01-01T00:00:00",
-                    "min_similarity": 0.5
+                    "units": ["кг", "мешок"],
+                    "min_similarity": 0.7
                 },
                 "sort_by": [
                     {"field": "relevance", "direction": "desc"},
@@ -302,71 +372,72 @@ class AdvancedSearchQuery(BaseModel):
                 "highlight_matches": True
             }
         }
+    )
 
 class SearchSuggestion(BaseModel):
     """Search suggestion for autocomplete.
     
-    Предложение для автодополнения поиска.
+    Smart suggestions to enhance user search experience.
     """
     text: str = Field(..., description="Suggested search text")
     type: str = Field(..., description="Type of suggestion (query, category, material)")
     score: float = Field(..., description="Relevance score")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "text": "цемент портландский М400",
                 "type": "material",
                 "score": 0.95
             }
         }
+    )
 
 class SearchHighlight(BaseModel):
     """Text highlighting information.
     
-    Информация о подсветке текста.
+    Provides context for where search matches were found in the text.
     """
     field: str = Field(..., description="Field name where match was found")
     original: str = Field(..., description="Original text")
     highlighted: str = Field(..., description="Text with highlights")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "field": "name",
                 "original": "Цемент портландский М400",
                 "highlighted": "<mark>Цемент</mark> <mark>портландский</mark> М400"
             }
         }
+    )
 
 class MaterialSearchResult(BaseModel):
     """Enhanced material search result with metadata.
     
-    Расширенный результат поиска материала с метаданными.
+    Rich search result providing material data plus search context and relevance information.
     """
     material: Material = Field(..., description="Material data")
     score: float = Field(..., description="Relevance score")
     search_type: str = Field(..., description="Type of search that found this result")
     highlights: Optional[List[SearchHighlight]] = Field(
         None,
-        description="Text highlights"
+        description="Text highlighting information"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "material": {
                     "id": "550e8400-e29b-41d4-a716-446655440000",
                     "name": "Цемент портландский М400",
                     "use_category": "Цемент",
                     "unit": "кг",
-                    "sku": "CEM400",
-                    "description": "Высококачественный портландцемент",
-                    "created_at": "2024-01-01T12:00:00Z",
-                    "updated_at": "2024-01-01T12:00:00Z"
+                    "sku": "CEM400001",
+                    "description": "Высококачественный портландцемент марки М400"
                 },
                 "score": 0.95,
-                "search_type": "vector",
+                "search_type": "hybrid",
                 "highlights": [
                     {
                         "field": "name",
@@ -376,11 +447,12 @@ class MaterialSearchResult(BaseModel):
                 ]
             }
         }
+    )
 
 class SearchResponse(BaseModel):
     """Comprehensive search response with metadata.
     
-    Комплексный ответ поиска с метаданными.
+    Complete search results package with pagination, analytics, and enhancement features.
     """
     results: List[MaterialSearchResult] = Field(..., description="Search results")
     total_count: int = Field(..., description="Total number of matching results")
@@ -403,8 +475,8 @@ class SearchResponse(BaseModel):
         description="Cursor for next page (cursor-based pagination)"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "results": [],
                 "total_count": 150,
@@ -425,11 +497,12 @@ class SearchResponse(BaseModel):
                 }
             }
         }
+    )
 
 class SearchAnalytics(BaseModel):
     """Search analytics data.
     
-    Данные аналитики поиска.
+    Comprehensive search performance and usage analytics for optimization and insights.
     """
     query: str = Field(..., description="Search query")
     results_count: int = Field(..., description="Number of results returned")
@@ -438,8 +511,8 @@ class SearchAnalytics(BaseModel):
     user_id: Optional[str] = Field(None, description="User ID (if available)")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Search timestamp")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "query": "цемент М400",
                 "results_count": 25,
@@ -448,6 +521,7 @@ class SearchAnalytics(BaseModel):
                 "timestamp": "2024-01-01T12:00:00Z"
             }
         }
+    )
 
 class Category(BaseModel):
     id: Optional[str] = None  # UUID from Qdrant
@@ -463,7 +537,6 @@ class Unit(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-# Batch operations schemas
 class MaterialBatchCreate(BaseModel):
     materials: List[MaterialCreate] = Field(..., min_items=1, max_items=1000)
     batch_size: int = Field(default=100, ge=1, le=500)
@@ -471,7 +544,7 @@ class MaterialBatchCreate(BaseModel):
 class MaterialBatchResponse(BaseModel):
     """Unified batch response schema.
     
-    Единая схема ответа для batch операций.
+    Comprehensive batch operation results with detailed success/failure analytics.
     """
     success: bool = Field(..., description="Overall operation success status")
     total_processed: int = Field(..., description="Total number of materials processed")
@@ -480,20 +553,19 @@ class MaterialBatchResponse(BaseModel):
     processing_time_seconds: float = Field(..., description="Processing time in seconds")
     errors: List[str] = Field(default=[], description="General error messages")
     
-    # Computed properties for convenience
     @property
     def successful_count(self) -> int:
-        """Number of successfully processed materials"""
+        """Number of successfully processed materials."""
         return len(self.successful_materials)
     
     @property
     def failed_count(self) -> int:
-        """Number of failed materials"""
+        """Number of failed materials."""
         return len(self.failed_materials)
     
     @property
     def success_rate(self) -> float:
-        """Success rate as percentage"""
+        """Success rate as percentage."""
         if self.total_processed == 0:
             return 0.0
         return (self.successful_count / self.total_processed) * 100
@@ -502,6 +574,9 @@ class MaterialBatchResponse(BaseModel):
 class MaterialImportItem(BaseModel):
     sku: str = Field(..., min_length=3, max_length=50)
     name: str = Field(..., min_length=2, max_length=200)
+    use_category: str = Field(..., max_length=200)  # Renamed from category
+    unit: str
+    description: Optional[str] = None
 
 class MaterialImportRequest(BaseModel):
     materials: List[MaterialImportItem] = Field(..., min_items=1, max_items=1000)
@@ -509,7 +584,6 @@ class MaterialImportRequest(BaseModel):
     default_unit: str = Field(default="шт")
     batch_size: int = Field(default=100, ge=1, le=500)
 
-# Raw Product schemas
 class RawProductCreate(RawProductBase):
     """Schema for creating raw product"""
     pricelistid: int
@@ -528,7 +602,6 @@ class RawProduct(RawProductBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-# Response schemas for raw products
 class RawProductListResponse(BaseModel):
     supplier_id: int
     pricelistid: Optional[int] = None

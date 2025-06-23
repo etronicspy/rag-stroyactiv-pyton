@@ -304,31 +304,27 @@ def get_tags_metadata() -> List[Dict[str, str]]:
     return [
         {
             "name": "search",
-            "description": "🔍 **Material Search & Discovery** - AI-powered semantic search for construction materials with natural language processing"
+            "description": "🔍 **Material Search** - Unified construction material search system with vector search, SQL, and fuzzy-matching support"
         },
         {
             "name": "materials", 
-            "description": "📦 **Material Management** - Complete CRUD operations for construction materials catalog with batch processing and validation"
+            "description": "📦 **Materials Management** - CRUD operations for construction materials catalog with bulk upload support"
         },
         {
             "name": "prices",
-            "description": "💰 **Price Management** - Import and process supplier price lists from CSV/Excel files with comprehensive analytics"
+            "description": "💰 **Price Management** - Supplier price list upload and management with multiple format support"
         },
         {
             "name": "reference",
-            "description": "📚 **Reference Data** - Manage categories, units, and other reference information for material classification"
-        },
-        {
-            "name": "advanced-search",
-            "description": "🚀 **Advanced Search** - Complex search operations with filters, algorithm selection, and detailed analytics"
+            "description": "�� **Reference Data** - Reference catalogs for categories, units, suppliers, and currencies"
         },
         {
             "name": "health",
-            "description": "🩺 **Health & Monitoring** - Comprehensive system health checks, database monitoring, and performance metrics"
+            "description": "🩺 **System Health Monitoring** - Endpoints for API health checks and connected services status verification"
         },
         {
             "name": "tunnel",
-            "description": "🔌 **SSH Tunnel Management** - Secure database connection management with status monitoring and configuration"
+            "description": "🔌 **SSH Tunnel** - SSH tunnel management for secure remote database connections"
         }
     ]
 

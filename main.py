@@ -19,7 +19,7 @@ from core.logging.context import CorrelationContext, with_correlation_context
 # Import routers and middleware
 from api.routes import (
     health_router, search_router, materials_router, prices_router, reference_router,
-    advanced_search_router, tunnel_router
+    tunnel_router
 )
 
 # Import configuration
@@ -64,12 +64,11 @@ if settings.BACKEND_CORS_ORIGINS:
 setup_middleware(app, settings)
 
 # Register routers with English tags
-app.include_router(health_router, prefix=f"{settings.API_V1_STR}/health", tags=["health"])
-app.include_router(search_router, prefix=settings.API_V1_STR, tags=["search"])
+app.include_router(health_router, prefix="", tags=["health"])
+app.include_router(search_router, prefix="", tags=["search"])
 app.include_router(materials_router, prefix=f"{settings.API_V1_STR}/materials", tags=["materials"])
 app.include_router(prices_router, prefix=f"{settings.API_V1_STR}/prices", tags=["prices"])
 app.include_router(reference_router, prefix=f"{settings.API_V1_STR}/reference", tags=["reference"])
-app.include_router(advanced_search_router, prefix="", tags=["advanced-search"])
 app.include_router(tunnel_router, prefix=settings.API_V1_STR, tags=["tunnel"])
 
 # Always initialize logging system according to configuration

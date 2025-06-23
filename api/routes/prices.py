@@ -649,8 +649,13 @@ async def mark_product_as_processed(
         logger.error(f"Error marking product as processed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.post("/upload", response_model=PriceUploadResponse)
-async def upload_price_file(
+@router.post(
+    "/upload",
+    response_model=PriceUploadResponse,
+    summary="💰 Upload Prices – Price List Upload",
+    response_description="Price file processing and upload results"
+)
+async def upload_prices(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     supplier_id: Optional[UUID] = Query(None, description="ID поставщика"),
@@ -658,14 +663,62 @@ async def upload_price_file(
     process_async: bool = Query(True, description="Обработать асинхронно")
 ):
     """
-    Загрузка прайс-листа материалов в формате CSV или Excel.
+    💰 **Upload Prices** - Bulk price list upload
     
-    Файл будет обработан и данные загружены в систему.
+    Uploads and processes files containing construction material prices. Supports
+    CSV and Excel formats with automatic material matching and data validation.
     
-    - **file**: Файл прайс-листа (CSV или Excel)
-    - **supplier_id**: ID поставщика (опционально)
-    - **supplier_name**: Название поставщика (опционально)
-    - **process_async**: Обработать асинхронно (по умолчанию True)
+    **Supported Formats:**
+    - 📊 **CSV**: Delimiters (,;|), encodings (UTF-8, Windows-1251)
+    - 📋 **Excel**: .xlsx, .xls files with multiple sheets
+    - 🔍 **Auto-detection**: Automatic format and structure detection
+    
+    **Required Fields:**
+    - `material_name` or `sku`: Material identification
+    - `price`: Price (positive number)
+    - `supplier`: Supplier name (optional)
+    - `valid_from`: Validity start date (optional)
+    - `valid_until`: Validity end date (optional)
+    
+    **Processing Features:**
+    - 🔍 Intelligent material matching by name/SKU
+    - 💱 Automatic currency detection
+    - 📊 Price and date validation
+    - ⚡ Batch processing for large price lists
+    - 🔄 Existing price updates
+    - 📈 Price trend analysis
+    
+    **Request Example:**
+    ```bash
+    curl -X POST -F "file=@path/to/price_list.xlsx" -F "supplier_id=supplier_001" -F "supplier_name=BuildTrade LLC" -F "process_async=true" http://localhost:8000/prices/upload
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: File processed successfully (may have warnings)
+    - **400 Bad Request**: Unsupported format or empty file
+    - **413 Request Entity Too Large**: File size exceeded (50MB)
+    - **422 Unprocessable Entity**: Data validation errors
+    - **500 Internal Server Error**: File processing error
+    
+    **File Requirements:**
+    - **Size**: Maximum 50MB
+    - **Encoding**: UTF-8 (recommended), Windows-1251
+    - **Structure**: First row contains column headers
+    - **Data**: Minimum 1 price row required
+    
+    **Processing Statistics:**
+    - `total_processed`: Total number of processed records
+    - `successful`: Successfully uploaded prices
+    - `failed`: Number of errors
+    - `matched_materials`: Matched materials count
+    - `updated_prices`: Updated existing prices count
+    
+    **Use Cases:**
+    - Supplier price list uploads
+    - Catalog price updates
+    - ERP system data import
+    - External source synchronization
+    - Bulk price updates
     """
     # Проверка расширения файла
     filename = file.filename
