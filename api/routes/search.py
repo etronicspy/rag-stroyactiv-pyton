@@ -87,6 +87,19 @@ async def search_materials_trailing(
     q: str = Query(..., description="Поисковый запрос"),
     limit: int = Query(10, description="Максимальное количество результатов"),
 ):
+    """Legacy endpoint with trailing slash kept for backward-compatibility.
+
+    Этот маршрут оставлен для старых клиентов/скриптов, которые обращались к "/search/" с
+    закрывающим слэшем. Полностью делегирует выполнение основному эндпоинту
+    :func:`search_materials` без изменения логики.
+
+    Args:
+        q (str): Поисковый запрос.
+        limit (int): Лимит результатов.
+
+    Returns:
+        List[Material]: Список найденных материалов (идентичен `/search`).
+    """
     return await search_materials(q=q, limit=limit)
 
 # Alias endpoint for backward compatibility with older tests
@@ -113,6 +126,15 @@ async def search_materials_root(
     q: str = Query(..., description="Поисковый запрос"),
     limit: int = Query(10, description="Максимальное количество результатов"),
 ):
+    """Root-level alias (`/`) used mainly in unit tests.
+
+    Args:
+        q (str): Поисковый запрос.
+        limit (int): Лимит результатов.
+
+    Returns:
+        List[Material]: Результаты поиска.
+    """
     return await search_materials(q=q, limit=limit)
 
 # Trailing slash root variant
@@ -121,4 +143,9 @@ async def search_materials_root_slash(
     q: str = Query(..., description="Поисковый запрос"),
     limit: int = Query(10, description="Максимальное количество результатов"),
 ):
+    """Root-level alias with trailing slash (`/`).
+
+    Оставлен для совместимости с окружениями, которые автоматически добавляют
+    слэш после базового пути. Делегирует в :func:`search_materials`.
+    """
     return await search_materials(q=q, limit=limit) 
