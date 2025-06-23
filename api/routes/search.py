@@ -5,12 +5,13 @@ from core.logging import get_logger
 from core.config import get_settings
 from core.schemas.materials import Material
 from services.materials import MaterialsService  # for test patching
+from core.schemas.response_models import ERROR_RESPONSES
 
-router = APIRouter()
+router = APIRouter(responses=ERROR_RESPONSES)
 logger = get_logger(__name__)
 settings = get_settings()
 
-@router.get("/search", response_model=List[Material])
+@router.get("/search", response_model=List[Material], responses=ERROR_RESPONSES)
 async def search_materials(
     q: str = Query(..., description="Поисковый запрос"),
     limit: int = Query(10, description="Максимальное количество результатов"),
@@ -28,7 +29,7 @@ async def search_materials(
     return results
 
 # Trailing slash variant for legacy clients
-@router.get("/search/", response_model=List[Material])
+@router.get("/search/", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
 async def search_materials_trailing(
     q: str = Query(..., description="Поисковый запрос"),
     limit: int = Query(10, description="Максимальное количество результатов"),
@@ -36,7 +37,7 @@ async def search_materials_trailing(
     return await search_materials(q=q, limit=limit)
 
 # Alias endpoint for backward compatibility with older tests
-@router.get("/search/materials", response_model=List[Material])
+@router.get("/search/materials", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
 async def search_materials_alias(
     query: str = Query(..., description="Search query", alias="query"),
     limit: int = Query(10, description="Maximum number of results"),
@@ -54,7 +55,7 @@ async def search_materials_alias(
     return results
 
 # Root endpoint variant for unit tests (prefix handled externally)
-@router.get("", response_model=List[Material])
+@router.get("", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
 async def search_materials_root(
     q: str = Query(..., description="Поисковый запрос"),
     limit: int = Query(10, description="Максимальное количество результатов"),
@@ -62,7 +63,7 @@ async def search_materials_root(
     return await search_materials(q=q, limit=limit)
 
 # Trailing slash root variant
-@router.get("/", response_model=List[Material])
+@router.get("/", response_model=List[Material], responses=ERROR_RESPONSES, include_in_schema=False)
 async def search_materials_root_slash(
     q: str = Query(..., description="Поисковый запрос"),
     limit: int = Query(10, description="Максимальное количество результатов"),

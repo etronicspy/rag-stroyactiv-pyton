@@ -12,6 +12,7 @@ from core.schemas.materials import (
     MaterialCreate, MaterialUpdate, Material, MaterialSearchQuery, 
     MaterialBatchCreate, MaterialBatchResponse, MaterialImportRequest
 )
+from core.schemas.response_models import ERROR_RESPONSES
 from core.database.interfaces import IVectorDatabase
 from core.dependencies.database import get_vector_db_dependency, get_ai_client_dependency
 from core.database.exceptions import DatabaseError
@@ -19,7 +20,7 @@ from services.materials import MaterialsService
 
 
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(responses=ERROR_RESPONSES)
 
 
 def get_materials_service(
@@ -138,7 +139,7 @@ async def health_check(
     return health_status
 
 
-@router.post("/", response_model=Material)
+@router.post("/", response_model=Material, responses=ERROR_RESPONSES)
 async def create_material(
     material: MaterialCreate,
     service: MaterialsService = Depends(get_materials_service)
@@ -214,7 +215,7 @@ async def create_material(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.get("/{material_id}", response_model=Material)
+@router.get("/{material_id}", response_model=Material, responses=ERROR_RESPONSES)
 async def get_material(
     material_id: str,
     service: MaterialsService = Depends(get_materials_service)
@@ -271,7 +272,7 @@ async def get_material(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/search", response_model=List[Material])
+@router.post("/search", response_model=List[Material], responses=ERROR_RESPONSES)
 async def search_materials(
     query: MaterialSearchQuery,
     service: MaterialsService = Depends(get_materials_service)

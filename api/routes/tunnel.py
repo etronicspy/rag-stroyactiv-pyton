@@ -7,13 +7,14 @@ This module provides API endpoints for managing SSH tunnel service.
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
+from core.schemas.response_models import ERROR_RESPONSES
 
 from core.dependencies.tunnel import (
     TunnelService,
     RequiredTunnelService
 )
 
-router = APIRouter(prefix="/tunnel", tags=["tunnel"])
+router = APIRouter(prefix="/tunnel", tags=["tunnel"], responses=ERROR_RESPONSES)
 
 
 class TunnelStatusResponse(BaseModel):

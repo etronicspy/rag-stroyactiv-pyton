@@ -4,8 +4,9 @@ from core.schemas.materials import Category, Unit
 from services.materials import CategoryService, UnitService
 from core.database.interfaces import IVectorDatabase
 from core.dependencies.database import get_vector_db_dependency
+from core.schemas.response_models import ERROR_RESPONSES
 
-router = APIRouter()
+router = APIRouter(responses=ERROR_RESPONSES)
 
 def get_category_service(
     vector_db: IVectorDatabase = Depends(get_vector_db_dependency)

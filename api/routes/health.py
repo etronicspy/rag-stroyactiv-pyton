@@ -20,8 +20,9 @@ from core.logging.metrics.performance import get_performance_optimizer
 from core.logging.metrics.integration import get_metrics_integrated_logger, get_global_metrics_logger
 from core.database.factories import DatabaseFactory
 from core.database.pool_manager import get_pool_manager
+from core.schemas.response_models import ERROR_RESPONSES
 
-router = APIRouter()
+router = APIRouter(responses=ERROR_RESPONSES)
 logger = get_logger(__name__)
 settings = get_settings()
 
@@ -467,7 +468,7 @@ class HealthChecker:
 health_checker = HealthChecker()
 
 
-@router.get("")
+@router.get("", responses=ERROR_RESPONSES)
 async def basic_health_check():
     """
     🔍 **Basic Health Check** - Быстрая проверка статуса API
@@ -506,7 +507,7 @@ async def basic_health_check():
     return await health_checker.check_basic_health()
 
 
-@router.get("/full")
+@router.get("/full", responses=ERROR_RESPONSES)
 async def full_health_check():
     """
     🔍 **Full Health Check** - Полная диагностика всех систем

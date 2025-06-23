@@ -16,8 +16,9 @@ from services.price_processor import PriceProcessor
 import traceback
 import time
 from datetime import datetime
+from core.schemas.response_models import ERROR_RESPONSES
 
-router = APIRouter()
+router = APIRouter(responses=ERROR_RESPONSES)
 logger = get_logger(__name__)
 settings = get_settings()
 
