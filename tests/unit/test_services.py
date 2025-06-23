@@ -17,7 +17,6 @@ Unit tests for services
 - test_database_architecture.py (части)
 """
 import pytest
-import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 

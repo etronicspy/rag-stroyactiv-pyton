@@ -54,7 +54,7 @@ class DatabaseLogger(DatabaseLoggerInterface):
             extra_data: Additional data to log
             correlation_id: Request correlation ID
         """
-        level = logging.INFO if success else logging.ERROR
+        logging.INFO if success else logging.ERROR
         message = f"Database operation: {operation}"
         
         if not success and error:

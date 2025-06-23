@@ -8,11 +8,10 @@ import asyncio
 import psutil
 import time
 from core.logging import get_logger
-from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic, Union
+from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import deque
-import math
 
 logger = get_logger(__name__)
 

@@ -3,8 +3,6 @@ Tests for full middleware recovery functionality.
 Testing all recovered components: Security, Logging, Compression, RateLimit.
 """
 
-import pytest
-import json
 import time
 from fastapi.testclient import TestClient
 from unittest.mock import patch

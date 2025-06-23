@@ -4,7 +4,6 @@ Handler implementations.
 This module provides implementations of the IHandler interface.
 """
 
-import logging
 import os
 import sys
 from typing import Any, Dict, Optional, TextIO
@@ -49,7 +48,6 @@ class BaseHandler(IHandler):
     
     def close(self) -> None:
         """Close the handler and release any resources."""
-        pass
     
     def _emit_formatted_record(self, formatted_record: str, original_record: Dict[str, Any]) -> None:
         """
@@ -252,4 +250,3 @@ class NullHandler(BaseHandler):
             formatted_record: The formatted record
             original_record: The original record
         """
-        pass 

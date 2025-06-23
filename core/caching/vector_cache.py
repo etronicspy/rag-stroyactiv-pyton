@@ -5,12 +5,11 @@ Vector Cache for optimized embedding storage and retrieval.
 Stage 1.3: Vector Search Optimization
 """
 
-import numpy as np
 import asyncio
 import hashlib
 import time
 from core.logging import get_logger
-from typing import List, Optional, Dict, Any, Tuple, Union
+from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
 import json
 

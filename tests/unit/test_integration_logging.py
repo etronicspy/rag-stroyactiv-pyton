@@ -11,12 +11,9 @@ Created: 2024
 """
 
 import pytest
-import logging
 from unittest.mock import patch, MagicMock, AsyncMock
-from typing import Dict, Any, List, Optional
 
 from fastapi import FastAPI, Request, Response
-from starlette.middleware.base import RequestResponseEndpoint
 from starlette.types import ASGIApp
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -223,7 +220,7 @@ class TestSQLAlchemyIntegration:
         original_rollback = session.rollback
         original_flush = session.flush
         
-        extension = SessionExtension(session)
+        SessionExtension(session)
         
         # Methods should be patched
         assert session.commit is not original_commit

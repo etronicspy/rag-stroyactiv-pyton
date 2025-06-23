@@ -18,11 +18,10 @@ import time
 import threading
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
-from contextvars import copy_context
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import lru_cache, wraps
-from typing import Dict, List, Optional, Any, Tuple, Callable, Union
+from typing import Dict, List, Optional, Any, Callable, Union
 from weakref import WeakValueDictionary
 
 
@@ -310,7 +309,6 @@ class BatchProcessor:
         """Write batch of entries to log file."""
         # This is a simplified file writer
         # In production, this would write to actual log files/systems
-        pass
     
     def _process_metric_batch(self, batch: List[MetricEntry]):
         """Process a batch of metric entries."""

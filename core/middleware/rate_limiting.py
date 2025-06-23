@@ -3,13 +3,11 @@ Rate limiting middleware using Redis backend.
 Implements sliding window rate limiting with different tiers.
 """
 
-import asyncio
 import time
 from typing import Optional, Dict, Any, Callable, Tuple
 from core.logging import get_logger
-from datetime import datetime, timedelta
 
-from fastapi import HTTPException, Request, Response
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 import redis.asyncio as aioredis
 

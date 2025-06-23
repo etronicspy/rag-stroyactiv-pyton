@@ -5,8 +5,6 @@ This module provides a centralized access point to all configuration settings.
 """
 
 from functools import lru_cache
-from typing import Optional, Dict, Any
-import os
 
 from .base import Settings, get_settings, get_environment_name, is_production, is_development
 from .constants import (
@@ -15,9 +13,7 @@ from .constants import (
     DefaultPorts,
     FileSizeLimits,
     DatabaseNames,
-    ModelNames,
-    ConnectionPools,
-    RateLimits
+    ModelNames
 )
 from .database import DatabaseConfig
 from .ai import AIConfig

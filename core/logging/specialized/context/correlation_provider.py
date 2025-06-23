@@ -66,7 +66,7 @@ class CorrelationProvider(ICorrelationProvider):
             correlation_id = self.generate_correlation_id()
         
         # Save the previous correlation ID
-        previous_correlation_id = self.get_correlation_id()
+        self.get_correlation_id()
         
         # Set the new correlation ID
         token = _correlation_id_var.set(correlation_id)

@@ -6,7 +6,7 @@ This module provides integration with SQLAlchemy.
 
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from typing import Any, Dict, Optional
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.event import listen

@@ -6,9 +6,8 @@ This module provides a validator for logging configuration.
 
 import logging
 import os
-import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
+from typing import List, Optional
 
 from core.logging.config.settings import LoggingSettings
 

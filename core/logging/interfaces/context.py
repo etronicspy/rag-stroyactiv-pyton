@@ -7,7 +7,7 @@ This module defines interfaces for context management and correlation ID trackin
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, TypeVar, Generic, ContextManager
+from typing import Any, Dict, Optional, TypeVar, ContextManager
 
 T = TypeVar('T')
 
@@ -23,7 +23,6 @@ class ICorrelationProvider(ABC):
         Returns:
             The current correlation ID or None if not set
         """
-        pass
     
     @abstractmethod
     def set_correlation_id(self, correlation_id: str) -> None:
@@ -33,7 +32,6 @@ class ICorrelationProvider(ABC):
         Args:
             correlation_id: The correlation ID to set
         """
-        pass
     
     @abstractmethod
     def generate_correlation_id(self) -> str:
@@ -43,12 +41,10 @@ class ICorrelationProvider(ABC):
         Returns:
             A new correlation ID
         """
-        pass
     
     @abstractmethod
     def clear_correlation_id(self) -> None:
         """Clear the current correlation ID."""
-        pass
     
     @abstractmethod
     def with_correlation_id(self, correlation_id: Optional[str] = None) -> ContextManager[str]:
@@ -61,7 +57,6 @@ class ICorrelationProvider(ABC):
         Returns:
             A context manager that sets and clears the correlation ID
         """
-        pass
 
 
 class IContextProvider(ABC):
@@ -75,7 +70,6 @@ class IContextProvider(ABC):
         Returns:
             The current context as a dictionary
         """
-        pass
     
     @abstractmethod
     def set_context(self, context: Dict[str, Any]) -> None:
@@ -85,7 +79,6 @@ class IContextProvider(ABC):
         Args:
             context: The context to set
         """
-        pass
     
     @abstractmethod
     def update_context(self, **kwargs) -> None:
@@ -95,12 +88,10 @@ class IContextProvider(ABC):
         Args:
             **kwargs: The context values to update
         """
-        pass
     
     @abstractmethod
     def clear_context(self) -> None:
         """Clear the current context."""
-        pass
     
     @abstractmethod
     def with_context(self, **kwargs) -> ContextManager[Dict[str, Any]]:
@@ -113,4 +104,3 @@ class IContextProvider(ABC):
         Returns:
             A context manager that sets and clears the context
         """
-        pass 

@@ -3,19 +3,18 @@
 Реализация гибридного репозитория материалов.
 """
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from core.logging import get_logger
 from datetime import datetime
 import asyncio
 import uuid
-import time
 
 from core.repositories.base import BaseRepository
 from core.repositories.interfaces import IMaterialsRepository
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase
-from core.database.exceptions import DatabaseError, QueryError
-from core.schemas.materials import Material, MaterialCreate, MaterialUpdate, MaterialSearchQuery
-from core.logging import DatabaseLogger, log_database_operation
+from core.database.exceptions import DatabaseError
+from core.schemas.materials import Material, MaterialCreate, MaterialUpdate
+from core.logging import DatabaseLogger
 from core.logging.metrics import get_metrics_collector
 
 

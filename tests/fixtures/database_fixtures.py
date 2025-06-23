@@ -2,11 +2,9 @@
 Фикстуры для работы с базами данных в тестах
 """
 import pytest
-import asyncio
-from typing import Dict, List, Any, Optional
-from unittest.mock import AsyncMock, Mock, patch
+from typing import Dict, List
+from unittest.mock import AsyncMock, Mock
 from .data_fixtures import TestDataProvider
-from .mock_fixtures import MockFactories
 
 
 class DatabaseTestHelpers:

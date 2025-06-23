@@ -20,13 +20,12 @@ from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import ConnectionError, DatabaseError, QueryError
 from core.database.factories import DatabaseFactory
 from core.database.init_db import DatabaseInitializer
-from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
+from core.database.interfaces import IVectorDatabase, IRelationalDatabase
 from core.repositories.hybrid_materials import HybridMaterialsRepository
 from core.repositories.cached_materials import CachedMaterialsRepository
 from core.schemas.materials import MaterialCreate, Material
 from core.monitoring.logger import get_logger
 import redis.exceptions
-from sqlalchemy.exc import OperationalError
 
 logger = get_logger(__name__)
 
@@ -367,8 +366,8 @@ class TestHybridDatabaseOperations:
         
         try:
             health_start = datetime.utcnow()
-            rel_health = await rel_db.health_check()
-            cache_health = await cache_db.health_check()
+            await rel_db.health_check()
+            await cache_db.health_check()
             
             health_time = (datetime.utcnow() - health_start).total_seconds()
             assert health_time < 10.0  # Should take less than 10 seconds

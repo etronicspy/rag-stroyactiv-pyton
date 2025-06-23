@@ -8,7 +8,6 @@ This module defines interfaces for factory classes:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type, TypeVar, Generic
 
 from .core import ILogger, IFormatter, IHandler
 
@@ -28,7 +27,6 @@ class ILoggerFactory(ABC):
         Returns:
             A logger instance
         """
-        pass
     
     @abstractmethod
     def get_logger(self, name: str, **kwargs) -> ILogger:
@@ -42,7 +40,6 @@ class ILoggerFactory(ABC):
         Returns:
             A logger instance
         """
-        pass
 
 
 class IFormatterFactory(ABC):
@@ -60,7 +57,6 @@ class IFormatterFactory(ABC):
         Returns:
             A formatter instance
         """
-        pass
     
     @abstractmethod
     def get_formatter(self, formatter_type: str, **kwargs) -> IFormatter:
@@ -74,7 +70,6 @@ class IFormatterFactory(ABC):
         Returns:
             A formatter instance
         """
-        pass
 
 
 class IHandlerFactory(ABC):
@@ -92,7 +87,6 @@ class IHandlerFactory(ABC):
         Returns:
             A handler instance
         """
-        pass
     
     @abstractmethod
     def get_handler(self, handler_type: str, **kwargs) -> IHandler:
@@ -106,4 +100,3 @@ class IHandlerFactory(ABC):
         Returns:
             A handler instance
         """
-        pass 

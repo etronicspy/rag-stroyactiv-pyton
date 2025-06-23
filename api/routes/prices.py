@@ -5,8 +5,7 @@ API для управления прайс-листами поставщиков
 """
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, Query, BackgroundTasks
-from fastapi.responses import JSONResponse
-from typing import List, Optional
+from typing import Optional
 import tempfile
 import os
 from uuid import UUID
@@ -14,7 +13,6 @@ from core.logging import get_logger
 from core.config import get_settings
 from core.schemas.materials import PriceUploadResponse, PriceProcessingStatus
 from services.price_processor import PriceProcessor
-from core.dependencies.database import get_materials_repository
 import traceback
 import time
 from datetime import datetime

@@ -3,9 +3,8 @@
 Мок-клиенты и адаптеры для тестирования и fallback стратегий.
 """
 from core.logging import get_logger
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from datetime import datetime
-import asyncio
 
 logger = get_logger(__name__)
 
@@ -95,15 +94,12 @@ class MockPostgreSQLSession:
     
     async def commit(self):
         """Mock commit"""
-        pass
     
     async def rollback(self):
         """Mock rollback"""  
-        pass
     
     async def close(self):
         """Mock close"""
-        pass
     
     def __aenter__(self):
         return self

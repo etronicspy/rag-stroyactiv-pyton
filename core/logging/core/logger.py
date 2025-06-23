@@ -5,7 +5,7 @@ This module provides the base implementation of the ILogger interface.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 from core.logging.interfaces import ILogger, IHandler
 

@@ -10,7 +10,7 @@ import threading
 from typing import Dict, Any, Optional
 from contextlib import contextmanager
 
-from .collectors import get_metrics_collector, MetricsCollector
+from .collectors import get_metrics_collector
 from .performance import get_performance_optimizer
 from ..base.loggers import get_logger
 from ..context.correlation import get_correlation_id

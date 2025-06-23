@@ -29,7 +29,6 @@ class IDatabaseLogger(ABC):
             success: Whether the operation was successful
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def log_query(
@@ -50,7 +49,6 @@ class IDatabaseLogger(ABC):
             success: Whether the query was successful
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def log_connection(
@@ -69,7 +67,6 @@ class IDatabaseLogger(ABC):
             error: The error if the connection failed
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def operation_context(
@@ -87,7 +84,6 @@ class IDatabaseLogger(ABC):
         Returns:
             A context manager that logs the operation
         """
-        pass
 
 
 class IVectorDatabaseLogger(IDatabaseLogger):
@@ -114,7 +110,6 @@ class IVectorDatabaseLogger(IDatabaseLogger):
             success: Whether the operation was successful
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def log_search_operation(
@@ -137,4 +132,3 @@ class IVectorDatabaseLogger(IDatabaseLogger):
             success: Whether the operation was successful
             **kwargs: Additional context for the log message
         """
-        pass 

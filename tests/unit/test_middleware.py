@@ -7,11 +7,9 @@ Unit тесты для компонентов middleware
 """
 import pytest
 import asyncio
-import time
 from unittest.mock import Mock, AsyncMock, patch
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from starlette.responses import JSONResponse
 
 from core.middleware import RateLimitMiddleware, LoggingMiddleware, SecurityMiddleware
 from core.config import settings, get_settings
@@ -173,7 +171,7 @@ class TestLoggingMiddleware:
     @pytest.mark.unit
     def test_request_logging(self, app, caplog):
         """Test request logging."""
-        settings = get_settings()
+        get_settings()
         app.add_middleware(LoggingMiddleware)
         client = TestClient(app)
         
@@ -192,7 +190,7 @@ class TestLoggingMiddleware:
     @pytest.mark.unit
     def test_response_logging(self, app, caplog):
         """Test response logging."""
-        settings = get_settings()
+        get_settings()
         app.add_middleware(LoggingMiddleware)
         client = TestClient(app)
         
@@ -209,7 +207,7 @@ class TestLoggingMiddleware:
     @pytest.mark.unit
     def test_exception_logging(self, app, caplog):
         """Test exception logging."""
-        settings = get_settings()
+        get_settings()
         app.add_middleware(LoggingMiddleware)
         client = TestClient(app)
         
@@ -459,7 +457,7 @@ class TestMiddlewareIntegration:
         # Add all middleware
         app.add_middleware(SecurityMiddleware)
         from core.config import get_settings
-        settings = get_settings()
+        get_settings()
         app.add_middleware(LoggingMiddleware)
         app.add_middleware(RateLimitMiddleware, default_requests_per_minute=100)
         

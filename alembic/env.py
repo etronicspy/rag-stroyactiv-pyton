@@ -3,11 +3,9 @@
 Конфигурация Alembic для асинхронных миграций PostgreSQL.
 """
 
-import asyncio
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 import os
 import sys
@@ -117,7 +115,6 @@ def run_migrations_online() -> None:
     except Exception as e:
         # Log error but don't crash startup
         print(f"Migration error (non-critical): {e}")
-        pass
 
 
 if context.is_offline_mode():

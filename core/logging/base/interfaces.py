@@ -26,7 +26,6 @@ class LoggerInterface(ABC):
             message: Message to log
             **kwargs: Additional logging context
         """
-        pass
     
     @abstractmethod
     def get_logger_name(self) -> str:
@@ -36,7 +35,6 @@ class LoggerInterface(ABC):
         Returns:
             Logger name
         """
-        pass
 
 
 class ContextManagerInterface(ABC):
@@ -54,7 +52,6 @@ class ContextManagerInterface(ABC):
         Returns:
             Current correlation ID or None
         """
-        pass
     
     @abstractmethod
     def set_correlation_id(self, correlation_id: str) -> None:
@@ -64,7 +61,6 @@ class ContextManagerInterface(ABC):
         Args:
             correlation_id: ID to set
         """
-        pass
     
     @abstractmethod
     def get_metadata(self) -> Dict[str, Any]:
@@ -74,7 +70,6 @@ class ContextManagerInterface(ABC):
         Returns:
             Request metadata dictionary
         """
-        pass
 
 
 class MetricsCollectorInterface(ABC):
@@ -101,7 +96,6 @@ class MetricsCollectorInterface(ABC):
             success: Whether operation was successful
             metadata: Additional operation metadata
         """
-        pass
     
     @abstractmethod
     def get_stats(self) -> Dict[str, Any]:
@@ -111,7 +105,6 @@ class MetricsCollectorInterface(ABC):
         Returns:
             Statistics dictionary
         """
-        pass
 
 
 class FormatterInterface(ABC):
@@ -132,7 +125,6 @@ class FormatterInterface(ABC):
         Returns:
             Formatted log message
         """
-        pass
 
 
 class DatabaseLoggerInterface(ABC):
@@ -165,7 +157,6 @@ class DatabaseLoggerInterface(ABC):
             extra_data: Additional operation data
             correlation_id: Request correlation ID
         """
-        pass
 
 
 # Type aliases for better code readability

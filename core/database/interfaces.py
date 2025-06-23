@@ -4,8 +4,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Union
-from datetime import datetime
+from typing import List, Dict, Any, Optional
 
 
 class IVectorDatabase(ABC):
@@ -27,7 +26,6 @@ class IVectorDatabase(ABC):
         Returns:
             True if collection created successfully
         """
-        pass
     
     @abstractmethod
     async def collection_exists(self, name: str) -> bool:
@@ -39,7 +37,6 @@ class IVectorDatabase(ABC):
         Returns:
             True if collection exists
         """
-        pass
     
     @abstractmethod
     async def upsert(self, collection_name: str, vectors: List[Dict[str, Any]]) -> bool:
@@ -52,7 +49,6 @@ class IVectorDatabase(ABC):
         Returns:
             True if upsert successful
         """
-        pass
     
     @abstractmethod
     async def search(self, collection_name: str, query_vector: List[float], 
@@ -68,7 +64,6 @@ class IVectorDatabase(ABC):
         Returns:
             List of search results with scores and metadata
         """
-        pass
     
     @abstractmethod
     async def get_by_id(self, collection_name: str, vector_id: str) -> Optional[Dict[str, Any]]:
@@ -81,7 +76,6 @@ class IVectorDatabase(ABC):
         Returns:
             Vector data or None if not found
         """
-        pass
     
     @abstractmethod
     async def update_vector(self, collection_name: str, vector_id: str, 
@@ -98,7 +92,6 @@ class IVectorDatabase(ABC):
         Returns:
             True if update successful
         """
-        pass
     
     @abstractmethod
     async def delete(self, collection_name: str, vector_id: str) -> bool:
@@ -111,7 +104,6 @@ class IVectorDatabase(ABC):
         Returns:
             True if deletion successful
         """
-        pass
     
     @abstractmethod
     async def batch_upsert(self, collection_name: str, vectors: List[Dict[str, Any]], 
@@ -126,7 +118,6 @@ class IVectorDatabase(ABC):
         Returns:
             True if batch upsert successful
         """
-        pass
     
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
@@ -135,7 +126,6 @@ class IVectorDatabase(ABC):
         Returns:
             Health status information
         """
-        pass
 
 
 class IRelationalDatabase(ABC):
@@ -152,7 +142,6 @@ class IRelationalDatabase(ABC):
         Returns:
             Query results
         """
-        pass
     
     @abstractmethod
     async def execute_command(self, command: str, params: Optional[Dict[str, Any]] = None) -> int:
@@ -165,7 +154,6 @@ class IRelationalDatabase(ABC):
         Returns:
             Number of affected rows
         """
-        pass
     
     @abstractmethod
     async def begin_transaction(self):
@@ -174,7 +162,6 @@ class IRelationalDatabase(ABC):
         Yields:
             Transaction session
         """
-        pass
     
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
@@ -183,7 +170,6 @@ class IRelationalDatabase(ABC):
         Returns:
             Health status information
         """
-        pass
 
 
 class ICacheDatabase(ABC):
@@ -199,7 +185,6 @@ class ICacheDatabase(ABC):
         Returns:
             Cached value or None
         """
-        pass
     
     @abstractmethod
     async def set(self, key: str, value: str, expire_seconds: Optional[int] = None) -> bool:
@@ -213,7 +198,6 @@ class ICacheDatabase(ABC):
         Returns:
             True if successful
         """
-        pass
     
     @abstractmethod
     async def delete(self, key: str) -> bool:
@@ -225,7 +209,6 @@ class ICacheDatabase(ABC):
         Returns:
             True if successful
         """
-        pass
     
     @abstractmethod
     async def exists(self, key: str) -> bool:
@@ -237,7 +220,6 @@ class ICacheDatabase(ABC):
         Returns:
             True if key exists
         """
-        pass
     
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
@@ -246,4 +228,3 @@ class ICacheDatabase(ABC):
         Returns:
             Health status information
         """
-        pass 

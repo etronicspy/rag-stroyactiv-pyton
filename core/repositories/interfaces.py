@@ -25,7 +25,6 @@ class IMaterialsRepository(ABC):
         Returns:
             Created material
         """
-        pass
     
     @abstractmethod
     async def upsert(self, material: MaterialCreate) -> Material:
@@ -37,7 +36,6 @@ class IMaterialsRepository(ABC):
         Returns:
             Created or updated material
         """
-        pass
     
     @abstractmethod
     async def get_by_id(self, material_id: str) -> Optional[Material]:
@@ -49,7 +47,6 @@ class IMaterialsRepository(ABC):
         Returns:
             Material or None if not found
         """
-        pass
     
     @abstractmethod
     async def update(self, material_id: str, material_update: MaterialUpdate) -> Optional[Material]:
@@ -62,7 +59,6 @@ class IMaterialsRepository(ABC):
         Returns:
             Updated material or None if not found
         """
-        pass
     
     @abstractmethod
     async def delete(self, material_id: str) -> bool:
@@ -74,7 +70,6 @@ class IMaterialsRepository(ABC):
         Returns:
             True if deleted successfully
         """
-        pass
     
     @abstractmethod
     async def list(self, skip: int = 0, limit: int = 100, 
@@ -89,7 +84,6 @@ class IMaterialsRepository(ABC):
         Returns:
             List of materials
         """
-        pass
     
     @abstractmethod
     async def search_semantic(self, query: str, limit: int = 10) -> List[Material]:
@@ -102,7 +96,6 @@ class IMaterialsRepository(ABC):
         Returns:
             List of matching materials
         """
-        pass
     
     @abstractmethod
     async def search_text(self, query: str, limit: int = 10) -> List[Material]:
@@ -115,7 +108,6 @@ class IMaterialsRepository(ABC):
         Returns:
             List of matching materials
         """
-        pass
     
     @abstractmethod
     async def create_batch(self, materials: List[MaterialCreate], 
@@ -129,7 +121,6 @@ class IMaterialsRepository(ABC):
         Returns:
             Batch operation results
         """
-        pass
 
     @abstractmethod
     async def batch_upsert(self, materials: List[MaterialCreate], 
@@ -143,7 +134,6 @@ class IMaterialsRepository(ABC):
         Returns:
             Batch operation results with created/updated counts
         """
-        pass
 
 
 class ICategoriesRepository(ABC):
@@ -160,7 +150,6 @@ class ICategoriesRepository(ABC):
         Returns:
             Created category
         """
-        pass
     
     @abstractmethod
     async def list(self) -> List[Category]:
@@ -169,7 +158,6 @@ class ICategoriesRepository(ABC):
         Returns:
             List of categories
         """
-        pass
     
     @abstractmethod
     async def delete(self, name: str) -> bool:
@@ -181,7 +169,6 @@ class ICategoriesRepository(ABC):
         Returns:
             True if deleted successfully
         """
-        pass
 
 
 class IUnitsRepository(ABC):
@@ -198,7 +185,6 @@ class IUnitsRepository(ABC):
         Returns:
             Created unit
         """
-        pass
     
     @abstractmethod
     async def list(self) -> List[Unit]:
@@ -207,7 +193,6 @@ class IUnitsRepository(ABC):
         Returns:
             List of units
         """
-        pass
     
     @abstractmethod
     async def delete(self, name: str) -> bool:
@@ -219,4 +204,3 @@ class IUnitsRepository(ABC):
         Returns:
             True if deleted successfully
         """
-        pass 

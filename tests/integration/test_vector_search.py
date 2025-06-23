@@ -8,10 +8,9 @@ Integration tests for vector search operations
 """
 import pytest
 import asyncio
-from unittest.mock import patch, Mock, AsyncMock
+from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from typing import Dict, Any, List
 
 from core.config import get_settings
 from core.database.factories import DatabaseFactory

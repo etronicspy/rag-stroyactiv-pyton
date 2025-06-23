@@ -7,7 +7,7 @@ This module provides a processor for batched log processing.
 import asyncio
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from core.logging.interfaces import IHandler
 from core.logging.optimized.async_logging.logging_queue import LoggingQueue

@@ -92,7 +92,6 @@ class TestBrotliDiagnostics:
             logger.info(f"🔍 Middleware Brotli detection: {brotli_detected}")
             
             # If Brotli import works, middleware should detect it too
-            import brotli
             assert brotli_detected == True, "Middleware should detect Brotli when it's available"
             
         except ImportError:

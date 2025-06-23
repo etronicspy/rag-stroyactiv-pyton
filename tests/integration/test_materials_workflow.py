@@ -9,8 +9,6 @@ Once the materials subsystem is fully migrated and stabilised, remove the
 """
 
 import pytest
-import asyncio
-from datetime import datetime
 
 # Skip the entire module until the workflow is fixed
 pytest.skip("Skipping hanging materials workflow integration tests", allow_module_level=True)
@@ -214,7 +212,6 @@ class TestMaterialsWorkflowIntegration:
         
         # Симуляция одновременных запросов удаления
         import threading
-        import time
         
         results = []
         
@@ -460,7 +457,6 @@ class TestDatabaseOperationsIntegration:
     def test_concurrent_operations(self, client_real):
         """Тест конкурентных операций с материалами"""
         import threading
-        import time
         
         results = []
         errors = []
@@ -481,7 +477,7 @@ class TestDatabaseOperationsIntegration:
                 if response.status_code == 200:
                     # Попытка удалить созданный материал
                     material_id = response.json()["id"]
-                    delete_response = client_real.delete(f"/api/v1/materials/{material_id}")
+                    client_real.delete(f"/api/v1/materials/{material_id}")
                     
             except Exception as e:
                 errors.append((index, str(e)))

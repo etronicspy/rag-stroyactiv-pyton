@@ -5,9 +5,7 @@ This module provides a provider for logging configuration.
 """
 
 import logging
-import os
-import sys
-from typing import Dict, List, Optional, Any, Union, Type, TypeVar, cast
+from typing import Dict, Optional, Any, TypeVar, cast
 
 from core.logging.config.settings import LoggingSettings, get_logging_settings
 from core.logging.config.validator import validate_configuration

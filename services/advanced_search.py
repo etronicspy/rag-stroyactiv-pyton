@@ -14,17 +14,17 @@ import asyncio
 import json
 import re
 import time
-from base64 import b64encode, b64decode
+from base64 import b64encode
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple, Set
+from typing import List, Dict, Any, Optional, Tuple
 from difflib import SequenceMatcher
 from core.logging import get_logger
 
 from core.schemas.materials import (
     AdvancedSearchQuery, MaterialFilterOptions, SortOption, PaginationOptions,
     SearchResponse, MaterialSearchResult, SearchSuggestion, SearchHighlight,
-    SearchAnalytics, Material
+    SearchAnalytics
 )
 from core.repositories.cached_materials import CachedMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase

@@ -9,18 +9,16 @@ from core.logging.managers.unified import get_unified_logging_manager
 from core.logging import log_database_operation_decorator  # Новый декоратор для логирования операций с БД
 from core.logging.metrics.integration import (  # 🎯 ЭТАП 5.4: Metrics Integration
     get_metrics_integrated_logger,
-    log_database_operation_with_metrics
 )
 import uuid
-import asyncio
 from datetime import datetime
 
 from core.schemas.materials import (
     Material, MaterialCreate, MaterialUpdate, MaterialBatchResponse, MaterialImportItem,
     Category, Unit
 )
-from core.database.interfaces import IVectorDatabase, IRelationalDatabase
-from core.database.exceptions import DatabaseError, ConnectionError, QueryError
+from core.database.interfaces import IVectorDatabase
+from core.database.exceptions import DatabaseError
 from core.repositories.base import BaseRepository
 from core.logging.metrics import get_metrics_collector
 
@@ -144,7 +142,7 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If creation fails
         """
-        correlation_id = get_correlation_id()
+        get_correlation_id()
         logger.info(f"Creating material: {material.name}")
         
         with self.performance_tracker.time_operation("materials_service", "create_material", 1):
@@ -211,7 +209,7 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If retrieval fails
         """
-        correlation_id = get_correlation_id()
+        get_correlation_id()
         logger.debug(f"Retrieving material: {material_id}")
         
         try:
@@ -355,7 +353,7 @@ class MaterialsService(BaseRepository):
         Raises:
             DatabaseError: If search fails
         """
-        correlation_id = get_correlation_id()
+        get_correlation_id()
         logger.debug(f"Performing vector search for: '{query}'")
         
         with self.performance_tracker.time_operation("materials_service", "search_materials", limit):
@@ -483,7 +481,7 @@ class MaterialsService(BaseRepository):
         """
         import time
         
-        correlation_id = get_correlation_id()
+        get_correlation_id()
         logger.info(f"Starting batch creation of {len(materials)} materials")
         
         start_time = time.time()
@@ -818,7 +816,6 @@ class CategoryService:
                     logger.debug(f"Categories collection '{self.collection_name}' created")
         except Exception as e:
             logger.error(f"Failed to ensure categories collection: {e}")
-            pass
     
     async def create_category(self, name: str, description: Optional[str] = None) -> Category:
         """Create a new category and save to Qdrant."""
@@ -961,7 +958,6 @@ class UnitService:
                     logger.debug(f"Units collection '{self.collection_name}' created")
         except Exception as e:
             logger.error(f"Failed to ensure units collection: {e}")
-            pass
     
     async def create_unit(self, name: str, description: Optional[str] = None) -> Unit:
         """Create a new unit and save to Qdrant."""

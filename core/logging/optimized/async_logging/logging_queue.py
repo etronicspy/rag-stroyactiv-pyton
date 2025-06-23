@@ -103,7 +103,7 @@ class LoggingQueue:
             A batch of items from the queue
         """
         batch = []
-        start_time = time.time()
+        time.time()
         
         async with self._lock:
             # Wait for at least one item or timeout

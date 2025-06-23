@@ -12,22 +12,15 @@ Created: 2024
 """
 
 import pytest
-import asyncio
 import time
-import threading
 import uuid
-import psutil
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from unittest.mock import Mock, patch
-from typing import List, Dict, Any
-import statistics
+from typing import Dict, Any
 
 # Core imports
 from core.monitoring.unified_manager import get_unified_logging_manager
 from core.monitoring.context import CorrelationContext, get_correlation_id
 from core.monitoring.logger import get_logger
-from core.config import get_settings
 
 
 class TestLoggerCachingPerformance:
@@ -38,13 +31,13 @@ class TestLoggerCachingPerformance:
         # Measure uncached logger creation
         start_time = time.perf_counter()
         for i in range(1000):
-            logger = get_logger(f"uncached_test_{i}")
+            get_logger(f"uncached_test_{i}")
         uncached_duration = time.perf_counter() - start_time
         
         # Measure cached logger creation (same names)
         start_time = time.perf_counter()
         for i in range(1000):
-            logger = get_logger("cached_test")
+            get_logger("cached_test")
         cached_duration = time.perf_counter() - start_time
         
         # Cached should be significantly faster
@@ -65,7 +58,7 @@ class TestCorrelationIdOptimizationPerformance:
         # Test standard UUID generation
         start_time = time.perf_counter()
         for _ in range(10000):
-            correlation_id = str(uuid.uuid4())
+            str(uuid.uuid4())
         standard_duration = time.perf_counter() - start_time
         
         print(f"Standard UUID generation: {standard_duration:.4f}s for 10000 IDs")

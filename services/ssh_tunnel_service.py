@@ -8,16 +8,13 @@ monitoring, and automatic reconnection.
 """
 
 import asyncio
-from functools import lru_cache
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 from core.logging import get_logger
 
 from core.config import get_settings
-from .tunnel.ssh_tunnel import SSHTunnel
 from .tunnel.tunnel_config import TunnelConfig
 from .tunnel.tunnel_manager import TunnelManager
-from .tunnel.exceptions import SSHTunnelError
 
 logger = get_logger(__name__)
 

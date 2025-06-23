@@ -4,9 +4,8 @@
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, Query, Path
+from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime
-from uuid import UUID
 
 from core.logging import get_logger
 from core.schemas.materials import (
@@ -15,7 +14,7 @@ from core.schemas.materials import (
 )
 from core.database.interfaces import IVectorDatabase
 from core.dependencies.database import get_vector_db_dependency, get_ai_client_dependency
-from core.database.exceptions import DatabaseError, ConnectionError, QueryError
+from core.database.exceptions import DatabaseError
 from services.materials import MaterialsService
 
 

@@ -8,9 +8,7 @@ Extracted and refactored from core/monitoring/logger.py.
 import logging
 import os
 from typing import Optional
-from functools import lru_cache
 
-from core.config import get_settings
 from core.config import get_logging_config
 
 # 🔧 CONSTANTS: Moved hardcoded values to module level

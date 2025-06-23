@@ -6,7 +6,7 @@ This module provides a provider for context management.
 
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Dict, Generator, Optional
+from typing import Any, Dict, Generator
 
 from core.logging.interfaces import IContextProvider
 

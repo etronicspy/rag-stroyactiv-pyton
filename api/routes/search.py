@@ -1,11 +1,9 @@
-from fastapi import APIRouter, Depends, Query
-from typing import List, Optional
+from fastapi import APIRouter, Query
+from typing import List
 
 from core.logging import get_logger
 from core.config import get_settings
-from core.schemas.materials import Material, MaterialSearchQuery
-from core.repositories.interfaces import IMaterialsRepository
-from core.dependencies.database import get_materials_repository
+from core.schemas.materials import Material
 from services.materials import MaterialsService  # for test patching
 
 router = APIRouter()

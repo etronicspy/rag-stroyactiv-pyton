@@ -6,8 +6,7 @@ This module provides integration with FastAPI.
 
 import logging
 import time
-import uuid
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from typing import Any, Callable, List, Optional
 
 from fastapi import FastAPI, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware

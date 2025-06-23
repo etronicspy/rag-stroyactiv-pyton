@@ -7,7 +7,7 @@ This module defines interfaces for metrics collection and performance tracking:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union, ContextManager
+from typing import Any, Dict, Optional, ContextManager
 
 
 class IMetricsCollector(ABC):
@@ -28,7 +28,6 @@ class IMetricsCollector(ABC):
             value: The increment value
             labels: The metric labels
         """
-        pass
     
     @abstractmethod
     def set_gauge(
@@ -45,7 +44,6 @@ class IMetricsCollector(ABC):
             value: The gauge value
             labels: The metric labels
         """
-        pass
     
     @abstractmethod
     def record_histogram(
@@ -62,7 +60,6 @@ class IMetricsCollector(ABC):
             value: The histogram value
             labels: The metric labels
         """
-        pass
     
     @abstractmethod
     def export_metrics(self) -> Dict[str, Any]:
@@ -72,7 +69,6 @@ class IMetricsCollector(ABC):
         Returns:
             A dictionary of all metrics
         """
-        pass
 
 
 class IPerformanceTracker(ABC):
@@ -86,7 +82,6 @@ class IPerformanceTracker(ABC):
         Args:
             name: The timer name
         """
-        pass
     
     @abstractmethod
     def stop_timer(self, name: str) -> float:
@@ -99,7 +94,6 @@ class IPerformanceTracker(ABC):
         Returns:
             The elapsed time in milliseconds
         """
-        pass
     
     @abstractmethod
     def track_operation(
@@ -120,7 +114,6 @@ class IPerformanceTracker(ABC):
             success: Whether the operation was successful
             **kwargs: Additional context for the operation
         """
-        pass
     
     @abstractmethod
     def operation_context(
@@ -140,7 +133,6 @@ class IPerformanceTracker(ABC):
         Returns:
             A context manager that tracks the operation
         """
-        pass
     
     @abstractmethod
     def get_stats(self) -> Dict[str, Any]:
@@ -150,4 +142,3 @@ class IPerformanceTracker(ABC):
         Returns:
             A dictionary of performance statistics
         """
-        pass 

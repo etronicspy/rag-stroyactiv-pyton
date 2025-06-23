@@ -6,12 +6,9 @@
 import asyncio
 from core.logging import get_logger
 from typing import Dict, Any, Optional
-import subprocess
 import sys
-import os
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from alembic import command
 from alembic.config import Config
 
@@ -83,7 +80,6 @@ class DatabaseInitializer:
             logger.error(f"Migration failed: {e}")
             # Не прерываем инициализацию, если миграции не удались
             logger.warning("Continuing initialization despite migration failure")
-            pass
     
     async def seed_reference_data(self) -> Dict[str, int]:
         """Seed reference data.

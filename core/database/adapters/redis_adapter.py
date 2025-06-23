@@ -8,13 +8,11 @@ import pickle
 from core.logging import get_logger
 import zlib
 from typing import Any, Dict, List, Optional, Union, Set
-from datetime import datetime, timedelta
-import asyncio
-from contextlib import asynccontextmanager
+from datetime import datetime
 
 import redis.asyncio as redis
 from redis.asyncio import ConnectionPool
-from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
+from redis.exceptions import RedisError
 
 # Try to import msgpack for optimized serialization
 try:
@@ -25,7 +23,7 @@ except ImportError:
     get_logger(__name__).warning("msgpack not available, falling back to JSON+pickle serialization")
 
 from core.database.interfaces import ICacheDatabase
-from core.database.exceptions import ConnectionError, DatabaseError, QueryError
+from core.database.exceptions import ConnectionError, DatabaseError
 
 
 logger = get_logger(__name__)
@@ -678,7 +676,7 @@ class RedisDatabase(ICacheDatabase):
             DatabaseError: If operation fails
         """
         try:
-            pattern = f"{self.key_prefix}*"
+            f"{self.key_prefix}*"
             return await self.delete_pattern("*")  # Will use prefix automatically
             
         except Exception as e:

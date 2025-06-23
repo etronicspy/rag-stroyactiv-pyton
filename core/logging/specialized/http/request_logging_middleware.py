@@ -113,7 +113,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             request_context = await anyio.to_thread.run_sync(sync_func)
         
         # Process the request
-        start_time = time.time()
+        time.time()
         response = None
         try:
             response = await call_next(request)
@@ -400,7 +400,7 @@ class AsyncRequestLoggingMiddleware:
         request_context["correlation_id"] = correlation_id
         
         # Process the request
-        start_time = time.time()
+        time.time()
         
         # Wrap the send function to capture the response
         async def send_wrapper(message: Dict[str, Any]) -> None:

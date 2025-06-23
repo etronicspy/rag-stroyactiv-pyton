@@ -16,18 +16,13 @@ Created: 2024
 import pytest
 import asyncio
 import uuid
-import time
-import json
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
-from typing import Dict, Any, List
 
 # Core imports
 from main import app
-from core.monitoring.unified_manager import get_unified_logging_manager
 from core.monitoring.context import CorrelationContext, get_correlation_id
 from services.materials import MaterialsService
-from core.config import get_settings
 
 
 class TestMaterialManagementWorkflows:
@@ -215,7 +210,7 @@ class TestErrorHandlingWorkflows:
                     results = await service.search_materials("test", limit=5)
                     # If no exception, operation was handled
                     assert isinstance(results, list)
-                except Exception as e:
+                except Exception:
                     # Exception should be properly logged with correlation ID
                     assert get_correlation_id() == correlation_id
 

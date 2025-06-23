@@ -19,9 +19,7 @@ import uuid
 import time
 import json
 from unittest.mock import Mock, patch, AsyncMock
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from contextlib import asynccontextmanager
 
 # Core imports
 from main import app
@@ -209,7 +207,6 @@ class TestDatabaseOperationIntegration:
             async with manager.database_operation_context("qdrant", "search"):
                 # Simulate database operation
                 await asyncio.sleep(0.01)
-                result = "operation_result"
             
             # Verify logging was called
             mock_log.assert_called()
@@ -283,7 +280,7 @@ class TestEndToEndRequestTracing:
         assert response.status_code == 200
         
         # Response headers should contain correlation ID
-        response_headers = dict(response.headers)
+        dict(response.headers)
         # Note: Actual header name depends on middleware implementation
     
     @pytest.mark.asyncio
@@ -509,7 +506,7 @@ class TestErrorHandlingIntegration:
         async def failing_app(scope, receive, send):
             raise Exception("Application error")
         
-        middleware = LoggingMiddleware(failing_app, settings)
+        LoggingMiddleware(failing_app, settings)
         
         # Should handle errors gracefully
         # (Actual error handling depends on middleware implementation)

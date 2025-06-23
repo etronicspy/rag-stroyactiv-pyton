@@ -7,9 +7,9 @@ Provides detailed health monitoring for all database types, services, and system
 import asyncio
 import time
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 import httpx
 
@@ -19,7 +19,6 @@ from core.logging.managers.unified import get_unified_logging_manager
 from core.logging.metrics.performance import get_performance_optimizer
 from core.logging.metrics.integration import get_metrics_integrated_logger, get_global_metrics_logger
 from core.database.factories import DatabaseFactory
-from core.database.exceptions import ConnectionError as DatabaseConnectionError
 from core.database.pool_manager import get_pool_manager
 
 router = APIRouter()
@@ -630,7 +629,7 @@ async def full_health_check():
     - 🐳 Kubernetes liveness/readiness probes
     - 📊 Интеграция с системами мониторинга (Prometheus, Grafana)
     """
-    settings = get_settings()
+    get_settings()
     start_time = time.time()
     
     # Run detailed health checks concurrently
@@ -1192,7 +1191,7 @@ async def _test_correlation_optimization() -> Dict[str, Any]:
     try:
         import time
         from core.logging.metrics.performance import get_cached_correlation_id
-        from core.logging import get_correlation_id, generate_correlation_id
+        from core.logging import generate_correlation_id
         
         # Test cached correlation ID performance
         start_time = time.time()
@@ -1442,7 +1441,7 @@ async def metrics_integration_health_check():
         start_time = time.time()
         
         metrics_summary = metrics_logger.get_metrics_summary()
-        global_summary = global_logger.get_metrics_summary()
+        global_logger.get_metrics_summary()
         
         summary_test_time = (time.time() - start_time) * 1000
         

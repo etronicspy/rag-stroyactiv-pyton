@@ -6,17 +6,10 @@
 from functools import lru_cache
 from typing import Optional, Dict, Any
 from core.logging import get_logger
-from enum import Enum
 
 from core.config import settings, DatabaseType, AIProvider
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
 from core.database.exceptions import ConfigurationError, ConnectionError
-from core.database.mocks import (
-    create_mock_redis_client, 
-    create_mock_postgresql_database,
-    MockRedisClient,
-    MockPostgreSQLAdapter
-)
 from core.database.adapters.mock_adapters import (
     create_mock_relational_adapter,
     create_mock_cache_adapter

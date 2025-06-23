@@ -4,13 +4,12 @@
 """
 
 from abc import ABC
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional
 from datetime import datetime
-import uuid
 from core.logging import get_logger
 
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
-from core.database.exceptions import DatabaseError, QueryError
+from core.database.exceptions import DatabaseError
 
 
 class BaseRepository(ABC):

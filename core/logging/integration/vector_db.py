@@ -7,7 +7,7 @@ This module provides integration with vector databases.
 import logging
 import time
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Union, cast, TypeVar, ParamSpec
+from typing import Any, Callable, Optional, TypeVar, ParamSpec
 
 from core.logging.config import get_configuration
 from core.logging.interfaces import ILogger

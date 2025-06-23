@@ -9,7 +9,7 @@ import logging
 from typing import Callable, Dict, Any
 from functools import wraps
 
-from .correlation import get_correlation_id, get_or_generate_correlation_id
+from .correlation import get_correlation_id
 
 
 def log_with_correlation(logger_func: Callable) -> Callable:

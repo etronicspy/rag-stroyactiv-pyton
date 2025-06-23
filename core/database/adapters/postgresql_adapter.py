@@ -3,21 +3,20 @@
 Адаптер для работы с PostgreSQL БД.
 """
 
-from typing import List, Dict, Any, Optional, Union, AsyncGenerator
+from typing import List, Dict, Any, Optional
 from core.logging import get_logger
 from datetime import datetime
 import uuid
 from contextlib import asynccontextmanager
-import asyncio
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, String, DateTime, Text, Integer, Numeric, Boolean, Index, func, or_
+from sqlalchemy import String, DateTime, Text, Integer, Numeric, Boolean, Index, func, or_
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, REAL
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import select, insert, update, delete
+from sqlalchemy.sql import select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text, inspect
+from sqlalchemy import text
 
 from core.database.interfaces import IRelationalDatabase
 from core.database.exceptions import ConnectionError, QueryError, DatabaseError, TransactionError

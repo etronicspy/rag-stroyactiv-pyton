@@ -4,12 +4,10 @@
 Содержит базовые категории материалов и единицы измерения.
 """
 
-import asyncio
-from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Dict
 from core.logging import get_logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
+from sqlalchemy import text
 
 logger = get_logger(__name__)
 

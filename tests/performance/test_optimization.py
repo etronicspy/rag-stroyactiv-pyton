@@ -11,7 +11,7 @@ import pytest
 import asyncio
 import time
 from unittest.mock import Mock, AsyncMock, patch
-from typing import List, Dict, Any
+from typing import List, Dict
 import random
 from datetime import datetime
 
@@ -244,7 +244,6 @@ class DynamicPoolManager:
     
     async def _analyze_and_adjust_pools(self):
         """Analyze and adjust pools."""
-        pass
     
     async def force_pool_resize(self, pool_name: str, new_size: int, reason: str = "") -> bool:
         """Force pool resize."""
@@ -364,7 +363,7 @@ class TestRateLimitPerformance:
         # Test many rate limit checks
         for _ in range(100):
             client_id = rate_limit_middleware._get_client_id(mock_request)
-            is_allowed = await rate_limit_middleware._check_rate_limit(client_id, "/api/v1/test")
+            await rate_limit_middleware._check_rate_limit(client_id, "/api/v1/test")
         
         check_time = time.time() - start_time
         
@@ -725,7 +724,7 @@ class TestRedisSerializationPerformance:
         # Serialize 1000 times
         for _ in range(1000):
             serialized = json.dumps(large_material_data)
-            deserialized = json.loads(serialized)
+            json.loads(serialized)
         
         json_time = time.time() - start_time
         assert json_time < 2.0, f"JSON serialization took too long: {json_time}s"
@@ -739,7 +738,7 @@ class TestRedisSerializationPerformance:
         # Serialize 1000 times
         for _ in range(1000):
             serialized = pickle.dumps(large_material_data)
-            deserialized = pickle.loads(serialized)
+            pickle.loads(serialized)
         
         pickle_time = time.time() - start_time
         assert pickle_time < 1.0, f"Pickle serialization took too long: {pickle_time}s"
@@ -773,14 +772,14 @@ class TestRedisSerializationPerformance:
         start_time = time.time()
         for _ in range(100):
             compressed = gzip.compress(json_data)
-            decompressed = gzip.decompress(compressed)
+            gzip.decompress(compressed)
         gzip_time = time.time() - start_time
         
         # Test zlib compression
         start_time = time.time()
         for _ in range(100):
             compressed = zlib.compress(json_data)
-            decompressed = zlib.decompress(compressed)
+            zlib.decompress(compressed)
         zlib_time = time.time() - start_time
         
         assert gzip_time < 1.0, f"Gzip compression took too long: {gzip_time}s"
@@ -791,7 +790,7 @@ class TestRedisSerializationPerformance:
     async def test_redis_batch_operations_performance(self):
         """Test Redis batch operations performance."""
         try:
-            import redis.asyncio as redis
+            pass
         except ImportError:
             pytest.skip("redis not available")
         
@@ -846,7 +845,7 @@ class TestRedisSerializationPerformance:
         # Serialize embeddings
         for embedding in embeddings:
             serialized = json.dumps(embedding)
-            deserialized = json.loads(serialized)
+            json.loads(serialized)
         
         embedding_time = time.time() - start_time
         assert embedding_time < 1.0, f"Embedding serialization took too long: {embedding_time}s" 

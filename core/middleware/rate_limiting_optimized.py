@@ -3,13 +3,11 @@ Optimized rate limiting middleware using Redis Lua scripts for atomic operations
 Provides distributed rate limiting with minimal race conditions.
 """
 
-import asyncio
 import time
 from core.logging import get_logger
 from typing import Optional, Dict, Any, Callable, Tuple
-from datetime import datetime, timedelta
 
-from fastapi import HTTPException, Request, Response
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 import redis.asyncio as aioredis
 

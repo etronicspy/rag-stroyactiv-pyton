@@ -9,7 +9,7 @@ import logging
 import threading
 from typing import Any, Dict, Optional, Union
 
-from core.logging.interfaces import ILogger, IHandler
+from core.logging.interfaces import IHandler
 from core.logging.core import Logger
 from core.logging.optimized.async_logging.logging_queue import LoggingQueue
 

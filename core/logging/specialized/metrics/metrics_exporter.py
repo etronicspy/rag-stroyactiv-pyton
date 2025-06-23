@@ -6,7 +6,7 @@ This module provides an exporter for metrics to external systems.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from core.logging.specialized.metrics.metrics_collector import MetricsCollector
 

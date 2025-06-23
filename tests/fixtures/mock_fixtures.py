@@ -2,7 +2,7 @@
 Mock объекты для unit тестов
 """
 from unittest.mock import Mock, AsyncMock, MagicMock
-from typing import Dict, List, Any, Optional
+from typing import List, Any
 from .data_fixtures import TestDataProvider
 
 

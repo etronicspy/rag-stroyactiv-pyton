@@ -4,7 +4,7 @@ SSH Tunnel exceptions for RAG Construction Materials API.
 This module defines custom exceptions for SSH tunnel operations.
 """
 
-from typing import Optional, Any
+from typing import Optional
 
 
 class SSHTunnelError(Exception):

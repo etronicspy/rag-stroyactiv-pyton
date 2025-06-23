@@ -3,19 +3,11 @@
 Сервис обработки цен для RAG Construction Materials API.
 """
 
-import asyncio
-from typing import List, Dict, Any, Optional, Tuple, Union
-import time
-import csv
-import io
+from typing import List, Dict, Any, Optional
 import pandas as pd
-from datetime import datetime, date
-from decimal import Decimal
-from core.models.materials import Material, Category, Unit
-from core.schemas.materials import RawProduct, RawProductCreate
-from qdrant_client import QdrantClient
+from datetime import datetime
+from core.models.materials import Category, Unit
 from qdrant_client.http import models
-import os
 import uuid
 from core.logging import get_logger
 import numpy as np

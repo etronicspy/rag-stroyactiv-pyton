@@ -10,8 +10,7 @@ from typing import Dict, Any, Optional
 
 from core.dependencies.tunnel import (
     TunnelService,
-    RequiredTunnelService,
-    ActiveTunnelService
+    RequiredTunnelService
 )
 
 router = APIRouter(prefix="/tunnel", tags=["tunnel"])

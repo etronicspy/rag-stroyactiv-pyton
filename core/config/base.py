@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any
 from pydantic_settings import BaseSettings
 from pydantic import Field, ConfigDict, field_validator
 
-from .type_definitions import DatabaseType, AIProvider, LogLevel, Environment
+from .type_definitions import DatabaseType, AIProvider, Environment
 from .constants import (
     VectorSize, 
     DefaultTimeouts, 
@@ -24,7 +24,6 @@ from .constants import (
 )
 from .database import DatabaseConfig
 from .ai import AIConfig
-from .log_config import LoggingConfig
 
 class Settings(BaseSettings):
     """Main application settings with modular configuration."""

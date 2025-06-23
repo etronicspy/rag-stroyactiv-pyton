@@ -4,9 +4,8 @@ Pool adapters for integrating existing database pools with dynamic pool manager.
 Адаптеры для интеграции существующих пулов соединений с динамическим менеджером.
 """
 
-import asyncio
 from core.logging import get_logger
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 from datetime import datetime
 
 from core.database.pool_manager import PoolProtocol
@@ -245,7 +244,7 @@ class QdrantPoolAdapter(PoolProtocol):
         try:
             # Test basic connectivity
             if hasattr(self.qdrant_db, 'client'):
-                collections = await self.qdrant_db.client.get_collections()
+                await self.qdrant_db.client.get_collections()
                 return True
             return False
                 

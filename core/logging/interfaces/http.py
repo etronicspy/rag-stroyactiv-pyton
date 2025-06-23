@@ -6,7 +6,7 @@ This module defines interfaces for HTTP request and response logging:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, ContextManager, Union
+from typing import Any, Dict, Optional, ContextManager
 
 
 class IRequestLogger(ABC):
@@ -31,7 +31,6 @@ class IRequestLogger(ABC):
             body: The request body
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def log_response(
@@ -52,7 +51,6 @@ class IRequestLogger(ABC):
             duration_ms: The request duration in milliseconds
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def log_error(
@@ -71,7 +69,6 @@ class IRequestLogger(ABC):
             url: The URL
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def request_context(
@@ -91,7 +88,6 @@ class IRequestLogger(ABC):
         Returns:
             A context manager that logs the request and response
         """
-        pass
 
 
 class IMiddlewareLogger(IRequestLogger):
@@ -110,7 +106,6 @@ class IMiddlewareLogger(IRequestLogger):
             middleware_name: The middleware name
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def log_middleware_end(
@@ -127,7 +122,6 @@ class IMiddlewareLogger(IRequestLogger):
             duration_ms: The middleware execution duration in milliseconds
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def log_middleware_error(
@@ -144,7 +138,6 @@ class IMiddlewareLogger(IRequestLogger):
             error: The error
             **kwargs: Additional context for the log message
         """
-        pass
     
     @abstractmethod
     def middleware_context(
@@ -162,4 +155,3 @@ class IMiddlewareLogger(IRequestLogger):
         Returns:
             A context manager that logs the middleware execution
         """
-        pass 

@@ -6,7 +6,7 @@ This module provides an implementation of the ILoggerFactory interface.
 
 import logging
 from functools import lru_cache
-from typing import Dict, Optional, Union
+from typing import Dict, Union
 
 from core.logging.interfaces import ILoggerFactory, ILogger
 from core.logging.core import Logger, AsyncLogger

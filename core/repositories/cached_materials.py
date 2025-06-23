@@ -6,13 +6,13 @@
 import json
 import hashlib
 from core.logging import get_logger
-from typing import Any, Dict, List, Optional, Tuple, Union
-from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+from datetime import datetime
 import asyncio
 
 from core.repositories.hybrid_materials import HybridMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
-from core.database.exceptions import DatabaseError, CacheError
+from core.database.exceptions import DatabaseError
 from core.schemas.materials import MaterialCreate, Material, SearchResponse
 from typing import Dict, Any
 

@@ -87,7 +87,6 @@ class CompressionMiddleware(BaseHTTPMiddleware):
         self.brotli_available = False
         if self.enable_brotli:
             try:
-                import brotli
                 self.brotli_available = True
                 logger.info("✅ Brotli compression available")
             except ImportError:
@@ -250,7 +249,7 @@ class CompressionMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Main dispatch method with compression logic."""
-        start_time = time.time() if self.enable_performance_logging else 0
+        time.time() if self.enable_performance_logging else 0
         self.total_responses += 1
         
         # Process request

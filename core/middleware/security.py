@@ -9,7 +9,7 @@ from core.logging import get_logger
 from typing import Dict, List, Optional, Callable, Any
 from urllib.parse import unquote
 
-from fastapi import Request, Response, HTTPException
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 

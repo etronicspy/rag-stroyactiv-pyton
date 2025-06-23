@@ -3,7 +3,6 @@
 Поддерживает автоматическое переключение между mock и real DB
 """
 import pytest
-import asyncio
 import os
 # Ensure Watchfiles hot-reload is disabled in all processes spawned during the
 # pytest session. Uvicorn/Watchfiles honours the ``WATCHFILES_DISABLE`` env var.
@@ -11,7 +10,6 @@ os.environ.setdefault("WATCHFILES_DISABLE", "true")
 import time
 import logging
 from core.logging import get_logger
-from typing import Dict, Any, List
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
@@ -543,7 +541,7 @@ def _patch_vector_db_factory(monkeypatch):
     call `get_vector_database()` during functional workflows.
     """
     from core.database.factories import DatabaseFactory
-    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import MagicMock
 
     class _StubVectorDB(MagicMock):
         async def collection_exists(self, *args, **kwargs):

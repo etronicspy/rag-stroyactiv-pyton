@@ -8,7 +8,6 @@ Extracted and refactored from core/monitoring/logger.py.
 import logging
 import json
 from datetime import datetime
-from typing import List
 
 from .interfaces import FormatterInterface
 

@@ -7,7 +7,7 @@ This module provides a logger implementation with context support.
 import logging
 from typing import Any, Dict, Optional, Union
 
-from core.logging.interfaces import ILogger, IHandler, ICorrelationProvider, IContextProvider
+from core.logging.interfaces import ICorrelationProvider, IContextProvider
 from core.logging.core import Logger
 from core.logging.core.context import CorrelationProvider, ContextProvider
 

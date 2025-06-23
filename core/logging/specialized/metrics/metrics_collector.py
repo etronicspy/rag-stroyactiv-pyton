@@ -4,8 +4,7 @@ Metrics collector implementation.
 This module provides a collector for metrics.
 """
 
-import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from core.logging.interfaces import IMetricsCollector
 

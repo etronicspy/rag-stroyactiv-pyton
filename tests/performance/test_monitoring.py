@@ -6,23 +6,16 @@ Performance tests for monitoring and health check system
 - test_monitoring.py
 """
 import pytest
-import asyncio
 import time
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from datetime import datetime
-from typing import Dict, Any
+from unittest.mock import AsyncMock, patch
 
 from core.monitoring.metrics import (
     MetricsCollector, 
     DatabaseMetrics, 
-    PerformanceTracker,
-    get_metrics_collector
+    PerformanceTracker
 )
 from core.monitoring.logger import (
-    DatabaseLogger,
-    setup_structured_logging,
-    get_logger,
-    RequestLogger
+    DatabaseLogger
 )
 from api.routes.health import HealthChecker
 
@@ -383,11 +376,11 @@ class TestHealthCheckerPerformance:
                         
                         # Run comprehensive health checks
                         for _ in range(5):
-                            basic_health = await health_checker.check_basic_health()
-                            qdrant_health = await health_checker.check_qdrant_health()
-                            pg_health = await health_checker.check_postgresql_health()
-                            redis_health = await health_checker.check_redis_health()
-                            openai_health = await health_checker.check_openai_health()
+                            await health_checker.check_basic_health()
+                            await health_checker.check_qdrant_health()
+                            await health_checker.check_postgresql_health()
+                            await health_checker.check_redis_health()
+                            await health_checker.check_openai_health()
                         
                         comprehensive_time = time.time() - start_time
                         

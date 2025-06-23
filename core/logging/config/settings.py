@@ -6,7 +6,7 @@ This module provides settings for the logging system.
 
 import os
 from enum import Enum
-from typing import Dict, List, Optional, Union, Any
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 

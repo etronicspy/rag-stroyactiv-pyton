@@ -5,21 +5,18 @@ Optimized Search Service with Parallel Hybrid Search and Advanced Caching.
 """
 
 import asyncio
-import json
 import time
 from core.logging import get_logger
-from typing import List, Dict, Any, Optional, Tuple, Set, Union
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-from functools import lru_cache
 from datetime import datetime, timedelta
 
 from core.schemas.materials import (
-    AdvancedSearchQuery, MaterialFilterOptions, SortOption, PaginationOptions,
-    SearchResponse, MaterialSearchResult, SearchSuggestion, Material
+    AdvancedSearchQuery, SearchResponse
 )
 from core.repositories.cached_materials import CachedMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
-from core.database.exceptions import DatabaseError, ValidationError
+from core.database.exceptions import DatabaseError
 from services.advanced_search import AdvancedSearchService
 
 logger = get_logger(__name__)

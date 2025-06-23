@@ -6,8 +6,7 @@ connection management, and service lifecycle.
 """
 
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import Mock, AsyncMock, patch
 from pathlib import Path
 import tempfile
 import os
@@ -17,10 +16,8 @@ from services.tunnel.tunnel_config import TunnelConfig
 from services.tunnel.tunnel_manager import TunnelManager
 from services.tunnel.ssh_tunnel import SSHTunnel
 from services.tunnel.exceptions import (
-    SSHTunnelError,
     SSHTunnelConnectionError,
     SSHTunnelConfigError,
-    SSHTunnelTimeoutError,
     SSHTunnelAuthenticationError,
     SSHTunnelKeyError
 )

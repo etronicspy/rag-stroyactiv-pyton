@@ -4,16 +4,12 @@ Multi-level caching system for optimized data access.
 Многоуровневая система кэширования для оптимизированного доступа к данным.
 """
 
-import asyncio
 import time
 from core.logging import get_logger
-from typing import Any, Optional, Dict, List, Union, Callable, TypeVar, Generic
+from typing import Any, Optional, Dict, List, TypeVar
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
 import pickle
-import json
-import weakref
 from abc import ABC, abstractmethod
 
 logger = get_logger(__name__)
@@ -59,27 +55,22 @@ class CacheBackend(ABC):
     @abstractmethod
     async def get(self, key: str) -> Optional[Any]:
         """Get value by key."""
-        pass
     
     @abstractmethod
     async def set(self, key: str, value: Any, ttl: float = 3600) -> bool:
         """Set value with TTL."""
-        pass
     
     @abstractmethod
     async def delete(self, key: str) -> bool:
         """Delete value by key."""
-        pass
     
     @abstractmethod
     async def clear(self) -> bool:
         """Clear all cached values."""
-        pass
     
     @abstractmethod
     def get_stats(self) -> CacheStats:
         """Get cache statistics."""
-        pass
 
 
 class L1MemoryCache(CacheBackend):

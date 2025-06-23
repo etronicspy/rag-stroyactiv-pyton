@@ -10,7 +10,6 @@ import threading
 import uuid
 from typing import Any, Dict, Optional, Set, TypeVar, cast
 
-from core.logging.interfaces import ILoggingContext
 
 
 T = TypeVar('T')

@@ -3,12 +3,9 @@
 Адаптер для Qdrant Vector Database с поддержкой облачной и локальной версий.
 """
 
-from typing import List, Dict, Any, Optional, Union, Tuple
+from typing import List, Dict, Any, Optional
 from core.logging import get_logger
 import asyncio
-from datetime import datetime
-import time
-import uuid
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct

@@ -14,10 +14,9 @@ Created: 2024
 import pytest
 import os
 import logging
-from unittest.mock import patch, MagicMock
-from typing import Dict, Any
+from unittest.mock import patch
 
-from core.logging.config.settings import LoggingSettings, get_logging_settings, LogLevel
+from core.logging.config.settings import LoggingSettings, LogLevel
 from core.logging.config.validator import ConfigurationValidator, validate_configuration
 from core.logging.config.provider import ConfigurationProvider, get_configuration
 

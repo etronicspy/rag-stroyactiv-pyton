@@ -8,7 +8,7 @@ Migrated and optimized from core/monitoring/unified_manager.py.
 import time
 import uuid
 import threading
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from enum import Enum
 from dataclasses import dataclass
 from contextlib import contextmanager
@@ -20,7 +20,7 @@ from ..base.loggers import get_logger
 from ..handlers.database import DatabaseLogger
 from ..handlers.request import RequestLogger
 from ..metrics.collectors import MetricsCollector, PerformanceTracker, get_metrics_collector
-from ..metrics.performance import get_performance_optimizer, PerformanceOptimizer
+from ..metrics.performance import get_performance_optimizer
 from ..context.correlation import get_correlation_id
 
 

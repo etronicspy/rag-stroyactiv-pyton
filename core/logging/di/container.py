@@ -5,7 +5,7 @@ This module provides a dependency injection container for the logging system.
 """
 
 from functools import lru_cache
-from typing import Dict, Any, Type, TypeVar, Generic, Optional
+from typing import Dict, Any, Type, TypeVar
 
 from core.logging.interfaces import (
     ILogger,

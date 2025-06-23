@@ -4,10 +4,8 @@ SSH Tunnel implementation for secure database connections.
 Updated to use proven sshtunnel library based on internet research.
 """
 
-import asyncio
 from core.logging import get_logger
 import time
-import threading
 from typing import Optional, Dict, Any
 from pathlib import Path
 

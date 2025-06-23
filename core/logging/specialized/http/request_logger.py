@@ -8,7 +8,7 @@ import json
 import logging
 import time
 import contextlib
-from typing import Any, Dict, List, Optional, Union, ContextManager
+from typing import Any, Dict, Optional, Union, ContextManager
 
 from core.logging.interfaces import IRequestLogger
 from core.logging.core import Logger

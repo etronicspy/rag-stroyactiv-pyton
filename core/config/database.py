@@ -10,9 +10,8 @@ This module provides configuration factories for all supported databases:
 from typing import Dict, Any
 from .constants import (
     DefaultTimeouts, 
-    DefaultPorts, 
     DatabaseNames, 
-    ConnectionPools,
+    ConnectionPools, 
     CacheSettings
 )
 

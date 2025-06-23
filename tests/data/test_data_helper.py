@@ -3,7 +3,6 @@ Test data helper module
 Contains paths and utilities for test data files
 """
 
-import os
 from pathlib import Path
 
 # Base path for test data

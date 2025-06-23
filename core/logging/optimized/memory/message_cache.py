@@ -6,7 +6,7 @@ This module provides a cache for log messages to avoid duplicating strings in me
 
 import threading
 import time
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple
 
 
 class MessageCache:

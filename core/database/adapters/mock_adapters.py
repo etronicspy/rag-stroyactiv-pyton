@@ -4,9 +4,8 @@ Mock adapters for database interfaces.
 Моки для интерфейсов баз данных.
 """
 from core.logging import get_logger
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from datetime import datetime
-import asyncio
 
 from core.database.interfaces import IRelationalDatabase, ICacheDatabase
 from core.database.mocks import MockRedisClient, MockPostgreSQLAdapter

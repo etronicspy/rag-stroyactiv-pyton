@@ -4,7 +4,6 @@ Correlation middleware implementation.
 This module provides a middleware for setting correlation ID in requests.
 """
 
-import time
 from typing import Any, Callable, Dict, Optional
 
 from fastapi import Request, Response
