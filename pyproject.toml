@@ -186,6 +186,7 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 ignore_missing_imports = true
+strict = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -247,4 +248,19 @@ exclude = [
 per-file-ignores = [
     "__init__.py:F401",
     "tests/*:S101",
-] 
+]
+
+# ========================================
+# RUFF LINTING
+# ========================================
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "B", "C4", "I", "UP"]  # pycodestyle, pyflakes, bugbear, comprehensions, isort, pyupgrade
+ignore = []
+exclude = [".venv", "alembic/versions"]
+
+# Enable automatic formatting on ruff check --fix
+[tool.ruff.format]
+quote-style = "preserve"
+indent-style = "space"
+line-length = 88 
