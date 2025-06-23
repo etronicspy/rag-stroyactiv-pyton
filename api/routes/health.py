@@ -468,7 +468,12 @@ class HealthChecker:
 health_checker = HealthChecker()
 
 
-@router.get("", responses=ERROR_RESPONSES)
+@router.get(
+    "",
+    responses=ERROR_RESPONSES,
+    summary="🩺 Basic Health – Базовая проверка",
+    response_description="Минимальная информация о состоянии сервиса"
+)
 async def basic_health_check():
     """
     🔍 **Basic Health Check** - Быстрая проверка статуса API
@@ -507,7 +512,12 @@ async def basic_health_check():
     return await health_checker.check_basic_health()
 
 
-@router.get("/full", responses=ERROR_RESPONSES)
+@router.get(
+    "/full",
+    responses=ERROR_RESPONSES,
+    summary="🔍 Full Health – Полная диагностика",
+    response_description="Полная информация о состоянии всех компонентов"
+)
 async def full_health_check():
     """
     🔍 **Full Health Check** - Полная диагностика всех систем
@@ -749,7 +759,11 @@ async def full_health_check():
     return JSONResponse(content=health_status, status_code=status_code)
 
 
-@router.get("/databases")
+@router.get(
+    "/databases",
+    summary="🗄️ Databases Health – Проверка баз данных",
+    response_description="Состояние всех баз данных"
+)
 async def database_health_check():
     """
     🗄️ **Database Health Check** - Проверка состояния баз данных
