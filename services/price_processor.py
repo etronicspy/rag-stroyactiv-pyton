@@ -281,35 +281,30 @@ class PriceProcessor:
             raise
 
     async def process_price_list(self, file_path: str, supplier_id: str, pricelistid: Optional[int] = None) -> Dict[str, Any]:
-        """Process price list file and store in vector database (supports both old and new formats)"""
+        """Process price list file and store in vector database (supports only new raw product format)."""
         try:
             # Read and validate file
             df = self.read_price_file(file_path)
-            
-            # Detect format and validate accordingly
+
+            # Detect format (raw product format is required)
             is_raw_product = self.is_raw_product_format(df)
-            
+
             if is_raw_product:
                 # New raw product format
                 missing_columns = self.validate_raw_product_columns(df)
                 if missing_columns:
                     raise ValueError(f"Missing required columns for raw products: {', '.join(missing_columns)}")
-                
+
                 # Generate pricelistid if not provided
                 if pricelistid is None:
                     pricelistid = int(datetime.utcnow().timestamp())
-                
+
                 df = self.clean_raw_product_data(df)
                 return await self._process_raw_products(df, supplier_id, pricelistid)
             else:
-                # Legacy format (backward compatibility)
-                missing_columns = self.validate_required_columns(df)
-                if missing_columns:
-                    raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
-                
-                df = self.clean_price_data(df)
-                return await self._process_legacy_format(df, supplier_id)
-            
+                # Legacy format is no longer supported – explicitly inform the caller
+                raise ValueError("Legacy price list format is no longer supported. Please use the new raw product format with columns: name, unit_price, calc_unit, …")
+
         except Exception as e:
             logger.error(f"Error processing price list: {e}")
             raise
@@ -403,68 +398,6 @@ class PriceProcessor:
             "pricelistid": pricelistid,
             "collection_name": collection_name,
             "upload_date": current_time.isoformat()
-        }
-
-    async def _process_legacy_format(self, df: pd.DataFrame, supplier_id: str) -> Dict[str, Any]:
-        """Process legacy price list format (backward compatibility)"""
-        if df.empty:
-            raise ValueError("No valid data found after cleaning")
-        
-        # Prepare collection
-        collection_name = self._get_collection_name(supplier_id)
-        self._ensure_collection_exists(collection_name)
-        
-        # Process materials and create embeddings
-        points = []
-        current_date = datetime.utcnow().isoformat()
-        
-        for _, row in df.iterrows():
-            try:
-                # Create text for embedding (legacy format)
-                text_for_embedding = f"{row['name']} {row['use_category']} {row.get('description', '')}"
-                embedding = await self._get_embedding(text_for_embedding)
-                
-                # Create point (legacy payload structure)
-                point_id = str(uuid.uuid4())
-                point = PointStruct(
-                    id=point_id,
-                    vector=embedding,
-                    payload={
-                        "name": row['name'],
-                        "use_category": row['use_category'],  # Updated field name
-                        "unit": row['unit'],
-                        "price": float(row['price']),
-                        "description": row.get('description', ''),
-                        "supplier_id": supplier_id,
-                        "upload_date": current_date,
-                    }
-                )
-                points.append(point)
-                
-            except Exception as e:
-                logger.warning(f"Error processing row {row.get('name', 'unknown')}: {e}")
-                continue
-        
-        if not points:
-            raise ValueError("No valid points created from data")
-        
-        # Store in Qdrant
-        self.qdrant_client.upsert(
-            collection_name=collection_name,
-            points=points
-        )
-        
-        # Enforce limit of 3 price lists per supplier (legacy)
-        self._enforce_price_list_limit(collection_name, limit=3)
-        
-        logger.info(f"Successfully processed {len(points)} materials for supplier {supplier_id}")
-        
-        return {
-            "success": True,
-            "materials_processed": len(points),
-            "supplier_id": supplier_id,
-            "collection_name": collection_name,
-            "upload_date": current_date
         }
 
     def get_latest_price_list(self, supplier_id: str, limit: int = 1000) -> Dict[str, Any]:

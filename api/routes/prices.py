@@ -43,27 +43,12 @@ async def process_price_list(
     📂 **Process Price List** - Обработка и загрузка прайс-листа поставщика
     
     Обрабатывает загруженный прайс-лист (CSV или Excel) и сохраняет данные в коллекции, 
-    специфичной для поставщика. Поддерживает как устаревший формат материалов, 
-    так и новый расширенный формат сырьевых продуктов.
+    специфичной для поставщика. Поддерживает только новый расширенный формат сырьевых продуктов.
     
     **Поддерживаемые форматы файлов:**
     - 📊 CSV (comma-separated values)
     - 📈 Excel (.xls, .xlsx)
     - 📋 Максимальный размер файла: 50MB
-    
-    **Устаревший формат (Legacy Materials):**
-    ```csv
-    name,use_category,unit,price,description
-    "Цемент М400","Цемент","тн",15000,"Портландцемент марки 400"
-    "Песок речной","Песок","м3",1200,"Песок для строительных работ"
-    ```
-    
-    **Обязательные поля (Legacy):**
-    - `name` - Название материала
-    - `use_category` - Категория материала (переименовано из 'category')
-    - `unit` - Единица измерения
-    - `price` - Цена
-    - `description` - Описание (опционально)
     
     **Новый формат (Raw Products):**
     ```csv
@@ -87,16 +72,6 @@ async def process_price_list(
     - **200 OK**: Прайс-лист успешно обработан
     - **400 Bad Request**: Некорректный формат файла или данных
     - **500 Internal Server Error**: Ошибка сервера при обработке
-    
-    **Example Response (Legacy Format):**
-    ```json
-    {
-        "message": "Price list processed successfully",
-        "supplier_id": "supplier_001",
-        "materials_processed": 150,
-        "upload_date": "2025-06-16T19:15:30.123456Z"
-    }
-    ```
     
     **Example Response (New Raw Products Format):**
     ```json
@@ -143,24 +118,11 @@ async def process_price_list(
         # Process the file with optional pricelistid
         result = await price_processor.process_price_list(temp_path, supplier_id, pricelistid)
         
-        # Return response based on format detected
-        if "raw_products_processed" in result:
-            # New raw product format
-            return {
-                "message": "Raw product list processed successfully",
-                "supplier_id": result["supplier_id"],
-                "pricelistid": result["pricelistid"],
-                "raw_products_processed": result["raw_products_processed"],
-                "upload_date": result["upload_date"]
-            }
-        else:
-            # Legacy format
-            return {
-                "message": "Price list processed successfully",
-                "supplier_id": result["supplier_id"],
-                "materials_processed": result["materials_processed"],
-                "upload_date": result["upload_date"]
-            }
+        # Since only the new extended raw product format is supported, simply return the processor result
+        return {
+            "message": "Raw product list processed successfully",
+            **result
+        }
     except ValueError as e:
         logger.error(f"Processing error: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Processing error: {str(e)}")
@@ -210,39 +172,30 @@ async def get_latest_price_list(
     ```json
     {
         "supplier_id": "supplier_001",
-        "total_count": 150,
+        "total_count": 2,
         "upload_date": "2025-06-16T19:15:30.123456Z",
         "pricelistid": 12345,
         "materials": [
             {
-                "id": "mat_001",
-                "name": "Цемент М400",
-                "category": "Цемент",
-                "unit": "тн",
-                "price": 15000,
-                "description": "Портландцемент марки 400",
-                "upload_date": "2025-06-16T19:15:30.123456Z"
-            },
-            {
-                "id": "mat_002", 
-                "name": "Песок речной",
-                "category": "Песок",
-                "unit": "м3",
-                "price": 1200,
-                "description": "Песок для строительных работ",
+                "id": "prod_001",
+                "name": "Кирпич керамический",
+                "sku": "SKU001",
+                "use_category": "Кирпич",
+                "unit_price": 12.50,
+                "unit_price_currency": "RUB",
+                "calc_unit": "шт",
+                "count": 1000,
                 "upload_date": "2025-06-16T19:15:30.123456Z"
             }
         ],
         "statistics": {
             "categories": {
-                "Цемент": 15,
-                "Песок": 8,
-                "Кирпич": 12
+                "Кирпич": 1
             },
-            "price_range": {
-                "min": 450,
-                "max": 25000,
-                "avg": 5200
+            "unit_price_range": {
+                "min": 12.5,
+                "max": 12.5,
+                "avg": 12.5
             }
         }
     }
@@ -674,11 +627,14 @@ async def upload_prices(
     - 🔍 **Auto-detection**: Automatic format and structure detection
     
     **Required Fields:**
-    - `material_name` or `sku`: Material identification
-    - `price`: Price (positive number)
-    - `supplier`: Supplier name (optional)
-    - `valid_from`: Validity start date (optional)
-    - `valid_until`: Validity end date (optional)
+    - `name`: Product name (required)
+    - `unit_price`: Main price (positive number, required)
+    - `calc_unit`: Calculation unit (e.g., "шт", "м³")
+    - `sku`: Stock Keeping Unit (optional)
+    - `use_category`: Category (optional)
+    - `count`: Quantity (defaults to 1)
+    - `unit_price_currency`: Currency code (defaults to "RUB")
+    - `date_price_change`: Date of price update (optional)
     
     **Processing Features:**
     - 🔍 Intelligent material matching by name/SKU

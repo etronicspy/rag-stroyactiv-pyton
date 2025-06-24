@@ -149,6 +149,10 @@ class MaterialsService(BaseRepository):
             try:
                 await self._ensure_collection_exists()
                 
+                # Duplicate validation (name + unit must be unique)
+                if await self._is_duplicate(material.name, material.unit):
+                    raise ValueError(f"Duplicate material (name + unit) already exists: {material.name} / {material.unit}")
+                
                 # Generate embedding for semantic search
                 text_for_embedding = self._prepare_text_for_embedding(material)
                 embedding = await self.get_embedding(text_for_embedding)
@@ -490,6 +494,7 @@ class MaterialsService(BaseRepository):
         errors = []
         created_materials = []
         failed_materials_list = []
+        seen_keys = set()
         
         try:
             await self._ensure_collection_exists()
@@ -529,6 +534,12 @@ class MaterialsService(BaseRepository):
                 
                 for j, (material, embedding) in enumerate(zip(chunk, embeddings)):
                     try:
+                        # Check duplicates inside DB and within the same batch
+                        key = (material.name.lower(), material.unit.lower())
+                        if key in seen_keys or await self._is_duplicate(material.name, material.unit):
+                            raise ValueError("Duplicate material (name + unit) detected")
+                        seen_keys.add(key)
+
                         material_id = str(uuid.uuid4())
                         
                         vector_data = {
@@ -663,8 +674,14 @@ class MaterialsService(BaseRepository):
     # === Helper Methods ===
     
     def _prepare_text_for_embedding(self, material: MaterialCreate) -> str:
-        """Prepare text for embedding generation."""
-        return f"{material.name} {material.use_category} {material.sku or ''} {material.description or ''}"
+        """Prepare text for embedding generation using name, unit and optional description.
+        
+        The embedding input is constructed as:
+            "<name> <unit> <description?>"
+        where description is included only if provided. This intentionally omits
+        use_category and sku as requested.
+        """
+        return f"{material.name} {material.unit} {material.description or ''}"
     
     def _convert_vector_result_to_material(self, result: Dict[str, Any]) -> Optional[Material]:
         """Convert vector database result to Material object."""
@@ -787,6 +804,34 @@ class MaterialsService(BaseRepository):
             if keyword in name_lower:
                 return unit
         return None
+
+    async def _is_duplicate(self, name: str, unit: str) -> bool:
+        """Check if a material with the same (name, unit) already exists.
+
+        Args:
+            name: Material name
+            unit: Measurement unit
+
+        Returns:
+            True if duplicate exists, False otherwise.
+        """
+        try:
+            # Build case-insensitive filter; store original but compare lower-cased
+            filter_conditions = {
+                "name": name,
+                "unit": unit
+            }
+            results = await self.vector_db.search(
+                collection_name=self.collection_name,
+                query_vector=[0.0] * 1536,  # dummy
+                limit=1,
+                filter_conditions=filter_conditions
+            )
+            return bool(results)
+        except Exception as exc:
+            # On failure we prefer to err on safe side – treat as duplicate to avoid collision
+            logger.error(f"Duplicate-check failed, assuming duplicate for '{name} / {unit}': {exc}")
+            return True
 
 
 # === Separate Services for Categories and Units ===
