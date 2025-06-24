@@ -1,2 +1,2 @@
-name,unit_price,unit_calc_price,unit,unit_calc,unit_calc_weight_kg,unit_calc_volume_m3,category,unit_quantity,buy_price,sale_price,date_price_change
-краска напольная 0.33л,250.00,750.00,шт,л,0.5,0.33,окрасочные материалы,10,0 ₽,0 ₽,20.12.2023
+sku,name,unit_price,unit_calc_price,unit,unit_calc,unit_calc_weight_kg,unit_calc_volume_m3,category,unit_quantity,buy_price,sale_price,date_price_change
+CCC0000UU,краска напольная 0.33л,250.00,750.00,шт,л,0.5,0.33,окрасочные материалы,10,0 ₽,0 ₽,20.12.2023
