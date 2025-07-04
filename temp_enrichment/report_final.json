@@ -1,0 +1,37 @@
+{
+  "total_products": 39,
+  "successful_products": 35,
+  "success_rate": 89.74358974358975,
+  "parsing_methods": {
+    "direct_weight": 3,
+    "ai_fallback": 10,
+    "area_from_dimensions": 6,
+    "direct_area": 9,
+    "direct_volume": 7,
+    "no_parsing": 4
+  },
+  "metric_units": {
+    "кг": 3,
+    "м3": 7,
+    "м2": 21,
+    "л": 4,
+    "null": 4
+  },
+  "hybrid_stats": {
+    "total_products": 39,
+    "regex_success": 25,
+    "ai_fallback": 10,
+    "total_failed": 4,
+    "regex_success_rate": 64.1025641025641,
+    "ai_fallback_rate": 25.64102564102564,
+    "total_success_rate": 89.74358974358975,
+    "ai_stats": {
+      "total_requests": 3,
+      "total_tokens": 3255,
+      "total_cost_usd": 0.0048825,
+      "total_cost_rub": 0.3661875,
+      "cost_per_request_rub": 0.1220625,
+      "cache_size": 10
+    }
+  }
+}
