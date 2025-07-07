@@ -16,7 +16,8 @@ import numpy as np
 from dataclasses import asdict
 
 from regex_parser import RegexParser
-from ai_fallback import AIFallbackParser, HybridParser
+from ai_parser import AIParser
+from hybrid_parser import HybridParser
 
 
 # Настройка логирования
@@ -51,12 +52,12 @@ class PriceEnricher:
             api_key = os.getenv('OPENAI_API_KEY')
             if api_key:
                 try:
-                    self.ai_parser = AIFallbackParser(api_key=api_key, cache_file=cache_file)
-                    logger.info("✅ AI fallback парсер активирован")
+                    self.ai_parser = AIParser(api_key=api_key, cache_file=cache_file)
+                    logger.info("✅ AI парсер активирован")
                 except Exception as e:
-                    logger.warning(f"⚠️ AI fallback недоступен: {str(e)}")
+                    logger.warning(f"⚠️ AI парсер недоступен: {str(e)}")
             else:
-                logger.warning("⚠️ AI fallback недоступен: нет OPENAI_API_KEY")
+                logger.warning("⚠️ AI парсер недоступен: нет OPENAI_API_KEY")
         
         # Гибридный парсер
         self.hybrid_parser = HybridParser(self.regex_parser, self.ai_parser)
@@ -117,7 +118,13 @@ class PriceEnricher:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             logger.warning("OPENAI_API_KEY не найден – эмбеддинги не будут добавлены")
-            return products
+            # Добавляем пустые эмбеддинги для совместимости
+            enriched = []
+            for prod in products:
+                out = dict(prod)
+                out["embedding"] = []
+                enriched.append(out)
+            return enriched
 
         import openai
         from packaging import version
@@ -235,12 +242,17 @@ class PriceEnricher:
         
         # Формируем отчет
         report = {
-            "total_products": len(products),
-            "successful_products": success,
-            "success_rate": success / len(products) * 100 if products else 0,
-            "parsing_methods": methods,
-            "metric_units": units,
-            "hybrid_stats": self.hybrid_parser.get_stats()
+            "summary": {
+                "total_products": len(products),
+                "successfully_parsed": success,
+                "success_rate": success / len(products) * 100 if products else 0,
+                "parsing_methods": methods,
+                "metric_units": units
+            },
+            "details": {
+                "hybrid_stats": self.hybrid_parser.get_stats(),
+                "products": products
+            }
         }
         
         # Сохраняем отчет

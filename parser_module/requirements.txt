@@ -1,0 +1,15 @@
+# AI Material Parser Dependencies
+
+# OpenAI integration
+openai>=1.30.0
+
+# Data handling
+pydantic>=2.0.0
+
+# Optional: for integration with main project
+# fastapi>=0.100.0
+# sqlalchemy>=2.0.0
+
+# Development dependencies (optional)
+# pytest>=7.0.0
+# pytest-asyncio>=0.21.0 

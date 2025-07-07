@@ -28,6 +28,12 @@ class MaterialBase(BaseModel):
         description="Measurement unit for the material",
         example="bag"
     )
+    color: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Material color (auto-extracted from name or manually specified)",
+        example="белый"
+    )
     sku: Optional[str] = Field(
         None, 
         min_length=3, 
@@ -103,6 +109,7 @@ class MaterialUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=200)
     use_category: Optional[str] = None  # Renamed from category
     unit: Optional[str] = None
+    color: Optional[str] = Field(None, max_length=100, description="Material color")
     sku: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = None
 
@@ -142,6 +149,7 @@ class Material(MaterialBase):
                 "name": "Portland Cement M500",
                 "use_category": "Cement",
                 "unit": "bag",
+                "color": "белый",
                 "sku": "CEM500-001",
                 "description": "High-strength Portland cement for structural concrete applications",
                 "embedding": ["... (embeddings available, total: 1536 dimensions)"],
