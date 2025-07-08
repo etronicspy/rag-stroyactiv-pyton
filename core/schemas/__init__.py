@@ -42,18 +42,32 @@ from .colors import (
     ColorListResponse
 )
 
-# Enhanced parsing schemas - NEW
+# Enhanced parsing schemas - NEW (Updated for RAG Integration)
 from .enhanced_parsing import (
+    ParsingMethod,
+    EnhancedParseRequest,
+    EnhancedParseResult,
+    BatchParseRequest,
+    BatchParseResponse,
+    ParserIntegrationConfig,
     ColorExtractionResult,
-    EmbeddingResult,
-    EnhancedParsingRequest,
-    EnhancedParsingResponse,
-    BatchEnhancedParsingRequest,
-    BatchEnhancedParsingResponse,
-    EnhancedParsingStatistics,
-    MaterialEmbeddingData,
-    ValidationResult,
-    EnhancedParsingConfig
+    EmbeddingGenerationResult
+)
+
+# Pipeline processing schemas - NEW (Stage 4)
+from .pipeline_models import (
+    ProcessingStage,
+    ProcessingStatus,
+    MaterialProcessRequest,
+    AIParsingResult,
+    RAGNormalizationResult,
+    SKUSearchResult,
+    DatabaseSaveResult,
+    ProcessingResult,
+    BatchProcessingRequest,
+    BatchProcessingResponse,
+    PipelineConfiguration,
+    PipelineStatistics
 )
 
 __all__ = [
@@ -90,15 +104,26 @@ __all__ = [
     "ColorSearchQuery",
     "ColorSearchResult",
     "ColorListResponse",
-    # Enhanced parsing schemas - NEW
+    # Enhanced parsing schemas - NEW (Updated for RAG Integration)
+    "ParsingMethod",
+    "EnhancedParseRequest",
+    "EnhancedParseResult",
+    "BatchParseRequest", 
+    "BatchParseResponse",
+    "ParserIntegrationConfig",
     "ColorExtractionResult",
-    "EmbeddingResult",
-    "EnhancedParsingRequest",
-    "EnhancedParsingResponse", 
-    "BatchEnhancedParsingRequest",
-    "BatchEnhancedParsingResponse",
-    "EnhancedParsingStatistics",
-    "MaterialEmbeddingData",
-    "ValidationResult",
-    "EnhancedParsingConfig"
+    "EmbeddingGenerationResult",
+    # Pipeline processing schemas - NEW (Stage 4)
+    "ProcessingStage",
+    "ProcessingStatus",
+    "MaterialProcessRequest",
+    "AIParsingResult",
+    "RAGNormalizationResult",
+    "SKUSearchResult",
+    "DatabaseSaveResult",
+    "ProcessingResult",
+    "BatchProcessingRequest",
+    "BatchProcessingResponse",
+    "PipelineConfiguration",
+    "PipelineStatistics"
 ] 

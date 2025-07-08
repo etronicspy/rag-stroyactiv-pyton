@@ -59,16 +59,38 @@ class ColorReference(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={
-            "example": {
-                "id": "550e8400-e29b-41d4-a716-446655440000",
-                "name": "белый",
-                "hex_code": "#FFFFFF",
-                "rgb_values": [255, 255, 255],
-                "aliases": ["светлый", "молочный", "снежный"],
-                "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
-                "created_at": "2025-06-16T16:46:29.421964Z",
-                "updated_at": "2025-06-16T16:46:29.421964Z"
-            }
+            "examples": [
+                {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "name": "белый",
+                    "hex_code": "#FFFFFF",
+                    "rgb_values": [255, 255, 255],
+                    "aliases": ["светлый", "молочный", "снежный"],
+                    "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
+                    "created_at": "2025-06-16T16:46:29.421964Z",
+                    "updated_at": "2025-06-16T16:46:29.421964Z"
+                },
+                {
+                    "id": "550e8400-e29b-41d4-a716-446655440001",
+                    "name": "синий",
+                    "hex_code": "#0066FF",
+                    "rgb_values": [0, 102, 255],
+                    "aliases": ["голубой", "васильковый", "небесный"],
+                    "embedding": [0.4, 0.5, 0.6, "...", "(1536 dimensions)"],
+                    "created_at": "2025-06-16T16:46:29.421964Z",
+                    "updated_at": "2025-06-16T16:46:29.421964Z"
+                },
+                {
+                    "id": "550e8400-e29b-41d4-a716-446655440002",
+                    "name": "коричневый",
+                    "hex_code": "#8B4513",
+                    "rgb_values": [139, 69, 19],
+                    "aliases": ["кофейный", "шоколадный", "каштановый"],
+                    "embedding": [0.7, 0.8, 0.9, "...", "(1536 dimensions)"],
+                    "created_at": "2025-06-16T16:46:29.421964Z",
+                    "updated_at": "2025-06-16T16:46:29.421964Z"
+                }
+            ]
         }
     )
 
@@ -100,6 +122,43 @@ class ColorCreate(BaseModel):
         default=[],
         description="Alternative color names and variations",
         example=["светлый", "молочный", "снежный"]
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "белый",
+                    "hex_code": "#FFFFFF",
+                    "rgb_values": [255, 255, 255],
+                    "aliases": ["светлый", "молочный", "снежный", "кремовый"]
+                },
+                {
+                    "name": "синий",
+                    "hex_code": "#0066FF",
+                    "rgb_values": [0, 102, 255],
+                    "aliases": ["голубой", "васильковый", "небесный"]
+                },
+                {
+                    "name": "красный",
+                    "hex_code": "#FF0000",
+                    "rgb_values": [255, 0, 0],
+                    "aliases": ["алый", "кирпичный", "багряный"]
+                },
+                {
+                    "name": "зеленый",
+                    "hex_code": "#00FF00",
+                    "rgb_values": [0, 255, 0],
+                    "aliases": ["травяной", "изумрудный", "малахитовый"]
+                },
+                {
+                    "name": "коричневый",
+                    "hex_code": "#8B4513",
+                    "rgb_values": [139, 69, 19],
+                    "aliases": ["кофейный", "шоколадный", "каштановый"]
+                }
+            ]
+        }
     )
 
 

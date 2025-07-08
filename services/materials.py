@@ -17,6 +17,7 @@ from core.schemas.materials import (
     Material, MaterialCreate, MaterialUpdate, MaterialBatchResponse, MaterialImportItem,
     Category, Unit
 )
+from core.schemas.colors import ColorReference, ColorCreate
 from core.database.interfaces import IVectorDatabase
 from core.database.exceptions import DatabaseError
 from core.repositories.base import BaseRepository
@@ -1116,7 +1117,186 @@ class UnitService:
             logger.error(f"Failed to delete unit {unit_id}: {e}")
             return False
     
- 
+
+
+class ColorService(BaseRepository):
+    """Service for managing color references with Qdrant persistence."""
+    
+    def __init__(self, vector_db: IVectorDatabase = None, ai_client = None):
+        # Use factory defaults if not provided
+        if vector_db is None:
+            try:
+                from core.database.factories import DatabaseFactory
+                vector_db = DatabaseFactory.create_vector_database()
+            except Exception as e:
+                logger.warning(f"Failed to get vector DB client: {e}")
+                vector_db = None
+        
+        if ai_client is None:
+            try:
+                from core.database.factories import AIClientFactory
+                ai_client = AIClientFactory.create_ai_client()
+                logger.info("✅ AI client successfully created for ColorService")
+            except Exception as e:
+                logger.error(f"❌ Failed to create AI client for ColorService: {e}")
+                ai_client = None
+        
+        super().__init__(vector_db=vector_db, ai_client=ai_client)
+        self.collection_name = "construction_colors"
+        logger.info("ColorService initialized with Qdrant persistence")
+    
+    async def _ensure_collection_exists(self) -> None:
+        """Ensure colors collection exists in Qdrant."""
+        try:
+            if self.vector_db:
+                # Check if collection exists
+                exists = await self.vector_db.collection_exists(self.collection_name)
+                
+                if not exists:
+                    # Create collection if it doesn't exist
+                    await self.vector_db.create_collection(
+                        name=self.collection_name,
+                        vector_size=1536,  # OpenAI text-embedding-3-small
+                        distance_metric="cosine"
+                    )
+                    logger.debug(f"Colors collection '{self.collection_name}' created")
+        except Exception as e:
+            logger.error(f"Failed to ensure colors collection: {e}")
+    
+    async def create_color(self, color_data: ColorCreate) -> ColorReference:
+        """Create a new color reference and save to Qdrant."""
+        try:
+            if not self.vector_db:
+                raise Exception("Vector database not available")
+            
+            # Ensure collection exists
+            await self._ensure_collection_exists()
+            
+            # Generate UUID for color ID
+            import uuid
+            color_id = str(uuid.uuid4())
+            
+            # Generate embedding for color name and aliases
+            color_text = f"{color_data.name} {' '.join(color_data.aliases)}"
+            
+            # Use AI client to generate embedding (inherited from BaseRepository)
+            try:
+                embedding = await self.get_embedding(color_text)
+                logger.debug(f"Generated embedding for color '{color_data.name}': {len(embedding)} dimensions")
+            except Exception as e:
+                logger.error(f"Failed to generate embedding for color '{color_data.name}': {e}")
+                # Use fallback hash-based vector
+                import hashlib
+                hash_obj = hashlib.md5(color_text.encode())
+                hash_hex = hash_obj.hexdigest()
+                embedding = []
+                for i in range(1536):
+                    byte_index = i % len(hash_hex)
+                    value = int(hash_hex[byte_index], 16) / 15.0 - 0.5
+                    embedding.append(value)
+                logger.warning(f"Using fallback embedding for color '{color_data.name}'")
+            
+            # Create ColorReference
+            color_ref = ColorReference(
+                id=color_id,
+                name=color_data.name,
+                hex_code=color_data.hex_code,
+                rgb_values=color_data.rgb_values,
+                aliases=color_data.aliases,
+                embedding=embedding
+            )
+            
+            # Save to Qdrant
+            await self.vector_db.upsert(
+                collection_name=self.collection_name,
+                vectors=[{
+                    "id": color_id,
+                    "vector": embedding,
+                    "payload": {
+                        "name": color_data.name,
+                        "hex_code": color_data.hex_code,
+                        "rgb_values": color_data.rgb_values,
+                        "aliases": color_data.aliases,
+                        "type": "color",
+                        "created_at": color_ref.created_at.isoformat(),
+                        "updated_at": color_ref.updated_at.isoformat()
+                    }
+                }]
+            )
+            
+            logger.info(f"Color '{color_data.name}' created and saved to Qdrant with ID {color_id}")
+            return color_ref
+            
+        except Exception as e:
+            logger.error(f"Failed to create color {color_data.name}: {e}")
+            raise e
+    
+    async def get_colors(self) -> List[ColorReference]:
+        """Get all colors from Qdrant."""
+        try:
+            if not self.vector_db:
+                logger.warning("Vector DB not available, returning empty colors list")
+                return []
+            
+            # Ensure collection exists
+            await self._ensure_collection_exists()
+            
+            # Get all colors from Qdrant using scroll_all
+            results = await self.vector_db.scroll_all(
+                collection_name=self.collection_name,
+                with_payload=True,
+                with_vectors=True
+            )
+            
+            colors = []
+            for result in results:
+                payload = result.get("payload", {})
+                if payload.get("type") == "color":
+                    color_ref = ColorReference(
+                        id=result.get("id"),
+                        name=payload.get("name"),
+                        hex_code=payload.get("hex_code"),
+                        rgb_values=payload.get("rgb_values"),
+                        aliases=payload.get("aliases", []),
+                        embedding=result.get("vector", []),
+                        created_at=datetime.fromisoformat(payload.get("created_at", datetime.utcnow().isoformat())),
+                        updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
+                    )
+                    colors.append(color_ref)
+            
+            logger.info(f"Retrieved {len(colors)} colors from Qdrant")
+            return colors
+            
+        except Exception as e:
+            logger.error(f"Failed to get colors: {e}")
+            # Return empty list instead of raising error
+            return []
+    
+    async def delete_color(self, color_id: str) -> bool:
+        """Delete a color from Qdrant by ID."""
+        try:
+            if not self.vector_db:
+                logger.warning("Vector DB not available")
+                return False
+            
+            # Delete from Qdrant using the provided ID
+            deleted = await self.vector_db.delete(
+                collection_name=self.collection_name,
+                vector_id=color_id
+            )
+            
+            if deleted:
+                logger.info(f"Color with ID '{color_id}' deleted from Qdrant")
+                return True
+            else:
+                logger.warning(f"Failed to delete color with ID '{color_id}' from Qdrant")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to delete color {color_id}: {e}")
+            return False
+
+
 # --- Backward compatibility -------------------------------------------------
 # Older tests patch private method ``_search_in_vector_db``. During the
 # refactor it was renamed to ``_search_vector``.  Provide an alias so that

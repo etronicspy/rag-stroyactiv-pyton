@@ -5,8 +5,10 @@
 
 from .embedding_comparison import EmbeddingComparisonService
 from .collection_initializer import CollectionInitializerService
+from .material_processing_pipeline import MaterialProcessingPipeline
 
 __all__ = [
     "EmbeddingComparisonService",
-    "CollectionInitializerService"
+    "CollectionInitializerService",
+    "MaterialProcessingPipeline"
 ] 

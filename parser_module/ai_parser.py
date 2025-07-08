@@ -45,7 +45,7 @@ except ImportError:
 
 @dataclass
 class ParsedResult:
-    """Result of AI parsing"""
+    """Result of AI parsing with enhanced color and embeddings support"""
     name: str
     original_unit: str
     original_price: float
@@ -57,7 +57,11 @@ class ParsedResult:
     success: bool = False
     error_message: Optional[str] = None
     processing_time: float = 0.0
-    embeddings: Optional[List[float]] = None
+    # Enhanced fields for RAG integration
+    color: Optional[str] = None  # Extracted color from material name
+    embeddings: Optional[List[float]] = None  # Material name embedding (1536dim)
+    color_embedding: Optional[List[float]] = None  # Color embedding (1536dim)
+    unit_embedding: Optional[List[float]] = None  # Unit embedding (1536dim)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -73,7 +77,11 @@ class ParsedResult:
             "success": self.success,
             "error_message": self.error_message,
             "processing_time": self.processing_time,
-            "embeddings": self.embeddings
+            # Enhanced fields for RAG integration
+            "color": self.color,
+            "embeddings": self.embeddings,
+            "color_embedding": self.color_embedding,
+            "unit_embedding": self.unit_embedding
         }
 
 
@@ -189,20 +197,26 @@ class AIParser:
                     # Validate and normalize
                     unit_parsed = normalize_unit(parsed_data.get("unit_parsed", ""))
                     price_coefficient = parsed_data.get("price_coefficient", 1.0)
+                    color = parsed_data.get("color", None)
                     
                     if unit_parsed and self._validate_parsing_result(unit_parsed, price_coefficient):
                         result.unit_parsed = unit_parsed
                         result.price_coefficient = price_coefficient
+                        result.color = color
                         # Fix: price_parsed should be original price divided by coefficient
                         # If 1 unit contains X metric units, then price per metric unit = price / X
                         result.price_parsed = price / price_coefficient if price_coefficient != 0 else price
                         result.confidence = parsed_data.get("confidence", 0.8)
                         result.success = True
                         
-                        # Generate embeddings for the material name
-                        result.embeddings = self._generate_embeddings(name)
+                        # Generate multiple embeddings for RAG integration
+                        result.embeddings = self._generate_embeddings(name)  # Material name embedding
+                        if color:
+                            result.color_embedding = self._generate_embeddings(color)  # Color embedding
+                        if unit_parsed:
+                            result.unit_embedding = self._generate_embeddings(unit_parsed)  # Unit embedding
                         
-                        self.logger.info(f"Successfully parsed: {name} -> {unit_parsed} (x{price_coefficient})")
+                        self.logger.info(f"Successfully parsed: {name} -> {unit_parsed} (x{price_coefficient}) color: {color}")
                     else:
                         result.error_message = "Invalid parsing result after validation"
                         self.logger.warning(f"Validation failed for: {name}")
@@ -343,6 +357,8 @@ class AIParser:
             unit_parsed = ai_response.get("unit_parsed", "")
             price_coefficient = ai_response.get("price_coefficient", 1.0)
             confidence = ai_response.get("confidence", 0.5)
+            # Extract color field (new for RAG integration)
+            color = ai_response.get("color", None)
             
             # Validate types
             if not isinstance(unit_parsed, str):
@@ -354,10 +370,15 @@ class AIParser:
             except (ValueError, TypeError):
                 return None
             
+            # Validate color field
+            if color is not None and not isinstance(color, str):
+                color = None
+            
             return {
                 "unit_parsed": unit_parsed,
                 "price_coefficient": price_coefficient,
-                "confidence": confidence
+                "confidence": confidence,
+                "color": color
             }
             
         except Exception as e:
