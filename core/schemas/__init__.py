@@ -42,6 +42,20 @@ from .colors import (
     ColorListResponse
 )
 
+# Enhanced parsing schemas - NEW
+from .enhanced_parsing import (
+    ColorExtractionResult,
+    EmbeddingResult,
+    EnhancedParsingRequest,
+    EnhancedParsingResponse,
+    BatchEnhancedParsingRequest,
+    BatchEnhancedParsingResponse,
+    EnhancedParsingStatistics,
+    MaterialEmbeddingData,
+    ValidationResult,
+    EnhancedParsingConfig
+)
+
 __all__ = [
     # Material schemas
     "MaterialBase",
@@ -75,5 +89,16 @@ __all__ = [
     "ColorNormalizationResponse",
     "ColorSearchQuery",
     "ColorSearchResult",
-    "ColorListResponse"
+    "ColorListResponse",
+    # Enhanced parsing schemas - NEW
+    "ColorExtractionResult",
+    "EmbeddingResult",
+    "EnhancedParsingRequest",
+    "EnhancedParsingResponse", 
+    "BatchEnhancedParsingRequest",
+    "BatchEnhancedParsingResponse",
+    "EnhancedParsingStatistics",
+    "MaterialEmbeddingData",
+    "ValidationResult",
+    "EnhancedParsingConfig"
 ] 
