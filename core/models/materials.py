@@ -9,6 +9,11 @@ class Material(BaseModel):
     unit: str
     sku: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = None
+    # Enhanced fields for parsing and normalization
+    color: Optional[str] = None
+    normalized_color: Optional[str] = None
+    normalized_parsed_unit: Optional[str] = None
+    unit_coefficient: Optional[float] = None
     embedding: Optional[List[float]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -20,7 +25,11 @@ class Material(BaseModel):
                 "use_category": "Cement",  # Updated field name
                 "unit": "bag",
                 "sku": "CEM0001",
-                "description": "Высококачественный цемент для строительных работ"
+                "description": "Высококачественный цемент для строительных работ",
+                "color": "серый",
+                "normalized_color": "серый",
+                "normalized_parsed_unit": "мешок",
+                "unit_coefficient": 1.0
             }
         }
     )

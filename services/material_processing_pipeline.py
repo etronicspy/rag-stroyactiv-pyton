@@ -35,6 +35,7 @@ from core.schemas.enhanced_parsing import (
 )
 from services.enhanced_parser_integration import EnhancedParserIntegrationService
 from services.embedding_comparison import EmbeddingComparisonService
+from services.sku_search_service import get_sku_search_service
 from core.database.collections.colors import ColorCollection
 from core.database.collections.units import UnitsCollection
 
@@ -70,6 +71,7 @@ class MaterialProcessingPipeline:
         # Initialize services
         self.parser_service = EnhancedParserIntegrationService()
         self.rag_service = EmbeddingComparisonService(vector_db=vector_db)
+        self.sku_search_service = get_sku_search_service()  # NEW: SKU search service
         
         # Statistics tracking
         self.statistics = PipelineStatistics(
@@ -423,23 +425,30 @@ class MaterialProcessingPipeline:
         try:
             self.logger.debug(f"SKU Search stage for: {request.name}")
             
-            # TODO: Implement actual SKU search logic
-            # This is a placeholder that will be implemented in Stage 6
+            # Use real SKU search service (STAGE 6 Implementation)
+            sku_search_response = await self.sku_search_service.find_sku_by_material_data(
+                material_name=request.name,
+                normalized_unit=rag_result.normalized_unit or "",
+                normalized_color=rag_result.normalized_color,
+                material_embedding=ai_result.material_embedding  # Use AI parsing embedding
+            )
             
-            # For now, return a mock result
+            # Convert SKUSearchResponse to SKUSearchResult for pipeline
             sku_result = SKUSearchResult(
-                success=False,  # No actual search implemented yet
-                sku=None,
-                similarity_score=None,
-                search_method="not_implemented",
-                candidates_found=0,
-                processing_time=time.time() - stage_start,
-                error_message="SKU search not implemented yet - placeholder for Stage 6"
+                success=sku_search_response.search_successful,
+                sku=sku_search_response.found_sku,
+                similarity_score=sku_search_response.best_match.similarity_score if sku_search_response.best_match else 0.0,
+                search_method=sku_search_response.search_method,
+                candidates_found=sku_search_response.candidates_evaluated,
+                processing_time=sku_search_response.processing_time,
+                error_message=sku_search_response.error_message
             )
             
             self.logger.info(
                 f"SKU Search completed for {request.name}: "
                 f"success={sku_result.success}, sku={sku_result.sku}, "
+                f"similarity={sku_result.similarity_score:.3f}, "
+                f"candidates={sku_result.candidates_found}, "
                 f"time={sku_result.processing_time:.2f}s"
             )
             

@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from enum import Enum
+from dataclasses import dataclass
 
 
 class ProcessingStage(str, Enum):
@@ -428,3 +429,196 @@ class PipelineStatistics(BaseModel):
                 "statistics_updated_at": "2025-01-25T10:00:00Z"
             }
         } 
+
+@dataclass
+class ProcessingStatistics:
+    total_processed: int = 0
+    successful_parsing: int = 0
+    successful_normalization: int = 0
+    successful_sku_search: int = 0
+    processing_time: float = 0.0
+    average_time_per_item: float = 0.0
+
+# === COMBINED EMBEDDING MODELS ===
+
+class CombinedEmbeddingRequest(BaseModel):
+    """Request model for generating combined material embedding"""
+    material_name: str = Field(..., description="Material name")
+    normalized_unit: str = Field(..., description="Normalized unit of measurement")
+    normalized_color: Optional[str] = Field(None, description="Normalized color (None for colorless materials)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "material_name": "Кирпич керамический",
+                "normalized_unit": "м³",
+                "normalized_color": "красный"
+            }
+        }
+
+class CombinedEmbeddingResult(BaseModel):
+    """Result of combined material embedding generation"""
+    material_embedding: List[float] = Field(..., description="Combined material embedding (1536 dimensions)")
+    embedding_text: str = Field(..., description="Text used for embedding generation")
+    processing_time: float = Field(..., description="Time taken for embedding generation (seconds)")
+    success: bool = Field(..., description="Whether embedding generation was successful")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "material_embedding": [0.123, -0.456, 0.789],  # Shortened for example
+                "embedding_text": "Кирпич керамический м³ красный",
+                "processing_time": 0.245,
+                "success": True
+            }
+        }
+
+class BatchEmbeddingRequest(BaseModel):
+    """Request for batch generation of combined embeddings"""
+    materials: List[CombinedEmbeddingRequest] = Field(..., description="List of materials for embedding generation")
+    batch_size: int = Field(default=10, description="Number of materials to process in parallel")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "materials": [
+                    {"material_name": "Кирпич керамический", "normalized_unit": "м³", "normalized_color": "красный"},
+                    {"material_name": "Цемент портландский", "normalized_unit": "кг", "normalized_color": None}
+                ],
+                "batch_size": 5
+            }
+        }
+
+class BatchEmbeddingResponse(BaseModel):
+    """Response for batch embedding generation"""
+    results: List[CombinedEmbeddingResult] = Field(..., description="Results for each material")
+    total_processed: int = Field(..., description="Total number of materials processed")
+    successful_count: int = Field(..., description="Number of successful embeddings")
+    failed_count: int = Field(..., description="Number of failed embeddings")
+    total_processing_time: float = Field(..., description="Total processing time (seconds)")
+    average_time_per_item: float = Field(..., description="Average time per material (seconds)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "results": [],  # Would contain CombinedEmbeddingResult objects
+                "total_processed": 2,
+                "successful_count": 2,
+                "failed_count": 0,
+                "total_processing_time": 0.892,
+                "average_time_per_item": 0.446
+            }
+        }
+
+class EmbeddingCacheEntry(BaseModel):
+    """Cache entry for combined embeddings"""
+    embedding: List[float]
+    created_at: datetime
+    access_count: int = 0
+    last_accessed: datetime
+
+class CombinedEmbeddingConfig(BaseModel):
+    """Configuration for combined embedding generation"""
+    cache_enabled: bool = True
+    cache_ttl_seconds: int = 86400  # 24 hours
+    max_cache_size: int = 1000
+    batch_size: int = 10
+    text_format: str = "{name} {normalized_unit} {normalized_color}"
+    embedding_model: str = "text-embedding-3-small"
+
+# === SKU SEARCH MODELS (STAGE 6) ===
+
+class SKUSearchRequest(BaseModel):
+    """Request model for SKU search in materials reference"""
+    material_name: str = Field(..., description="Material name to search for")
+    normalized_unit: str = Field(..., description="Normalized unit of measurement")
+    normalized_color: Optional[str] = Field(None, description="Normalized color (None for any color)")
+    material_embedding: Optional[List[float]] = Field(None, description="Pre-computed material embedding")
+    
+    # Search parameters
+    similarity_threshold: float = Field(0.35, ge=0.0, le=1.0, description="Minimum similarity threshold")
+    max_candidates: int = Field(20, ge=1, le=100, description="Maximum candidates to retrieve")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "material_name": "Цемент портландский белый",
+                "normalized_unit": "кг",
+                "normalized_color": "белый",
+                "similarity_threshold": 0.75,
+                "max_candidates": 10
+            }
+        }
+
+class SKUSearchCandidate(BaseModel):
+    """Candidate material from reference database (adapted to real DB structure)"""
+    material_id: str = Field(..., description="Material ID in reference database")
+    sku: Optional[str] = Field(..., description="SKU from reference database")
+    name: str = Field(..., description="Material name from reference (field: 'name')")
+    unit: str = Field(..., description="Unit from reference (field: 'unit')")
+    description: Optional[str] = Field(None, description="Description from reference")
+    
+    # Search scores
+    similarity_score: float = Field(..., description="Vector similarity score")
+    unit_match: bool = Field(..., description="Exact unit match")
+    color_match: bool = Field(..., description="Color compatibility match (always True - no color field)")
+    overall_match: bool = Field(..., description="Overall match result")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "material_id": "uuid-string",
+                "sku": "CEM001",
+                "material_name": "Цемент портландский М400",
+                "normalized_unit": "кг",
+                "normalized_color": "белый",
+                "similarity_score": 0.89,
+                "unit_match": True,
+                "color_match": True,
+                "overall_match": True
+            }
+        }
+
+class SKUSearchResponse(BaseModel):
+    """Response from SKU search service"""
+    found_sku: Optional[str] = Field(None, description="Found SKU or None")
+    search_successful: bool = Field(..., description="Whether search completed successfully")
+    candidates_evaluated: int = Field(..., description="Number of candidates evaluated")
+    matching_candidates: int = Field(..., description="Number of matching candidates")
+    best_match: Optional[SKUSearchCandidate] = Field(None, description="Best matching candidate")
+    
+    # Search details
+    search_method: str = Field(..., description="Search method used")
+    processing_time: float = Field(..., description="Processing time in seconds")
+    error_message: Optional[str] = Field(None, description="Error message if any")
+    
+    # All candidates for debugging
+    all_candidates: List[SKUSearchCandidate] = Field(default_factory=list, description="All evaluated candidates")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "found_sku": "CEM001",
+                "search_successful": True,
+                "candidates_evaluated": 15,
+                "matching_candidates": 3,
+                "search_method": "two_phase_vector_filtering",
+                "processing_time": 0.245,
+                "best_match": {
+                    "sku": "CEM001",
+                    "material_name": "Цемент портландский М400",
+                    "similarity_score": 0.89,
+                    "overall_match": True
+                }
+            }
+        }
+
+class SKUSearchConfig(BaseModel):
+    """Configuration for SKU search service"""
+    similarity_threshold: float = Field(0.35, description="Default similarity threshold")
+    max_candidates: int = Field(20, description="Maximum candidates per search")
+    strict_unit_matching: bool = Field(True, description="Require exact unit match")
+    flexible_color_matching: bool = Field(True, description="Allow None color to match any color")
+    reference_collection: str = Field("materials", description="Reference materials collection name")
+    cache_enabled: bool = Field(True, description="Enable search result caching")
+    cache_ttl: int = Field(3600, description="Cache TTL in seconds") 

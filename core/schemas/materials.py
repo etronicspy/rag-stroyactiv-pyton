@@ -31,8 +31,26 @@ class MaterialBase(BaseModel):
     color: Optional[str] = Field(
         None,
         max_length=100,
-        description="Material color (auto-extracted from name or manually specified)",
+        description="Material color (original/raw color from source)",
         example="белый"
+    )
+    normalized_color: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Normalized color for consistent matching",
+        example="белый"
+    )
+    normalized_parsed_unit: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Normalized and parsed unit for accurate matching",
+        example="кг"
+    )
+    unit_coefficient: Optional[float] = Field(
+        None,
+        ge=0.0,
+        description="Unit conversion coefficient for different unit formats",
+        example=1.0
     )
     sku: Optional[str] = Field(
         None, 
@@ -110,6 +128,9 @@ class MaterialUpdate(BaseModel):
     use_category: Optional[str] = None  # Renamed from category
     unit: Optional[str] = None
     color: Optional[str] = Field(None, max_length=100, description="Material color")
+    normalized_color: Optional[str] = Field(None, max_length=100, description="Normalized color")
+    normalized_parsed_unit: Optional[str] = Field(None, max_length=50, description="Normalized unit")
+    unit_coefficient: Optional[float] = Field(None, ge=0.0, description="Unit coefficient")
     sku: Optional[str] = Field(None, min_length=3, max_length=50)
     description: Optional[str] = None
 
@@ -150,6 +171,9 @@ class Material(MaterialBase):
                 "use_category": "Cement",
                 "unit": "bag",
                 "color": "белый",
+                "normalized_color": "белый",
+                "normalized_parsed_unit": "мешок",
+                "unit_coefficient": 1.0,
                 "sku": "CEM500-001",
                 "description": "High-strength Portland cement for structural concrete applications",
                 "embedding": ["... (embeddings available, total: 1536 dimensions)"],

@@ -44,7 +44,6 @@ from .colors import (
 
 # Enhanced parsing schemas - NEW (Updated for RAG Integration)
 from .enhanced_parsing import (
-    ParsingMethod,
     EnhancedParseRequest,
     EnhancedParseResult,
     BatchParseRequest,
@@ -67,7 +66,30 @@ from .pipeline_models import (
     BatchProcessingRequest,
     BatchProcessingResponse,
     PipelineConfiguration,
-    PipelineStatistics
+    PipelineStatistics,
+    # Combined Embedding models
+    CombinedEmbeddingRequest,
+    CombinedEmbeddingResult,
+    BatchEmbeddingRequest,
+    BatchEmbeddingResponse,
+    EmbeddingCacheEntry,
+    CombinedEmbeddingConfig
+)
+
+# Processing models for batch API
+from .processing_models import (
+    ProcessingStatus,
+    MaterialInput,
+    BatchMaterialsRequest,
+    BatchProcessingResponse,
+    BatchValidationError,
+    ProcessingProgress,
+    ProcessingStatusResponse,
+    MaterialProcessingResult,
+    ProcessingResultsResponse,
+    ProcessingJobConfig,
+    ProcessingStatistics,
+    BatchResponse
 )
 
 __all__ = [
@@ -105,7 +127,6 @@ __all__ = [
     "ColorSearchResult",
     "ColorListResponse",
     # Enhanced parsing schemas - NEW (Updated for RAG Integration)
-    "ParsingMethod",
     "EnhancedParseRequest",
     "EnhancedParseResult",
     "BatchParseRequest", 
@@ -125,5 +146,30 @@ __all__ = [
     "BatchProcessingRequest",
     "BatchProcessingResponse",
     "PipelineConfiguration",
-    "PipelineStatistics"
+    "PipelineStatistics",
+    # Combined Embedding models
+    "CombinedEmbeddingRequest",
+    "CombinedEmbeddingResult",
+    "BatchEmbeddingRequest",
+    "BatchEmbeddingResponse",
+    "EmbeddingCacheEntry",
+    "CombinedEmbeddingConfig",
+    # SKU Search models (STAGE 6)
+    "SKUSearchRequest",
+    "SKUSearchResponse", 
+    "SKUSearchCandidate",
+    "SKUSearchConfig",
+    # Processing models for batch API
+    "ProcessingStatus",
+    "MaterialInput",
+    "BatchMaterialsRequest",
+    "BatchProcessingResponse",
+    "BatchValidationError",
+    "ProcessingProgress",
+    "ProcessingStatusResponse",
+    "MaterialProcessingResult",
+    "ProcessingResultsResponse",
+    "ProcessingJobConfig",
+    "ProcessingStatistics",
+    "BatchResponse"
 ] 

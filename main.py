@@ -19,7 +19,7 @@ from core.logging.context import CorrelationContext, with_correlation_context
 # Import routers and middleware
 from api.routes import (
     health_router, search_router, materials_router, prices_router, reference_router,
-    tunnel_router
+    tunnel_router, health_unified, search_unified, enhanced_processing
 )
 
 # Import configuration
@@ -70,6 +70,9 @@ app.include_router(materials_router, prefix=f"{settings.API_V1_STR}/materials", 
 app.include_router(prices_router, prefix=f"{settings.API_V1_STR}/prices", tags=["prices"])
 app.include_router(reference_router, prefix=f"{settings.API_V1_STR}/reference", tags=["reference"])
 app.include_router(tunnel_router, prefix=settings.API_V1_STR, tags=["tunnel"])
+app.include_router(health_unified.router, prefix=f"{settings.API_V1_STR}/health", tags=["health"])
+app.include_router(search_unified.router, prefix=f"{settings.API_V1_STR}/search", tags=["search"])
+app.include_router(enhanced_processing.router, prefix=f"{settings.API_V1_STR}/enhanced_processing", tags=["enhanced_processing"])
 
 # Always initialize logging system according to configuration
 setup_structured_logging()

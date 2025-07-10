@@ -22,6 +22,8 @@ def upgrade() -> None:
     """Upgrade database schema.
     
     Создает таблицу materials с поддержкой векторного поиска и полнотекстового поиска.
+    Включает расширенные поля для парсинга и нормализации: color, normalized_color, 
+    normalized_parsed_unit, unit_coefficient.
     """
     # Create materials table
     op.create_table(
@@ -33,6 +35,12 @@ def upgrade() -> None:
         sa.Column('unit', sa.String(50), nullable=False),
         sa.Column('sku', sa.String(50), nullable=True),
         sa.Column('description', sa.Text(), nullable=True),
+        
+        # Enhanced material fields for parsing and normalization
+        sa.Column('color', sa.String(100), nullable=True),
+        sa.Column('normalized_color', sa.String(100), nullable=True),
+        sa.Column('normalized_parsed_unit', sa.String(50), nullable=True),
+        sa.Column('unit_coefficient', sa.Float(), nullable=True),
         
         # Vector embedding for semantic search
         sa.Column('embedding', postgresql.ARRAY(postgresql.REAL), nullable=True),
@@ -51,6 +59,12 @@ def upgrade() -> None:
     op.create_index('idx_materials_category', 'materials', ['use_category'])
     op.create_index('idx_materials_sku', 'materials', ['sku'], unique=True)
     op.create_index('idx_materials_category_unit', 'materials', ['use_category', 'unit'])
+    
+    # Enhanced search indexes
+    op.create_index('idx_materials_color', 'materials', ['color'])
+    op.create_index('idx_materials_normalized_color', 'materials', ['normalized_color'])
+    op.create_index('idx_materials_normalized_unit', 'materials', ['normalized_parsed_unit'])
+    op.create_index('idx_materials_unit_coefficient', 'materials', ['unit_coefficient'])
     
     # GIN indexes for full-text search using trigrams
     op.create_index(
@@ -104,7 +118,9 @@ def upgrade() -> None:
                 COALESCE(NEW.name, '') || ' ' || 
                 COALESCE(NEW.description, '') || ' ' ||
                 COALESCE(NEW.use_category, '') || ' ' ||
-                COALESCE(NEW.sku, '')
+                COALESCE(NEW.sku, '') || ' ' ||
+                COALESCE(NEW.color, '') || ' ' ||
+                COALESCE(NEW.normalized_color, '')
             );
             RETURN NEW;
         END;

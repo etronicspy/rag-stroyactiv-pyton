@@ -172,6 +172,11 @@ class MaterialsService(BaseRepository):
                         "unit": material.unit,
                         "sku": material.sku,
                         "description": material.description,
+                        # Enhanced fields for parsing and normalization
+                        "color": material.color,
+                        "normalized_color": material.normalized_color,
+                        "normalized_parsed_unit": material.normalized_parsed_unit,
+                        "unit_coefficient": material.unit_coefficient,
                         "created_at": current_time.isoformat(),
                         "updated_at": current_time.isoformat()
                     }
@@ -192,6 +197,11 @@ class MaterialsService(BaseRepository):
                     unit=material.unit,
                     sku=material.sku,
                     description=material.description,
+                    # Enhanced fields
+                    color=material.color,
+                    normalized_color=material.normalized_color,
+                    normalized_parsed_unit=material.normalized_parsed_unit,
+                    unit_coefficient=material.unit_coefficient,
                     embedding=embedding,  # Full embedding, will be formatted by field_serializer
                     created_at=current_time,
                     updated_at=current_time
@@ -552,6 +562,11 @@ class MaterialsService(BaseRepository):
                                 "unit": material.unit,
                                 "sku": material.sku,
                                 "description": material.description,
+                                # Enhanced fields
+                                "color": material.color,
+                                "normalized_color": material.normalized_color,
+                                "normalized_parsed_unit": material.normalized_parsed_unit,
+                                "unit_coefficient": material.unit_coefficient,
                                 "created_at": current_time.isoformat(),
                                 "updated_at": current_time.isoformat()
                             }
@@ -566,6 +581,11 @@ class MaterialsService(BaseRepository):
                             unit=material.unit,
                             sku=material.sku,
                             description=material.description,
+                            # Enhanced fields
+                            color=material.color,
+                            normalized_color=material.normalized_color,
+                            normalized_parsed_unit=material.normalized_parsed_unit,
+                            unit_coefficient=material.unit_coefficient,
                             embedding=embedding,  # Full embedding, will be formatted by field_serializer
                             created_at=current_time,
                             updated_at=current_time
@@ -675,14 +695,18 @@ class MaterialsService(BaseRepository):
     # === Helper Methods ===
     
     def _prepare_text_for_embedding(self, material: MaterialCreate) -> str:
-        """Prepare text for embedding generation using name, unit and optional description.
+        """Prepare text for embedding generation using name, unit, color and optional description.
         
         The embedding input is constructed as:
-            "<name> <unit> <description?>"
+            "<name> <normalized_parsed_unit or unit> <normalized_color or color> <description?>"
         where description is included only if provided. This intentionally omits
         use_category and sku as requested.
         """
-        return f"{material.name} {material.unit} {material.description or ''}"
+        # Use normalized fields if available, otherwise fallback to original
+        unit_text = material.normalized_parsed_unit or material.unit
+        color_text = material.normalized_color or material.color or ""
+        
+        return f"{material.name} {unit_text} {color_text} {material.description or ''}".strip()
     
     def _convert_vector_result_to_material(self, result: Dict[str, Any]) -> Optional[Material]:
         """Convert vector database result to Material object."""
@@ -710,6 +734,11 @@ class MaterialsService(BaseRepository):
                 unit=payload.get("unit"),
                 sku=payload.get("sku"),
                 description=payload.get("description"),
+                # Enhanced fields
+                color=payload.get("color"),
+                normalized_color=payload.get("normalized_color"),
+                normalized_parsed_unit=payload.get("normalized_parsed_unit"),
+                unit_coefficient=payload.get("unit_coefficient"),
                 embedding=formatted_embedding,
                 created_at=created_at,
                 updated_at=updated_at

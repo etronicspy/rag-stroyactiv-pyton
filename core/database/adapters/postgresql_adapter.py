@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import String, DateTime, Text, Integer, Numeric, Boolean, Index, func, or_
+from sqlalchemy import String, DateTime, Text, Integer, Numeric, Boolean, Float, Index, func, or_
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, REAL
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import select
@@ -34,6 +34,7 @@ class MaterialModel(Base):
     """SQLAlchemy model for materials table.
     
     Модель материалов с поддержкой полнотекстового поиска и векторных эмбеддингов.
+    Включает расширенные поля для парсинга и нормализации.
     """
     __tablename__ = "materials"
     
@@ -44,6 +45,12 @@ class MaterialModel(Base):
     unit: Mapped[str] = mapped_column(String(50), nullable=False)
     sku: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, unique=True, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Enhanced material fields for parsing and normalization
+    color: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    normalized_color: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    normalized_parsed_unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    unit_coefficient: Mapped[Optional[float]] = mapped_column(Float, nullable=True, index=True)
     
     # Vector embedding for semantic search (pgvector support)
     embedding: Mapped[Optional[List[float]]] = mapped_column(ARRAY(REAL), nullable=True)
@@ -61,6 +68,8 @@ class MaterialModel(Base):
         Index('idx_materials_description_gin', 'description', postgresql_using='gin', postgresql_ops={'description': 'gin_trgm_ops'}),
         Index('idx_materials_search_vector', 'search_vector', postgresql_using='gin'),
         Index('idx_materials_category_unit', 'use_category', 'unit'),
+        Index('idx_materials_color_unit', 'color', 'unit'),
+        Index('idx_materials_normalized_color_unit', 'normalized_color', 'normalized_parsed_unit'),
     )
 
 
@@ -414,6 +423,11 @@ class PostgreSQLAdapter(IRelationalDatabase):
                     unit=material_data['unit'],
                     sku=material_data.get('sku'),
                     description=material_data.get('description'),
+                    # Enhanced fields for parsing and normalization
+                    color=material_data.get('color'),
+                    normalized_color=material_data.get('normalized_color'),
+                    normalized_parsed_unit=material_data.get('normalized_parsed_unit'),
+                    unit_coefficient=material_data.get('unit_coefficient'),
                     embedding=material_data.get('embedding'),
                     search_vector=search_text,
                     created_at=material_data.get('created_at', datetime.utcnow()),
@@ -433,6 +447,11 @@ class PostgreSQLAdapter(IRelationalDatabase):
                     'unit': material.unit,
                     'sku': material.sku,
                     'description': material.description,
+                    # Enhanced fields
+                    'color': material.color,
+                    'normalized_color': material.normalized_color,
+                    'normalized_parsed_unit': material.normalized_parsed_unit,
+                    'unit_coefficient': material.unit_coefficient,
                     'embedding': material.embedding,
                     'created_at': material.created_at,
                     'updated_at': material.updated_at
@@ -512,6 +531,11 @@ class PostgreSQLAdapter(IRelationalDatabase):
                         'unit': material.unit,
                         'sku': material.sku,
                         'description': material.description,
+                        # Enhanced fields
+                        'color': material.color,
+                        'normalized_color': material.normalized_color,
+                        'normalized_parsed_unit': material.normalized_parsed_unit,
+                        'unit_coefficient': material.unit_coefficient,
                         'embedding': material.embedding,
                         'created_at': material.created_at,
                         'updated_at': material.updated_at,
@@ -570,6 +594,11 @@ class PostgreSQLAdapter(IRelationalDatabase):
                         'unit': material.unit,
                         'sku': material.sku,
                         'description': material.description,
+                        # Enhanced fields
+                        'color': material.color,
+                        'normalized_color': material.normalized_color,
+                        'normalized_parsed_unit': material.normalized_parsed_unit,
+                        'unit_coefficient': material.unit_coefficient,
                         'embedding': material.embedding,
                         'created_at': material.created_at,
                         'updated_at': material.updated_at
