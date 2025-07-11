@@ -1,27 +1,20 @@
 """
 Parser Configuration Module
 
-Comprehensive configuration for AI-powered parsing services with
-integration into the main project configuration system.
+This module provides comprehensive configuration management for parser operations,
+including AI model settings, performance tuning, validation rules, and debugging options.
 """
 
-import os
-from typing import Dict, List, Optional, Any, Literal
-from functools import lru_cache
+from typing import Dict, Any, Optional, Literal, Union
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from functools import lru_cache
 
 from core.config.constants import (
     DefaultTimeouts,
     DefaultRetries,
     DefaultBatchSizes,
     DefaultConfidenceThresholds
-)
-from core.config.type_definitions import (
-    TimeoutType,
-    RetryType,
-    BatchSizeType,
-    ConfidenceType
 )
 
 
@@ -102,7 +95,7 @@ class ParserModelConfig(BaseModel):
 class ParserPerformanceConfig(BaseModel):
     """Configuration for parser performance settings."""
     
-    batch_size: BatchSizeType = Field(
+    batch_size: int = Field(
         default=ParserConstants.DEFAULT_BATCH_SIZE,
         description="Default batch size for processing"
     )
@@ -112,22 +105,22 @@ class ParserPerformanceConfig(BaseModel):
         description="Maximum allowed batch size"
     )
     
-    timeout: TimeoutType = Field(
+    timeout: int = Field(
         default=ParserConstants.DEFAULT_PARSER_TIMEOUT,
         description="Default timeout for parsing operations"
     )
     
-    ai_request_timeout: TimeoutType = Field(
+    ai_request_timeout: int = Field(
         default=ParserConstants.DEFAULT_AI_REQUEST_TIMEOUT,
         description="Timeout for AI API requests"
     )
     
-    batch_timeout: TimeoutType = Field(
+    batch_timeout: int = Field(
         default=ParserConstants.DEFAULT_BATCH_TIMEOUT,
         description="Timeout for batch processing"
     )
     
-    retry_attempts: RetryType = Field(
+    retry_attempts: int = Field(
         default=ParserConstants.DEFAULT_RETRY_ATTEMPTS,
         description="Number of retry attempts for failed requests"
     )
@@ -153,7 +146,7 @@ class ParserPerformanceConfig(BaseModel):
 class ParserValidationConfig(BaseModel):
     """Configuration for parser validation settings."""
     
-    confidence_threshold: ConfidenceType = Field(
+    confidence_threshold: float = Field(
         default=ParserConstants.DEFAULT_CONFIDENCE_THRESHOLD,
         description="Minimum confidence threshold for accepting parse results"
     )

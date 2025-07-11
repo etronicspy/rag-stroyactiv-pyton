@@ -13,11 +13,8 @@ import json
 import os
 
 from core.parsers.config import (
-    ParserConfigManager,
-    get_config_manager,
-    SystemPromptsManager,
+    get_parser_config_manager,
     get_system_prompts_manager,
-    UnitsConfigManager,
     get_units_config_manager
 )
 
@@ -27,7 +24,7 @@ class TestParserConfigManager:
     
     def test_config_manager_initialization(self):
         """Test configuration manager initialization"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         assert config_manager.current_profile == "default"
         assert hasattr(config_manager, 'profiles')
@@ -36,15 +33,15 @@ class TestParserConfigManager:
     
     def test_get_config_manager_singleton(self):
         """Test singleton pattern for config manager"""
-        manager1 = get_config_manager()
-        manager2 = get_config_manager()
+        manager1 = get_parser_config_manager()
+        manager2 = get_parser_config_manager()
         
         assert manager1 is manager2
-        assert isinstance(manager1, ParserConfigManager)
+        assert manager1.__class__.__name__ == "ParserConfigManager"
     
     def test_available_profiles(self):
         """Test available configuration profiles"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         profiles = config_manager.get_available_profiles()
         
         assert isinstance(profiles, list)
@@ -56,7 +53,7 @@ class TestParserConfigManager:
     
     def test_switch_profile_valid(self):
         """Test switching to valid profile"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         # Test switching to development profile
         result = config_manager.switch_profile("development")
@@ -70,7 +67,7 @@ class TestParserConfigManager:
     
     def test_switch_profile_invalid(self):
         """Test switching to invalid profile"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         result = config_manager.switch_profile("invalid_profile")
         assert result is False
@@ -78,7 +75,7 @@ class TestParserConfigManager:
     
     def test_get_current_config(self):
         """Test getting current configuration"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         config = config_manager.get_current_config()
         assert isinstance(config, dict)
@@ -89,7 +86,7 @@ class TestParserConfigManager:
     
     def test_get_profile_config(self):
         """Test getting specific profile configuration"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         # Test default profile
         default_config = config_manager.get_profile_config("default")
@@ -108,14 +105,14 @@ class TestParserConfigManager:
     
     def test_get_profile_config_invalid(self):
         """Test getting invalid profile configuration"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         config = config_manager.get_profile_config("invalid_profile")
         assert config is None
     
     def test_update_profile_config(self):
         """Test updating profile configuration"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         # Update some configuration values
         updates = {
@@ -135,7 +132,7 @@ class TestParserConfigManager:
     
     def test_update_profile_config_invalid_profile(self):
         """Test updating invalid profile configuration"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         updates = {"openai_model": "gpt-4"}
         result = config_manager.update_profile_config("invalid_profile", updates)
@@ -143,7 +140,7 @@ class TestParserConfigManager:
     
     def test_reset_profile_config(self):
         """Test resetting profile configuration"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         # First update the config
         updates = {"openai_model": "gpt-4", "timeout": 60}
@@ -159,7 +156,7 @@ class TestParserConfigManager:
     
     def test_validate_config_valid(self):
         """Test configuration validation with valid config"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         valid_config = {
             "openai_model": "gpt-4o-mini",
@@ -174,7 +171,7 @@ class TestParserConfigManager:
     
     def test_validate_config_invalid(self):
         """Test configuration validation with invalid config"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         invalid_config = {
             "openai_model": "",  # Empty model
@@ -189,7 +186,7 @@ class TestParserConfigManager:
     
     def test_export_config(self):
         """Test exporting configuration"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             temp_path = f.name
@@ -215,7 +212,7 @@ class TestParserConfigManager:
     
     def test_import_config(self):
         """Test importing configuration"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         # Create test configuration file
         test_config = {
@@ -258,7 +255,7 @@ class TestParserConfigManager:
     
     def test_get_statistics(self):
         """Test getting configuration statistics"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         stats = config_manager.get_statistics()
         assert isinstance(stats, dict)
@@ -269,7 +266,7 @@ class TestParserConfigManager:
     
     def test_add_change_callback(self):
         """Test adding configuration change callback"""
-        config_manager = ParserConfigManager()
+        config_manager = get_parser_config_manager()
         
         callback_called = False
         callback_profile = None
@@ -299,7 +296,7 @@ class TestSystemPromptsManager:
     
     def test_prompts_manager_initialization(self):
         """Test system prompts manager initialization"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         assert hasattr(prompts_manager, 'prompts')
         assert hasattr(prompts_manager, 'templates')
@@ -315,7 +312,7 @@ class TestSystemPromptsManager:
     
     def test_get_available_prompts(self):
         """Test getting available prompts"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         prompts = prompts_manager.get_available_prompts()
         assert isinstance(prompts, list)
@@ -326,7 +323,7 @@ class TestSystemPromptsManager:
     
     def test_get_prompt_valid(self):
         """Test getting valid prompt"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         prompt = prompts_manager.get_prompt("main_parsing_prompt")
         assert isinstance(prompt, str)
@@ -334,14 +331,14 @@ class TestSystemPromptsManager:
     
     def test_get_prompt_invalid(self):
         """Test getting invalid prompt"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         prompt = prompts_manager.get_prompt("invalid_prompt")
         assert prompt is None
     
     def test_get_prompt_with_variables(self):
         """Test getting prompt with variable substitution"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         variables = {
             "material_name": "кирпич красный",
@@ -357,7 +354,7 @@ class TestSystemPromptsManager:
     
     def test_update_prompt(self):
         """Test updating prompt"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         new_prompt = "Test prompt for {material_name}"
         result = prompts_manager.update_prompt("test_prompt", new_prompt)
@@ -369,7 +366,7 @@ class TestSystemPromptsManager:
     
     def test_get_prompt_template(self):
         """Test getting prompt template"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         template = prompts_manager.get_prompt_template("main_parsing_prompt")
         assert isinstance(template, dict)
@@ -379,7 +376,7 @@ class TestSystemPromptsManager:
     
     def test_list_prompt_variables(self):
         """Test listing prompt variables"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         variables = prompts_manager.list_prompt_variables("main_parsing_prompt")
         assert isinstance(variables, list)
@@ -387,7 +384,7 @@ class TestSystemPromptsManager:
     
     def test_validate_prompt_variables(self):
         """Test validating prompt variables"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         # Valid variables
         valid_vars = {"material_name": "кирпич", "material_unit": "шт"}
@@ -403,7 +400,7 @@ class TestSystemPromptsManager:
     
     def test_get_statistics(self):
         """Test getting prompts statistics"""
-        prompts_manager = SystemPromptsManager()
+        prompts_manager = get_system_prompts_manager()
         
         stats = prompts_manager.get_statistics()
         assert isinstance(stats, dict)
@@ -418,7 +415,7 @@ class TestUnitsConfigManager:
     
     def test_units_manager_initialization(self):
         """Test units config manager initialization"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         assert hasattr(units_manager, 'units')
         assert hasattr(units_manager, 'conversions')
@@ -434,7 +431,7 @@ class TestUnitsConfigManager:
     
     def test_get_available_units(self):
         """Test getting available units"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         units = units_manager.get_available_units()
         assert isinstance(units, list)
@@ -447,7 +444,7 @@ class TestUnitsConfigManager:
     
     def test_get_unit_info(self):
         """Test getting unit information"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         info = units_manager.get_unit_info("м")
         assert isinstance(info, dict)
@@ -458,14 +455,14 @@ class TestUnitsConfigManager:
     
     def test_get_unit_info_invalid(self):
         """Test getting invalid unit information"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         info = units_manager.get_unit_info("invalid_unit")
         assert info is None
     
     def test_normalize_unit(self):
         """Test unit normalization"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         # Test various unit normalizations
         assert units_manager.normalize_unit("штука") == "шт"
@@ -477,14 +474,14 @@ class TestUnitsConfigManager:
     
     def test_normalize_unit_invalid(self):
         """Test normalizing invalid unit"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         normalized = units_manager.normalize_unit("invalid_unit")
         assert normalized is None
     
     def test_get_conversion_factor(self):
         """Test getting conversion factor"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         # Test conversion from derived units to base units
         factor = units_manager.get_conversion_factor("см", "м")
@@ -498,7 +495,7 @@ class TestUnitsConfigManager:
     
     def test_get_conversion_factor_invalid(self):
         """Test getting conversion factor for invalid units"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         factor = units_manager.get_conversion_factor("invalid_unit", "м")
         assert factor is None
@@ -508,7 +505,7 @@ class TestUnitsConfigManager:
     
     def test_convert_unit(self):
         """Test unit conversion"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         # Test various conversions
         result = units_manager.convert_unit(100, "см", "м")
@@ -522,7 +519,7 @@ class TestUnitsConfigManager:
     
     def test_convert_unit_invalid(self):
         """Test converting with invalid units"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         result = units_manager.convert_unit(100, "invalid_unit", "м")
         assert result is None
@@ -532,7 +529,7 @@ class TestUnitsConfigManager:
     
     def test_get_unit_suggestions(self):
         """Test getting unit suggestions"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         suggestions = units_manager.get_unit_suggestions("шту")
         assert isinstance(suggestions, list)
@@ -545,7 +542,7 @@ class TestUnitsConfigManager:
     
     def test_validate_unit(self):
         """Test unit validation"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         # Valid units
         assert units_manager.validate_unit("шт") is True
@@ -559,7 +556,7 @@ class TestUnitsConfigManager:
     
     def test_get_units_by_type(self):
         """Test getting units by type"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         # Test different unit types
         length_units = units_manager.get_units_by_type("length")
@@ -579,14 +576,14 @@ class TestUnitsConfigManager:
     
     def test_get_units_by_type_invalid(self):
         """Test getting units by invalid type"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         units = units_manager.get_units_by_type("invalid_type")
         assert units == []
     
     def test_get_statistics(self):
         """Test getting units statistics"""
-        units_manager = UnitsConfigManager()
+        units_manager = get_units_config_manager()
         
         stats = units_manager.get_statistics()
         assert isinstance(stats, dict)
@@ -602,7 +599,7 @@ class TestConfigManagerIntegration:
     def test_config_managers_work_together(self):
         """Test that all config managers work together"""
         # Get all managers
-        config_manager = get_config_manager()
+        config_manager = get_parser_config_manager()
         prompts_manager = get_system_prompts_manager()
         units_manager = get_units_config_manager()
         
@@ -618,7 +615,7 @@ class TestConfigManagerIntegration:
     
     def test_config_managers_statistics(self):
         """Test that all config managers provide statistics"""
-        config_manager = get_config_manager()
+        config_manager = get_parser_config_manager()
         prompts_manager = get_system_prompts_manager()
         units_manager = get_units_config_manager()
         
