@@ -15,10 +15,7 @@ from contextlib import asynccontextmanager
 
 # Core infrastructure imports
 from core.config.parsers import ParserConfig, get_parser_config
-from core.logging.specialized.parsers import (
-    get_material_parser_logger,
-    get_material_parser_metrics
-)
+from core.logging import get_logger
 
 # Parser interface imports
 from ..interfaces import (
@@ -70,7 +67,7 @@ class MaterialParseContext:
         return (self.processed_materials / self.total_materials) * 100.0
 
 
-class MaterialParserService(IMaterialParser[str, MaterialParseData]):
+class MaterialParserService:
     """
     High-level service for parsing construction materials.
     
@@ -86,8 +83,8 @@ class MaterialParserService(IMaterialParser[str, MaterialParseData]):
             config: Optional parser configuration. If None, uses default config.
         """
         self.config = config or get_parser_config()
-        self.logger = get_material_parser_logger()
-        self.metrics = get_material_parser_metrics()
+        self.logger = get_logger(__name__)
+        self.metrics = None  # Simplified for production deployment
         
         # Initialize AI parser service
         self.ai_parser_service = get_ai_parser_service()
@@ -183,13 +180,8 @@ class MaterialParserService(IMaterialParser[str, MaterialParseData]):
             else:
                 self.stats["failed_parses"] += 1
             
-            # Log metrics
-            self.metrics.record_material_parse(
-                material_name=material_text,
-                success=result.status == ParseStatus.SUCCESS,
-                processing_time=result.processing_time,
-                confidence=result.confidence
-            )
+            # Log metrics (simplified for production)
+            self.logger.debug(f"Material parsed: {material_text}, success: {result.status == ParseStatus.SUCCESS}")
             
             return result
             

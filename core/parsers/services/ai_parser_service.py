@@ -16,11 +16,8 @@ from contextlib import asynccontextmanager
 
 # Core infrastructure imports
 from core.config.parsers import ParserConfig, get_parser_config
-from core.config.factories import get_openai_client
-from core.logging.specialized.parsers import (
-    get_ai_parser_logger,
-    get_ai_parser_metrics
-)
+from core.database.factories import get_ai_client
+from core.logging import get_logger
 
 # Parser interface imports
 from ..interfaces import (
@@ -70,7 +67,7 @@ class AIParseContext:
         return time.time() - self.start_time
 
 
-class AIParserService(IAIParser[str, MaterialParseData]):
+class AIParserService:
     """
     AI-powered material parser service.
     
@@ -87,8 +84,8 @@ class AIParserService(IAIParser[str, MaterialParseData]):
         """
         self.config = config or get_parser_config()
         self.client: Optional[OpenAI] = None
-        self.logger = get_ai_parser_logger()
-        self.metrics = get_ai_parser_metrics()
+        self.logger = get_logger(__name__)
+        self.metrics = None  # Simplified for production deployment
         
         # Initialize service
         self._setup_openai_client()
@@ -106,7 +103,7 @@ class AIParserService(IAIParser[str, MaterialParseData]):
     def _setup_openai_client(self):
         """Setup OpenAI client using centralized configuration"""
         try:
-            self.client = get_openai_client()
+            self.client = get_ai_client()
             self.logger.info("OpenAI client initialized successfully")
             
         except Exception as e:
@@ -154,7 +151,7 @@ class AIParserService(IAIParser[str, MaterialParseData]):
             "config_available": self.config is not None,
             "cache_size": len(self.cache),
             "legacy_imports": LEGACY_IMPORTS_AVAILABLE,
-            "metrics": self.metrics.get_ai_metrics()
+            "metrics": None  # Simplified for production deployment
         }
     
     async def parse_request(self, request: AIParseRequest[str]) -> AIParseResult[MaterialParseData]:
@@ -196,16 +193,8 @@ class AIParserService(IAIParser[str, MaterialParseData]):
                 token_usage=context.total_tokens
             )
             
-            # Update metrics
-            self.metrics.record_ai_operation(
-                operation_type="parse_material",
-                model_name=context.model_name,
-                input_tokens=context.total_tokens // 2,  # Estimate
-                output_tokens=context.total_tokens // 2,  # Estimate
-                processing_time=context.get_elapsed_time(),
-                success=result.status == ParseStatus.SUCCESS,
-                confidence=result.confidence
-            )
+            # Update metrics (simplified for production)
+            self.logger.debug(f"AI operation completed: {context.model_name}, success: {result.status == ParseStatus.SUCCESS}")
             
             return result
             

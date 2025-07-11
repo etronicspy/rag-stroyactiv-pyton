@@ -17,10 +17,7 @@ import json
 
 # Core infrastructure imports
 from core.config.parsers import ParserConfig, get_parser_config
-from core.logging.specialized.parsers import (
-    get_batch_parser_logger,
-    get_batch_parser_metrics
-)
+from core.logging import get_logger
 
 # Parser interface imports
 from ..interfaces import (
@@ -115,7 +112,7 @@ class BatchConfiguration:
     parallel_processing: bool = True
 
 
-class BatchParserService(IBaseParser[List[str], List[MaterialParseData]]):
+class BatchParserService():
     """
     Specialized service for high-performance batch processing.
     
@@ -131,8 +128,8 @@ class BatchParserService(IBaseParser[List[str], List[MaterialParseData]]):
             config: Optional parser configuration. If None, uses default config.
         """
         self.config = config or get_parser_config()
-        self.logger = get_batch_parser_logger()
-        self.metrics = get_batch_parser_metrics()
+        self.logger = get_logger(__name__)
+        self.metrics = None  # Simplified for production deployment
         
         # Initialize material parser service
         self.material_parser_service = get_material_parser_service()

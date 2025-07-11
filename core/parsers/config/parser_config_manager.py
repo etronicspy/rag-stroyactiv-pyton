@@ -15,8 +15,8 @@ from contextlib import contextmanager
 
 # Core infrastructure imports
 from core.config.parsers import ParserConfig, get_parser_config
-from core.config.constants import ParserConstants
-from core.logging.specialized.parsers import get_material_parser_logger
+from core.config.parsers import ParserConstants
+from core.logging import get_logger
 
 
 @dataclass
@@ -51,7 +51,7 @@ class ParserConfigManager:
             config_path: Optional path to configuration file
         """
         self.config_path = Path(config_path) if config_path else None
-        self.logger = get_material_parser_logger()
+        self.logger = get_logger(__name__)
         
         # Current configuration
         self._current_config = get_parser_config()
@@ -89,9 +89,9 @@ class ParserConfigManager:
         
         # Development profile
         dev_config = get_parser_config()
-        dev_config.logging.enable_debug_logging = True
-        dev_config.logging.log_ai_requests = True
-        dev_config.performance.enable_caching = True
+        dev_config.debug.debug_mode = True
+        dev_config.debug.log_ai_requests = True
+        dev_config.cache.enable_caching = True
         dev_config.performance.retry_attempts = 2
         
         self._profiles["development"] = ParserConfigProfile(
@@ -102,9 +102,9 @@ class ParserConfigManager:
         
         # Production profile
         prod_config = get_parser_config()
-        prod_config.logging.enable_debug_logging = False
-        prod_config.logging.log_ai_requests = False
-        prod_config.performance.enable_caching = True
+        prod_config.debug.debug_mode = False
+        prod_config.debug.log_ai_requests = False
+        prod_config.cache.enable_caching = True
         prod_config.performance.retry_attempts = 3
         prod_config.performance.timeout = 60
         
@@ -117,7 +117,7 @@ class ParserConfigManager:
         # Testing profile
         test_config = get_parser_config()
         test_config.models.temperature = 0.0  # Deterministic for testing
-        test_config.performance.enable_caching = False
+        test_config.cache.enable_caching = False
         test_config.performance.retry_attempts = 1
         test_config.performance.timeout = 10
         
@@ -129,9 +129,9 @@ class ParserConfigManager:
         
         # Integration profile
         integration_config = get_parser_config()
-        integration_config.features.integration_mode = True
-        integration_config.logging.log_ai_requests = True
-        integration_config.performance.enable_caching = True
+        integration_config.integration_mode = True
+        integration_config.debug.log_ai_requests = True
+        integration_config.cache.enable_caching = True
         
         self._profiles["integration"] = ParserConfigProfile(
             name="integration",

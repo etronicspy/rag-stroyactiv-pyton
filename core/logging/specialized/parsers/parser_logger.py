@@ -13,7 +13,7 @@ from datetime import datetime
 from functools import lru_cache
 
 from core.logging.core.logger import Logger
-from core.logging.context.correlation import CorrelationProvider
+from core.logging.context.correlation import CorrelationContext
 from core.logging.interfaces.core import ILogger
 from core.logging.interfaces.context import ICorrelationProvider
 from core.logging.interfaces.metrics import IMetricsCollector, IPerformanceTracker
@@ -35,7 +35,7 @@ class ParserLogger:
             logger_name: Name for the logger instance
         """
         self.logger = Logger(logger_name)
-        self.correlation_provider = CorrelationProvider()
+        self.correlation_provider = CorrelationContext()
         self._start_times: Dict[str, float] = {}
         self._operation_counts: Dict[str, int] = {}
         
