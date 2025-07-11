@@ -8,7 +8,7 @@ This module exports all core implementations for the logging system.
 from .logger import Logger, AsyncLogger
 
 # Formatter implementations
-from .formatter import (
+from .log_formatter import (
     BaseFormatter,
     TextFormatter,
     JsonFormatter,
