@@ -80,4 +80,41 @@ class SSHDefaults:
     KEY_PATH = "~/.ssh/postgres_key"
     RETRY_ATTEMPTS = 3
     RETRY_DELAY = 5
-    KEEP_ALIVE = 60 
+    KEEP_ALIVE = 60
+
+
+class DefaultBatchSizes(IntEnum):
+    """Default batch sizes for various operations."""
+    PARSER_BATCH = 10
+    EMBEDDING_BATCH = 100
+    DATABASE_BATCH = 500
+    PROCESSING_BATCH = 50
+
+
+class DefaultRetries(IntEnum):
+    """Default retry attempt counts."""
+    API_REQUESTS = 3
+    DATABASE_OPERATIONS = 5
+    NETWORK_REQUESTS = 3
+    PARSER_OPERATIONS = 3
+
+
+class DefaultConfidenceThresholds:
+    """Default confidence thresholds for AI operations."""
+    PARSER_CONFIDENCE = 0.85
+    EMBEDDING_SIMILARITY = 0.7
+    CLASSIFICATION_CONFIDENCE = 0.8
+    VALIDATION_CONFIDENCE = 0.9
+
+
+class ParserDefaults:
+    """Default values specific to parser operations."""
+    OPENAI_MODEL = "gpt-4o-mini"
+    EMBEDDING_MODEL = "text-embedding-3-small"
+    TEMPERATURE = 0.1
+    MAX_TOKENS = 1000
+    BATCH_SIZE = 10
+    TIMEOUT = 30
+    RETRY_ATTEMPTS = 3
+    CONFIDENCE_THRESHOLD = 0.85
+    CACHE_TTL = 3600  # 1 hour 
