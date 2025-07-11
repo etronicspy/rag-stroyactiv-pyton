@@ -153,12 +153,12 @@ from core.logging.interfaces.core import ILogger, IFormatter, IHandler
 from core.logging.interfaces.factories import ILoggerFactory, IFormatterFactory, IHandlerFactory
 from core.logging.interfaces.context import ICorrelationProvider, IContextProvider
 from core.logging.interfaces.database import IDatabaseLogger
-from core.logging.interfaces.http import IRequestLogger
+from core.logging.interfaces.http_interface import IRequestLogger
 from core.logging.interfaces.metrics import IMetricsCollector, IPerformanceTracker
 
 # Import core implementations
 from core.logging.core.logger import Logger
-from core.logging.core.formatter import JsonFormatter, TextFormatter
+from core.logging.core.log_formatter import JsonFormatter, TextFormatter
 from core.logging.core.handler import ConsoleHandler, FileHandler
 
 # Import specialized implementations

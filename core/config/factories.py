@@ -194,12 +194,80 @@ def get_postgresql_engine(settings: Optional[Settings] = None):
     except ImportError:
         raise ImportError("sqlalchemy and asyncpg packages are required for PostgreSQL support")
 
+@lru_cache(maxsize=1)
+def get_parser_ai_client(settings: Optional[Settings] = None):
+    """
+    Factory function to get AI client specifically for parser operations.
+    
+    Args:
+        settings: Optional settings instance
+        
+    Returns:
+        AI client instance configured for parsing
+        
+    Raises:
+        ValueError: If unsupported AI provider
+        ImportError: If required package not installed
+    """
+    if settings is None:
+        settings = get_settings()
+    
+    # Use specific parser timeout and retry settings
+    config = settings.get_ai_config()
+    
+    if settings.AI_PROVIDER == AIProvider.OPENAI:
+        try:
+            import openai
+            return openai.AsyncOpenAI(
+                api_key=config["api_key"],
+                max_retries=config["max_retries"],
+                timeout=45  # Parser-specific timeout
+            )
+        except ImportError:
+            raise ImportError("openai package is required for OpenAI support")
+    
+    elif settings.AI_PROVIDER == AIProvider.AZURE_OPENAI:
+        try:
+            import openai
+            return openai.AsyncAzureOpenAI(
+                api_key=config["api_key"],
+                azure_endpoint=config["endpoint"],
+                api_version=config["api_version"],
+                max_retries=config["max_retries"],
+                timeout=45  # Parser-specific timeout
+            )
+        except ImportError:
+            raise ImportError("openai package is required for Azure OpenAI support")
+    
+    # For other providers, use default AI client
+    return get_ai_client(settings)
+
+@lru_cache(maxsize=1)
+def get_parser_embedding_client(settings: Optional[Settings] = None):
+    """
+    Factory function to get embedding client for parser operations.
+    
+    Args:
+        settings: Optional settings instance
+        
+    Returns:
+        Embedding client instance
+        
+    Raises:
+        ValueError: If unsupported AI provider
+        ImportError: If required package not installed
+    """
+    # For now, use the same AI client but with different configuration
+    return get_ai_client(settings)
+
 def clear_client_cache():
     """Clear all cached client instances."""
     get_vector_db_client.cache_clear()
     get_ai_client.cache_clear()
     get_redis_client.cache_clear()
     get_postgresql_engine.cache_clear()
+    get_parser_ai_client.cache_clear()
+    get_parser_embedding_client.cache_clear()
 
 def get_cache_info():
     """Get cache information for all client factories."""
@@ -207,5 +275,7 @@ def get_cache_info():
         "vector_db_cache": get_vector_db_client.cache_info()._asdict(),
         "ai_client_cache": get_ai_client.cache_info()._asdict(),
         "redis_cache": get_redis_client.cache_info()._asdict(),
-        "postgresql_cache": get_postgresql_engine.cache_info()._asdict()
+        "postgresql_cache": get_postgresql_engine.cache_info()._asdict(),
+        "parser_ai_cache": get_parser_ai_client.cache_info()._asdict(),
+        "parser_embedding_cache": get_parser_embedding_client.cache_info()._asdict()
     } 

@@ -25,7 +25,7 @@ from .database import (
 )
 
 # HTTP interfaces
-from .http import (
+from .http_interface import (
     IRequestLogger,
     IMiddlewareLogger
 )

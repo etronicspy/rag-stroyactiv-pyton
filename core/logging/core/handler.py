@@ -9,7 +9,7 @@ import sys
 from typing import Any, Dict, Optional, TextIO
 
 from core.logging.interfaces import IHandler, IFormatter
-from core.logging.core.formatter import TextFormatter
+from core.logging.core.log_formatter import TextFormatter
 
 
 class BaseHandler(IHandler):
