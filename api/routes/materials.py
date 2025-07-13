@@ -1,6 +1,6 @@
 """Refactored Materials API routes using new multi-database architecture.
 
-Рефакторенные API роуты материалов с новой мульти-БД архитектурой.
+Refactored materials API routes with new multi-database architecture.
 """
 
 from typing import List, Optional
@@ -20,7 +20,11 @@ from services.materials import MaterialsService
 
 
 logger = get_logger(__name__)
-router = APIRouter(responses=ERROR_RESPONSES)
+router = APIRouter(
+    prefix="",
+    tags=["materials"],
+    responses=ERROR_RESPONSES
+)
 
 
 def get_materials_service(
@@ -46,28 +50,28 @@ def get_materials_service(
 
 @router.get(
     "/health",
-    summary="Materials Health – Статус сервиса материалов",
-    response_description="Информация о состоянии сервиса материалов"
+    summary="🩺 Materials Health – Materials Service Status",
+    response_description="Materials service health information"
 )
 async def health_check(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    🔍 **Materials Service Health Check** - Проверка работы сервиса материалов
+    🔍 **Materials Service Health Check** - Materials service status verification
     
-    Проверяет состояние сервиса материалов и подключения к векторной базе данных.
-    Работает в режиме Qdrant-only для семантического поиска стройматериалов.
+    Checks the status of the materials service and vector database connectivity.
+    Operates in Qdrant-only mode for semantic search of construction materials.
     
-    **Особенности:**
-    - 🗄️ Проверка Qdrant подключения
-    - 📋 Список доступных endpoints
-    - ⚡ Быстрая диагностика сервиса
-    - 🎯 Статус инициализации
+    **Features:**
+    - 🗄️ Qdrant connection verification
+    - 📋 Available endpoints list
+    - ⚡ Quick service diagnostics
+    - 🎯 Initialization status
     
     **Response Status Codes:**
-    - **200 OK**: Сервис работает нормально
-    - **206 Partial Content**: Сервис работает с ограничениями
-    - **503 Service Unavailable**: Сервис недоступен
+    - **200 OK**: Service is running normally
+    - **206 Partial Content**: Service is running with limitations
+    - **503 Service Unavailable**: Service is unavailable
     
     **Example Response:**
     ```json
@@ -97,9 +101,9 @@ async def health_check(
     ```
     
     **Use Cases:**
-    - Проверка работы сервиса материалов
-    - Диагностика векторной БД
-    - Мониторинг доступности endpoints
+    - Materials service health verification
+    - Vector database diagnostics
+    - Endpoints availability monitoring
     """
     health_status = {
         "status": "healthy",
@@ -147,43 +151,43 @@ async def health_check(
     "/",
     response_model=Material,
     responses=ERROR_RESPONSES,
-    summary="➕ Create Material – Создание материала",
-    response_description="Созданный материал"
+    summary="➕ Create Material – Create New Material",
+    response_description="Created material with embedding"
 )
 async def create_material(
     material: MaterialCreate,
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    ➕ **Create Material** - Создание нового строительного материала
+    ➕ **Create Material** - Create new construction material
     
-    Создает новый материал с автоматической генерацией семантического embedding
-    для поиска. Материал сохраняется в векторную БД для последующего поиска.
+    Creates a new material with automatic generation of semantic embedding
+    for search. Material is saved to vector database for subsequent search.
     
-    **Особенности:**
-    - 🧠 Автогенерация 1536-мерного embedding (OpenAI)
-    - 🔍 Индексация для семантического поиска
-    - ✨ Автоматическое создание UUID
-    - 📝 Валидация обязательных полей
-    - ⏰ Автоматические временные метки
+    **Features:**
+    - 🧠 Auto-generation of 1536-dimensional embedding (OpenAI)
+    - 🔍 Indexing for semantic search
+    - ✨ Automatic UUID creation
+    - 📝 Required fields validation
+    - ⏰ Automatic timestamps
     
     **Required Fields:**
-    - `name`: Название материала (2-200 символов)
-    - `use_category`: Категория использования
-    - `unit`: Единица измерения
+    - `name`: Material name (2-200 characters)
+    - `use_category`: Usage category
+    - `unit`: Measurement unit
     
     **Optional Fields:**
-    - `sku`: Артикул/код материала (3-50 символов)
-    - `description`: Описание материала
+    - `sku`: Material code/part number (3-50 characters)
+    - `description`: Material description
     
     **Request Body Example:**
     ```json
     {
-        "name": "Портландцемент М500 Д0",
-        "use_category": "Цемент",
-        "unit": "мешок",
+        "name": "Portland Cement M500 D0",
+        "use_category": "Cement",
+        "unit": "bag",
         "sku": "CEM500-001",
-        "description": "Высокопрочный цемент для конструкционного бетона без минеральных добавок"
+        "description": "High-strength cement for structural concrete without mineral additives"
     }
     ```
     
@@ -191,11 +195,11 @@ async def create_material(
     ```json
     {
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "Портландцемент М500 Д0",
-        "use_category": "Цемент",
-        "unit": "мешок",
+        "name": "Portland Cement M500 D0",
+        "use_category": "Cement",
+        "unit": "bag",
         "sku": "CEM500-001",
-        "description": "Высокопрочный цемент для конструкционного бетона без минеральных добавок",
+        "description": "High-strength cement for structural concrete without mineral additives",
         "embedding": [0.023, -0.156, 0.789, ...], // 1536 dimensions
         "created_at": "2025-06-16T16:46:29.421964Z",
         "updated_at": "2025-06-16T16:46:29.421964Z"
@@ -203,14 +207,14 @@ async def create_material(
     ```
     
     **Response Status Codes:**
-    - **201 Created**: Материал успешно создан
-    - **400 Bad Request**: Ошибка валидации данных
-    - **500 Internal Server Error**: Ошибка создания embedding или БД
+    - **201 Created**: Material successfully created
+    - **400 Bad Request**: Data validation error
+    - **500 Internal Server Error**: Embedding creation or database error
     
     **Use Cases:**
-    - Добавление новых материалов в каталог
-    - Импорт данных из прайс-листов
-    - Создание справочников материалов
+    - Adding new materials to catalog
+    - Importing data from price lists
+    - Creating material reference books
     """
     try:
         logger.info(f"Creating material: {material.name}")
@@ -229,31 +233,31 @@ async def create_material(
     "/{material_id}",
     response_model=Material,
     responses=ERROR_RESPONSES,
-    summary="🔍 Get Material – Получение материала по ID",
-    response_description="Данные материала"
+    summary="🔍 Get Material – Get Material by ID",
+    response_description="Material data with embedding"
 )
 async def get_material(
     material_id: str,
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    🔍 **Get Material by ID** - Получение материала по идентификатору
+    🔍 **Get Material by ID** - Retrieve material by identifier
     
-    Возвращает полную информацию о материале включая embedding для анализа.
-    Поиск выполняется по UUID в векторной базе данных.
+    Returns complete material information including embedding for analysis.
+    Search is performed by UUID in vector database.
     
     **Path Parameters:**
-    - `material_id`: UUID материала в формате UUID4
+    - `material_id`: Material UUID in UUID4 format
     
     **Response Example:**
     ```json
     {
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "Портландцемент М500 Д0",
-        "use_category": "Цемент",
-        "unit": "мешок",
+        "name": "Portland Cement M500 D0",
+        "use_category": "Cement",
+        "unit": "bag",
         "sku": "CEM500-001",
-        "description": "Высокопрочный цемент для конструкционного бетона",
+        "description": "High-strength cement for structural concrete",
         "embedding": [0.023, -0.156, 0.789, ...], // 1536 dimensions
         "created_at": "2025-06-16T16:46:29.421964Z",
         "updated_at": "2025-06-16T16:46:29.421964Z"
@@ -261,15 +265,15 @@ async def get_material(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Материал найден и возвращен
-    - **404 Not Found**: Материал с указанным ID не найден
-    - **400 Bad Request**: Некорректный формат UUID
-    - **500 Internal Server Error**: Ошибка работы с БД
+    - **200 OK**: Material found and returned
+    - **404 Not Found**: Material with specified ID not found
+    - **400 Bad Request**: Invalid UUID format
+    - **500 Internal Server Error**: Database operation error
     
     **Use Cases:**
-    - Получение полной информации о материале
-    - Анализ embedding для отладки поиска
-    - Проверка существования материала
+    - Getting complete material information
+    - Analyzing embedding for search debugging
+    - Checking material existence
     """
     try:
         logger.debug(f"Getting material: {material_id}")
@@ -294,8 +298,8 @@ async def get_material(
 @router.get(
     "/",
     response_model=List[Material],
-    summary="📋 List Materials – Список материалов",
-    response_description="Список материалов с поддержкой фильтрации"
+    summary="📋 List Materials – List Materials with Pagination",
+    response_description="List of materials with filtering support"
 )
 async def get_materials(
     skip: int = 0, 
@@ -304,26 +308,26 @@ async def get_materials(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    📋 **List Materials** - Получение списка материалов с пагинацией
+    📋 **List Materials** - Get materials list with pagination
     
-    Возвращает список всех материалов с поддержкой пагинации и фильтрации.
-    Полезно для создания каталогов и административных интерфейсов.
+    Returns a list of all materials with pagination and filtering support.
+    Useful for creating catalogs and administrative interfaces.
     
     **Query Parameters:**
-    - `skip`: Количество записей для пропуска (offset) - default: 0
-    - `limit`: Максимальное количество записей - default: 10, max: 100
-    - `category`: Фильтр по категории использования (опционально)
+    - `skip`: Number of records to skip (offset) - default: 0
+    - `limit`: Maximum number of records - default: 10, max: 100
+    - `category`: Filter by usage category (optional)
     
     **Response Example:**
     ```json
     [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "Портландцемент М500 Д0",
-            "use_category": "Цемент",
-            "unit": "мешок",
+            "name": "Portland Cement M500 D0",
+            "use_category": "Cement",
+            "unit": "bag",
             "sku": "CEM500-001",
-            "description": "Высокопрочный цемент для конструкционного бетона",
+            "description": "High-strength cement for structural concrete",
             "embedding": null, // Hidden in list view
             "created_at": "2025-06-16T16:46:29.421964Z",
             "updated_at": "2025-06-16T16:46:29.421964Z"
@@ -332,20 +336,20 @@ async def get_materials(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Список возвращен успешно (может быть пустым)
-    - **400 Bad Request**: Некорректные параметры пагинации
-    - **500 Internal Server Error**: Ошибка получения данных
+    - **200 OK**: List returned successfully (may be empty)
+    - **400 Bad Request**: Invalid pagination parameters
+    - **500 Internal Server Error**: Data retrieval error
     
     **Pagination Examples:**
-    - `GET /materials/?limit=20` → первые 20 материалов
-    - `GET /materials/?skip=20&limit=20` → материалы 21-40
-    - `GET /materials/?category=Цемент&limit=50` → цементы (до 50 шт.)
+    - `GET /materials/?limit=20` → first 20 materials
+    - `GET /materials/?skip=20&limit=20` → materials 21-40
+    - `GET /materials/?category=Cement&limit=50` → cements (up to 50 items)
     
     **Use Cases:**
-    - Отображение каталога материалов
-    - Административные интерфейсы
-    - Экспорт данных
-    - Создание отчетов
+    - Display materials catalog
+    - Administrative interfaces
+    - Data export
+    - Report generation
     """
     try:
         logger.debug(f"Getting materials: skip={skip}, limit={limit}, category={category}")
@@ -363,8 +367,8 @@ async def get_materials(
 @router.put(
     "/{material_id}",
     response_model=Material,
-    summary="✏️ Update Material – Обновление материала",
-    response_description="Обновлённый материал"
+    summary="✏️ Update Material – Update Material",
+    response_description="Updated material"
 )
 async def update_material(
     material_id: str,
@@ -372,33 +376,33 @@ async def update_material(
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    ✏️ **Update Material** - Обновление существующего материала
+    ✏️ **Update Material** - Update existing material
     
-    Обновляет данные материала с пересчетом семантического embedding при изменении
-    критических полей (name, description). Поддерживает частичное обновление.
+    Updates material data with recalculation of semantic embedding when critical
+    fields (name, description) are changed. Supports partial updates.
     
-    **Особенности:**
-    - 🔄 Пересчет embedding при изменении ключевых полей
-    - 📝 Частичное обновление (только указанные поля)
-    - ⏰ Автоматическое обновление updated_at
-    - ✅ Валидация измененных данных
-    - 🔍 Проверка существования материала
+    **Features:**
+    - 🔄 Recalculation of embedding when key fields change
+    - 📝 Partial updates (only specified fields)
+    - ⏰ Automatic updated_at timestamp update
+    - ✅ Validation of changed data
+    - 🔍 Material existence verification
     
     **Path Parameters:**
-    - `material_id`: UUID материала для обновления
+    - `material_id`: Material UUID for update
     
     **Updateable Fields:**
-    - `name`: Название материала (триггерирует пересчет embedding)
-    - `use_category`: Категория использования 
-    - `unit`: Единица измерения
-    - `sku`: Артикул/код материала
-    - `description`: Описание (триггерирует пересчет embedding)
+    - `name`: Material name (triggers embedding recalculation)
+    - `use_category`: Usage category 
+    - `unit`: Measurement unit
+    - `sku`: Stock keeping unit/material code
+    - `description`: Description (triggers embedding recalculation)
     
     **Request Body Example:**
     ```json
     {
-        "name": "Портландцемент М500 Д0 (улучшенный)",
-        "description": "Высокопрочный цемент для конструкционного бетона с улучшенными характеристиками",
+        "name": "Portland Cement M500 D0 (Enhanced)",
+        "description": "High-strength cement for structural concrete with improved characteristics",
         "sku": "CEM500-001-V2"
     }
     ```
@@ -407,11 +411,11 @@ async def update_material(
     ```json
     {
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "Портландцемент М500 Д0 (улучшенный)",
-        "use_category": "Цемент",
-        "unit": "мешок",
+        "name": "Portland Cement M500 D0 (Enhanced)",
+        "use_category": "Cement",
+        "unit": "bag",
         "sku": "CEM500-001-V2",
-        "description": "Высокопрочный цемент для конструкционного бетона с улучшенными характеристиками",
+        "description": "High-strength cement for structural concrete with improved characteristics",
         "embedding": [0.021, -0.134, 0.756, ...], // Updated embedding
         "created_at": "2025-06-16T16:46:29.421964Z",
         "updated_at": "2025-06-16T17:30:15.123456Z" // Updated timestamp
@@ -419,16 +423,16 @@ async def update_material(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Материал успешно обновлен
-    - **404 Not Found**: Материал с указанным ID не найден
-    - **400 Bad Request**: Ошибка валидации данных
-    - **500 Internal Server Error**: Ошибка обновления или пересчета embedding
+    - **200 OK**: Material successfully updated
+    - **404 Not Found**: Material with specified ID not found
+    - **400 Bad Request**: Data validation error
+    - **500 Internal Server Error**: Update or embedding recalculation error
     
     **Use Cases:**
-    - Исправление данных материалов
-    - Обновление технических характеристик
-    - Изменение категоризации
-    - Актуализация артикулов
+    - Fixing material data
+    - Updating technical specifications
+    - Changing categorization
+    - Updating SKU codes
     """
     try:
         logger.info(f"Updating material: {material_id}")
@@ -450,30 +454,30 @@ async def update_material(
 
 @router.delete(
     "/{material_id}",
-    summary="🗑️ Delete Material – Удаление материала",
-    response_description="Результат удаления"
+    summary="🗑️ Delete Material – Delete Material",
+    response_description="Deletion result"
 )
 async def delete_material(
     material_id: str,
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    🗑️ **Delete Material** - Удаление материала
+    🗑️ **Delete Material** - Delete material
     
-    Удаляет материал из векторной базы данных по UUID. Операция необратимая,
-    восстановление возможно только из резервных копий.
+    Deletes material from vector database by UUID. Operation is irreversible,
+    recovery is only possible from backups.
     
-    **⚠️ ВНИМАНИЕ: Операция необратимая!**
+    **⚠️ WARNING: Operation is irreversible!**
     
-    **Особенности:**
-    - 🔥 Полное удаление из векторной БД
-    - 🔍 Проверка существования перед удалением
-    - 📊 Обновление индексов поиска
-    - ⚡ Быстрое выполнение
-    - 🛡️ Защита от случайного удаления
+    **Features:**
+    - 🔥 Complete removal from vector database
+    - 🔍 Existence verification before deletion
+    - 📊 Search index updates
+    - ⚡ Fast execution
+    - 🛡️ Protection against accidental deletion
     
     **Path Parameters:**
-    - `material_id`: UUID материала для удаления
+    - `material_id`: Material UUID for deletion
     
     **Response Example:**
     ```json
@@ -486,21 +490,21 @@ async def delete_material(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Материал успешно удален
-    - **404 Not Found**: Материал с указанным ID не найден
-    - **400 Bad Request**: Некорректный формат UUID
-    - **500 Internal Server Error**: Ошибка удаления из БД
+    - **200 OK**: Material successfully deleted
+    - **404 Not Found**: Material with specified ID not found
+    - **400 Bad Request**: Invalid UUID format
+    - **500 Internal Server Error**: Database deletion error
     
     **Use Cases:**
-    - Удаление устаревших материалов
-    - Очистка тестовых данных
-    - Удаление дубликатов
-    - Архивация неактуальных записей
+    - Removing obsolete materials
+    - Cleaning test data
+    - Removing duplicates
+    - Archiving outdated records
     
-    **⚠️ Рекомендации:**
-    - Создавайте резервные копии перед массовым удалением
-    - Проверяйте зависимости в связанных системах
-    - Используйте batch операции для множественного удаления
+    **⚠️ Recommendations:**
+    - Create backups before bulk deletion
+    - Check dependencies in related systems
+    - Use batch operations for multiple deletions
     """
     try:
         logger.info(f"Deleting material: {material_id}")
@@ -528,49 +532,49 @@ async def delete_material(
 @router.post(
     "/batch",
     response_model=MaterialBatchResponse,
-    summary="📦 Batch Create Materials – Массовое создание материалов",
-    response_description="Результаты пакетного создания материалов"
+    summary="📦 Batch Create Materials – Batch Create Materials",
+    response_description="Batch material creation results"
 )
 async def create_materials_batch(
     batch_data: MaterialBatchCreate,
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    📦 **Batch Create Materials** - Массовое создание материалов
+    📦 **Batch Create Materials** - Batch create materials
     
-    Создает множество материалов за один запрос с оптимизированной обработкой.
-    Поддерживает частичный успех - часть материалов может быть создана успешно.
+    Creates multiple materials in a single request with optimized processing.
+    Supports partial success - some materials may be created successfully.
     
-    **Особенности:**
-    - ⚡ Параллельная обработка embedding'ов
-    - 📊 Статистика успешных/неудачных операций
-    - 🔄 Batch обработка в векторной БД
-    - 🛡️ Graceful handling ошибок
-    - 📈 Прогресс трекинг
+    **Features:**
+    - ⚡ Parallel embedding processing
+    - 📊 Statistics of successful/failed operations
+    - 🔄 Batch processing in vector database
+    - 🛡️ Graceful error handling
+    - 📈 Progress tracking
     
-    **Лимиты:**
-    - **Минимум**: 1 материал
-    - **Максимум**: 1000 материалов за запрос
-    - **Batch size**: 100 материалов (настраивается)
-    - **Timeout**: 5 минут на весь запрос
+    **Limits:**
+    - **Minimum**: 1 material
+    - **Maximum**: 1000 materials per request
+    - **Batch size**: 100 materials (configurable)
+    - **Timeout**: 5 minutes for entire request
     
     **Request Body Example:**
     ```json
     {
         "materials": [
             {
-                "name": "Портландцемент М500",
-                "use_category": "Цемент",
-                "unit": "мешок",
+                "name": "Portland Cement M500",
+                "use_category": "Cement",
+                "unit": "bag",
                 "sku": "CEM500-001",
-                "description": "Высокопрочный цемент"
+                "description": "High-strength cement"
             },
             {
-                "name": "Кирпич керамический",
-                "use_category": "Кирпич",
-                "unit": "шт",
+                "name": "Ceramic Brick",
+                "use_category": "Brick",
+                "unit": "piece",
                 "sku": "BRICK-001",
-                "description": "Полнотелый кирпич"
+                "description": "Solid brick"
             }
         ],
         "batch_size": 100
@@ -585,11 +589,11 @@ async def create_materials_batch(
         "successful_materials": [
             {
                 "id": "550e8400-e29b-41d4-a716-446655440000",
-                "name": "Портландцемент М500",
-                "use_category": "Цемент",
-                "unit": "мешок",
+                "name": "Portland Cement M500",
+                "use_category": "Cement",
+                "unit": "bag",
                 "sku": "CEM500-001",
-                "description": "Высокопрочный цемент",
+                "description": "High-strength cement",
                 "embedding": [...],
                 "created_at": "2025-06-16T17:30:15.123456Z",
                 "updated_at": "2025-06-16T17:30:15.123456Z"
@@ -611,16 +615,16 @@ async def create_materials_batch(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Batch обработан (проверьте success_rate)
-    - **400 Bad Request**: Некорректные данные batch
-    - **413 Payload Too Large**: Превышен лимит материалов
-    - **500 Internal Server Error**: Критическая ошибка обработки
+    - **200 OK**: Batch processed (check success_rate)
+    - **400 Bad Request**: Invalid batch data
+    - **413 Payload Too Large**: Material limit exceeded
+    - **500 Internal Server Error**: Critical processing error
     
     **Use Cases:**
-    - Импорт каталогов материалов
-    - Миграция данных между системами
-    - Массовое создание тестовых данных
-    - Синхронизация с ERP системами
+    - Import material catalogs
+    - Data migration between systems
+    - Bulk creation of test data
+    - Synchronization with ERP systems
     """
     try:
         logger.info(f"Processing batch create: {len(batch_data.materials)} materials")
@@ -641,31 +645,31 @@ async def create_materials_batch(
 @router.post(
     "/import",
     response_model=MaterialBatchResponse,
-    summary="📥 Import Materials – Импорт материалов из JSON/CSV",
-    response_description="Результат импорта материалов"
+    summary="📥 Import Materials – Import Materials from JSON/CSV",
+    response_description="Material import results"
 )
 async def import_materials_from_json(
     import_data: MaterialImportRequest,
     service: MaterialsService = Depends(get_materials_service)
 ):
     """
-    📥 **Import Materials from JSON** - Импорт материалов из JSON файла
+    📥 **Import Materials from JSON** - Import materials from JSON file
     
-    Импортирует материалы из структурированного JSON формата с автоматическим
-    заполнением значений по умолчанию. Оптимизирован для импорта прайс-листов.
+    Imports materials from structured JSON format with automatic
+    default value filling. Optimized for price list imports.
     
-    **Особенности:**
-    - 📄 Упрощенный формат импорта (только SKU + name)
-    - 🔧 Автоматические значения по умолчанию
-    - 📊 Детальная статистика импорта
-    - 🛡️ Валидация и дедупликация
-    - ⚡ Оптимизированная обработка
+    **Features:**
+    - 📄 Simplified import format (only SKU + name)
+    - 🔧 Automatic default values
+    - 📊 Detailed import statistics
+    - 🛡️ Validation and deduplication
+    - ⚡ Optimized processing
     
     **Automatic Defaults:**
-    - `use_category`: "Стройматериалы" (настраивается)
-    - `unit`: "шт" (настраивается)
-    - `description`: Генерируется из name
-    - `embedding`: Автоматический расчет
+    - `use_category`: "Construction Materials" (configurable)
+    - `unit`: "piece" (configurable)
+    - `description`: Generated from name
+    - `embedding`: Automatic calculation
     
     **Request Body Example:**
     ```json
@@ -673,15 +677,15 @@ async def import_materials_from_json(
         "materials": [
             {
                 "sku": "CEM500-001",
-                "name": "Портландцемент М500 Д0"
+                "name": "Portland Cement M500 D0"
             },
             {
                 "sku": "BRICK-001", 
-                "name": "Кирпич керамический полнотелый"
+                "name": "Ceramic Solid Brick"
             }
         ],
-        "default_use_category": "Строительные материалы",
-        "default_unit": "единица",
+        "default_use_category": "Construction Materials",
+        "default_unit": "unit",
         "batch_size": 100
     }
     ```
@@ -694,11 +698,11 @@ async def import_materials_from_json(
         "successful_materials": [
             {
                 "id": "550e8400-e29b-41d4-a716-446655440000",
-                "name": "Портландцемент М500 Д0",
-                "use_category": "Строительные материалы",
-                "unit": "единица",
+                "name": "Portland Cement M500 D0",
+                "use_category": "Construction Materials",
+                "unit": "unit",
                 "sku": "CEM500-001",
-                "description": "Портландцемент М500 Д0",
+                "description": "Portland Cement M500 D0",
                 "embedding": [...],
                 "created_at": "2025-06-16T17:30:15.123456Z",
                 "updated_at": "2025-06-16T17:30:15.123456Z"
@@ -714,22 +718,22 @@ async def import_materials_from_json(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Импорт завершен (проверьте success_rate)
-    - **400 Bad Request**: Некорректный формат данных
-    - **413 Payload Too Large**: Превышен лимит импорта
-    - **500 Internal Server Error**: Ошибка обработки импорта
+    - **200 OK**: Import completed (check success_rate)
+    - **400 Bad Request**: Invalid data format
+    - **413 Payload Too Large**: Import limit exceeded
+    - **500 Internal Server Error**: Import processing error
     
     **Supported Formats:**
-    - Simple JSON с минимальными полями
-    - Bulk import от поставщиков
-    - Export/Import между системами
-    - Прайс-листы в JSON формате
+    - Simple JSON with minimal fields
+    - Bulk import from suppliers
+    - Export/Import between systems
+    - Price lists in JSON format
     
     **Use Cases:**
-    - Импорт прайс-листов поставщиков
-    - Миграция из старых систем
-    - Загрузка каталогов материалов
-    - Синхронизация с внешними API
+    - Import supplier price lists
+    - Migration from old systems
+    - Loading material catalogs
+    - Synchronization with external APIs
     """
     try:
         logger.info(f"Importing materials from JSON: {len(import_data.materials)} items")
@@ -829,258 +833,48 @@ async def upload_materials(
     - Initial database population
     """
 
-@router.get(
-    "",
-    response_model=List[Material],
-    summary="📋 List Materials – Complete Materials Catalog",
-    response_description="Complete materials list with pagination and filtering"
-)
-async def list_materials(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records"),
-    category: Optional[str] = Query(None, description="Filter by material category"),
-    unit: Optional[str] = Query(None, description="Filter by measurement unit"),
-):
-    """
-    📋 **List Materials** - Retrieve complete materials catalog with filtering
-    
-    Returns complete construction materials catalog with filtering capabilities
-    by categories, measurement units, and result pagination.
-    
-    **Features:**
-    - 📄 Pagination for large catalogs (default: 100 records)
-    - 🔍 Filtering by categories and measurement units
-    - 📊 Complete information for each material
-    - ⚡ Optimized database queries
-    - 🔄 Caching for frequently requested data
-    
-    **Query Parameters:**
-    - `skip`: Number of records to skip (pagination)
-    - `limit`: Maximum number of records (1-1000)
-    - `category`: Filter by material category
-    - `unit`: Filter by measurement unit
-    
-    **Response Example:**
-    ```json
-    [
-        {
-            "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "Portland Cement PC 500-D0",
-            "use_category": "Cement",
-            "unit": "kg",
-            "sku": "CEM-PC500-001",
-            "description": "Portland cement without mineral additives",
-            "embedding": null,
-            "created_at": "2025-06-16T16:46:29.421964Z",
-            "updated_at": "2025-06-16T16:46:29.421964Z"
-        }
-    ]
-    ```
-    
-    **Response Status Codes:**
-    - **200 OK**: Materials list returned successfully
-    - **400 Bad Request**: Invalid filtering parameters
-    - **500 Internal Server Error**: Data retrieval error
-    
-    **Filtering Examples:**
-    - `/materials?category=Cement` - cement materials only
-    - `/materials?unit=kg&limit=50` - materials in kilograms, 50 records
-    - `/materials?skip=100&limit=50` - records 101-150
-    
-    **Performance Notes:**
-    - Pagination recommended for large catalogs
-    - Filtering performed at database level
-    - Results cached for repeated requests
-    
-    **Use Cases:**
-    - Complete materials catalog browsing
-    - Creating dropdown lists in UI
-    - Data export for analysis
-    - External system synchronization
-    - Materials reporting
-    """
+# Duplicate endpoints, keeping the first definitions. The below endpoints are redundant and will be removed.
+# @router.get(
+#     "",
+#     response_model=List[Material],
+#     summary="📋 List Materials – Complete Materials Catalog",
+#     response_description="Complete materials list with pagination and filtering"
+# )
+# async def list_materials(
+#     skip: int = Query(0, ge=0, description="Number of records to skip"),
+#     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records"),
+#     category: Optional[str] = Query(None, description="Filter by material category"),
+#     unit: Optional[str] = Query(None, description="Filter by measurement unit"),
+# ):
+#     pass # Implementation for this endpoint is already above (get_materials)
 
-@router.get(
-    "/{material_id}",
-    response_model=Material,
-    summary="🔍 Get Material – Retrieve Material by ID",
-    response_description="Detailed information about specific material"
-)
-async def get_material(material_id: str):
-    """
-    🔍 **Get Material by ID** - Retrieve detailed material information
-    
-    Returns complete information about specific construction material by its
-    unique identifier.
-    
-    **Features:**
-    - 📊 Complete material information
-    - 🔍 Search by UUID or SKU
-    - ⚡ Fast access via indexed fields
-    - 🔄 Caching for frequently requested materials
-    
-    **Path Parameters:**
-    - `material_id`: Material UUID or SKU
-    
-    **Response Example:**
-    ```json
-    {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "Portland Cement PC 500-D0",
-        "use_category": "Cement",
-        "unit": "kg",
-        "sku": "CEM-PC500-001",
-        "description": "Portland cement without mineral additives grade 500",
-        "embedding": null,
-        "created_at": "2025-06-16T16:46:29.421964Z",
-        "updated_at": "2025-06-16T16:46:29.421964Z"
-    }
-    ```
-    
-    **Response Status Codes:**
-    - **200 OK**: Material found and returned
-    - **404 Not Found**: Material with specified ID not found
-    - **400 Bad Request**: Invalid ID format
-    - **500 Internal Server Error**: Data retrieval error
-    
-    **ID Formats:**
-    - **UUID**: `550e8400-e29b-41d4-a716-446655440000`
-    - **SKU**: `CEM-PC500-001` (if unique)
-    
-    **Use Cases:**
-    - Material details display in interface
-    - Material existence verification
-    - Data retrieval for editing
-    - API integration with external systems
-    - Material validation in orders
-    """
+# @router.get(
+#     "/{material_id}",
+#     response_model=Material,
+#     summary="🔍 Get Material – Retrieve Material by ID",
+#     response_description="Detailed information about specific material"
+# )
+# async def get_material(material_id: str):
+#     pass # Implementation for this endpoint is already above (get_material)
 
-@router.put(
-    "/{material_id}",
-    response_model=Material,
-    summary="✏️ Update Material – Material Update Operation",
-    response_description="Updated material information"
-)
-async def update_material(
-    material_id: str,
-    material_data: MaterialCreate
-):
-    """
-    ✏️ **Update Material** - Material information update
-    
-    Updates existing construction material data. Supports partial and complete
-    updates with data validation.
-    
-    **Features:**
-    - 📝 Partial and complete updates
-    - 🔍 SKU uniqueness validation
-    - 🧠 AI-enrichment of updated data
-    - 📈 Automatic embedding updates
-    - 📊 Change logging
-    - 🔄 Automatic timestamp updates
-    
-    **Request Body Example:**
-    ```json
-    {
-        "name": "Portland Cement PC 500-D0 Premium",
-        "description": "High-quality Portland cement without additives",
-        "use_category": "Cement",
-        "unit": "kg",
-        "sku": "CEM-PC500-PREM-001"
-    }
-    ```
-    
-    **Response Example:**
-    ```json
-    {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "Portland Cement PC 500-D0 Premium",
-        "use_category": "Cement",
-        "unit": "kg",
-        "sku": "CEM-PC500-PREM-001",
-        "description": "High-quality Portland cement without additives",
-        "embedding": null,
-        "created_at": "2025-06-16T16:46:29.421964Z",
-        "updated_at": "2025-06-16T18:15:42.123456Z"
-    }
-    ```
-    
-    **Response Status Codes:**
-    - **200 OK**: Material successfully updated
-    - **404 Not Found**: Material with specified ID not found
-    - **400 Bad Request**: Invalid data or duplicate SKU
-    - **422 Unprocessable Entity**: Data validation errors
-    - **500 Internal Server Error**: Update error
-    
-    **Validation Rules:**
-    - `name`: 1-500 characters, required field
-    - `sku`: Unique if specified
-    - `use_category`: Must exist in reference catalog
-    - `unit`: Must exist in reference catalog
-    
-    **Automatic Processing:**
-    - New embedding generation when name/description changes
-    - AI analysis and categorization of updated data
-    - Related records and indexes update
-    
-    **Use Cases:**
-    - Data error corrections
-    - Description and characteristics updates
-    - Material categorization changes
-    - External catalog synchronization
-    - Bulk updates via API
-    """
+# @router.put(
+#     "/{material_id}",
+#     response_model=Material,
+#     summary="✏️ Update Material – Material Update Operation",
+#     response_description="Updated material information"
+# )
+# async def update_material(
+#     material_id: str,
+#     material_data: MaterialCreate
+# ):
+#     pass # Implementation for this endpoint is already above (update_material)
 
-@router.delete(
-    "/{material_id}",
-    summary="🗑️ Delete Material – Material Deletion Operation",
-    response_description="Material deletion confirmation"
-)
-async def delete_material(material_id: str):
-    """
-    🗑️ **Delete Material** - Remove material from catalog
-    
-    Removes construction material from database. Operation is irreversible
-    and requires confirmation for critical data.
-    
-    **Features:**
-    - 🗑️ Permanent record deletion
-    - 🔍 Related data verification before deletion
-    - 📊 Deletion operation logging
-    - 🧹 Related embeddings and indexes cleanup
-    - ⚠️ Related records warnings
-    
-    **Response Example:**
-    ```json
-    {
-        "message": "Material successfully deleted",
-        "deleted_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-    ```
-    
-    **Response Status Codes:**
-    - **200 OK**: Material successfully deleted
-    - **404 Not Found**: Material with specified ID not found
-    - **409 Conflict**: Material is used in other records
-    - **500 Internal Server Error**: Deletion error
-    
-    **⚠️ Warnings:**
-    - Operation is irreversible - recovery impossible
-    - Check related data before deletion
-    - Backup recommended before bulk deletion
-    
-    **Cleanup Operations:**
-    - Vector embeddings removal from vector DB
-    - Search indexes cleanup
-    - Cached data removal
-    - Catalog statistics update
-    
-    **Use Cases:**
-    - Outdated materials removal
-    - Duplicate records cleanup
-    - Erroneously created materials removal
-    - Bulk catalog cleanup
-    - GDPR compliance requirements
-    """
+# @router.delete(
+#     "/{material_id}",
+#     summary="🗑️ Delete Material – Material Deletion Operation",
+#     response_description="Material deletion confirmation"
+# )
+# async def delete_material(material_id: str):
+#     pass # Implementation for this endpoint is already above (delete_material)
 
  

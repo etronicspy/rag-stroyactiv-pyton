@@ -103,8 +103,8 @@ async def get_tunnel_status(tunnel_service: TunnelService):
 
 @router.get(
     "/health",
-    summary="🩺 Tunnel Health – SSH Tunnel Health Check",
-    response_description="Simple tunnel status verification"
+    summary="🩺 Tunnel Health – SSH Tunnel Status Check",
+    response_description="Simple SSH tunnel status verification"
 )
 async def tunnel_health_check(tunnel_service: TunnelService):
     """

@@ -19,39 +19,6 @@ from core.config.parsers import ParserConfig, get_parser_config
 from core.config.constants import ParserConstants
 from core.logging.specialized.parsers import get_material_parser_logger
 
-# Legacy compatibility imports
-try:
-    from parser_module.units_config import (
-        UnitType, UnitInfo, STANDARD_UNITS, UNIT_ALIASES,
-        METRIC_UNITS, NON_METRIC_UNITS, QUANTITY_INDICATORS,
-        BLOCK_MATERIALS, MATERIAL_UNIT_HINTS,
-        normalize_unit, is_metric_unit, is_block_material,
-        get_material_hint, validate_unit_coefficient,
-        get_common_units_for_ai
-    )
-    LEGACY_UNITS_AVAILABLE = True
-except ImportError:
-    LEGACY_UNITS_AVAILABLE = False
-    
-    # Define basic enums and classes if legacy imports fail
-    class UnitType(Enum):
-        WEIGHT = "weight"
-        VOLUME = "volume"
-        AREA = "area"
-        LENGTH = "length"
-        COUNT = "count"
-        PACKAGING = "packaging"
-        LIQUID = "liquid"
-    
-    @dataclass
-    class UnitInfo:
-        name: str
-        symbol: str
-        unit_type: UnitType
-        base_unit: Optional[str] = None
-        conversion_factor: float = 1.0
-        aliases: List[str] = field(default_factory=list)
-
 
 @dataclass
 class UnitValidationRule:
@@ -139,12 +106,7 @@ class UnitsConfigManager:
     def _initialize_units_system(self):
         """Initialize units system with default configuration"""
         
-        if LEGACY_UNITS_AVAILABLE:
-            # Load from legacy system
-            self._load_legacy_units()
-        else:
-            # Initialize basic units
-            self._initialize_basic_units()
+        self._initialize_basic_units()
         
         # Initialize validation rules
         self._initialize_validation_rules()
@@ -155,31 +117,6 @@ class UnitsConfigManager:
         # Update statistics
         self.stats["total_units"] = len(self._units)
         self.stats["total_aliases"] = len(self._unit_aliases)
-    
-    def _load_legacy_units(self):
-        """Load units from legacy system"""
-        try:
-            # Load standard units
-            for unit_key, unit_info in STANDARD_UNITS.items():
-                self._units[unit_key] = unit_info
-                
-                # Add to metric/non-metric sets
-                if unit_key in METRIC_UNITS:
-                    self._metric_units.add(unit_key)
-                if unit_key in NON_METRIC_UNITS:
-                    self._non_metric_units.add(unit_key)
-            
-            # Load aliases
-            self._unit_aliases = UNIT_ALIASES.copy()
-            
-            # Load block materials
-            self._block_materials = BLOCK_MATERIALS.copy()
-            
-            self.logger.info("Loaded units from legacy system")
-            
-        except Exception as e:
-            self.logger.error(f"Error loading legacy units: {e}")
-            self._initialize_basic_units()
     
     def _initialize_basic_units(self):
         """Initialize basic units when legacy system is not available"""
@@ -461,14 +398,7 @@ class UnitsConfigManager:
             return "м3"
         
         # Check legacy hints if available
-        if LEGACY_UNITS_AVAILABLE:
-            try:
-                hint = get_material_hint(material_name)
-                if hint:
-                    self.stats["successful_material_hints"] += 1
-                    return hint
-            except Exception:
-                pass
+        # The legacy hints are removed, so this block is effectively removed.
         
         return None
     
@@ -498,14 +428,7 @@ class UnitsConfigManager:
             return is_valid
         
         # Use legacy validation if available
-        if LEGACY_UNITS_AVAILABLE:
-            try:
-                is_valid = validate_unit_coefficient(unit, coefficient)
-                if is_valid:
-                    self.stats["successful_validations"] += 1
-                return is_valid
-            except Exception:
-                pass
+        # The legacy validation is removed, so this block is effectively removed.
         
         # Basic validation - coefficient should be positive
         is_valid = coefficient > 0
@@ -551,11 +474,7 @@ class UnitsConfigManager:
         Returns:
             List[str]: List of common units
         """
-        if LEGACY_UNITS_AVAILABLE:
-            try:
-                return get_common_units_for_ai()
-            except Exception:
-                pass
+        # The legacy hints are removed, so this block is effectively removed.
         
         # Return basic common units
         return ["кг", "г", "т", "м3", "л", "м2", "м", "шт", "упак"]

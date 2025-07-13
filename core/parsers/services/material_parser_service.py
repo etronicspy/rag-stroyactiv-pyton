@@ -32,13 +32,15 @@ from ..interfaces import (
 
 # Service imports
 from .ai_parser_service import AIParserService, get_ai_parser_service
+from core.parsers.config.units_config_manager import get_units_manager
 
 # Legacy compatibility imports
-try:
-    from parser_module.units_config import normalize_unit, get_common_units_for_ai
-    LEGACY_IMPORTS_AVAILABLE = True
-except ImportError:
-    LEGACY_IMPORTS_AVAILABLE = False
+# The legacy parser_module has been removed, so these imports are no longer needed.
+# try:
+#     from parser_module.units_config import normalize_unit, get_common_units_for_ai
+#     LEGACY_IMPORTS_AVAILABLE = True
+# except ImportError:
+#     LEGACY_IMPORTS_AVAILABLE = False
 
 
 @dataclass
@@ -145,7 +147,6 @@ class MaterialParserService:
             "initialized": self._initialized,
             "ai_parser_healthy": self.ai_parser_service.is_healthy(),
             "config_available": self.config is not None,
-            "legacy_imports": LEGACY_IMPORTS_AVAILABLE,
             "statistics": self.stats,
             "ai_parser_details": self.ai_parser_service.get_health_details()
         }
@@ -495,14 +496,11 @@ class MaterialParserService:
         Returns:
             List[str]: List of supported units
         """
-        if not LEGACY_IMPORTS_AVAILABLE:
-            return ["шт", "м", "м²", "м³", "кг", "т", "л", "упак"]
-        
-        return get_common_units_for_ai()
-    
+        return get_units_manager().get_common_units_for_ai()
+
     def validate_unit(self, unit: str) -> Optional[str]:
         """
-        Validate and normalize unit.
+        Validate a unit and normalize it if possible.
         
         Args:
             unit: Unit to validate
@@ -510,23 +508,8 @@ class MaterialParserService:
         Returns:
             Optional[str]: Normalized unit or None if invalid
         """
-        if not LEGACY_IMPORTS_AVAILABLE:
-            # Basic validation without legacy imports
-            common_units = ["шт", "м", "м²", "м³", "кг", "т", "л", "упак"]
-            unit_lower = unit.lower().strip()
-            
-            for common_unit in common_units:
-                if unit_lower == common_unit.lower():
-                    return common_unit
-            
-            return None
-        
-        try:
-            normalized = normalize_unit(unit)
-            return normalized if normalized else None
-        except Exception:
-            return None
-    
+        return get_units_manager().normalize_unit(unit)
+
     def export_config(self, output_path: Union[str, Path]) -> None:
         """
         Export current configuration to file.

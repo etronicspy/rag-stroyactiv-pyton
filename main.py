@@ -18,7 +18,7 @@ from core.logging.context import CorrelationContext, with_correlation_context
 
 # Import routers and middleware
 from api.routes import (
-    health_router, search_router, materials_router, prices_router, reference_router,
+    materials_router, prices_router, reference_router,
     tunnel_router, health_unified, search_unified, enhanced_processing
 )
 
@@ -64,15 +64,16 @@ if settings.BACKEND_CORS_ORIGINS:
 setup_middleware(app, settings)
 
 # Register routers with English tags
-app.include_router(health_router, prefix="", tags=["health"])
-app.include_router(search_router, prefix="", tags=["search"])
+# Removing duplicated health and search routers as they are included via their unified versions.
+# app.include_router(health_router, prefix="", tags=["health"])
+# app.include_router(search_router, prefix="", tags=["search"])
 app.include_router(materials_router, prefix=f"{settings.API_V1_STR}/materials", tags=["materials"])
 app.include_router(prices_router, prefix=f"{settings.API_V1_STR}/prices", tags=["prices"])
 app.include_router(reference_router, prefix=f"{settings.API_V1_STR}/reference", tags=["reference"])
 app.include_router(tunnel_router, prefix=settings.API_V1_STR, tags=["tunnel"])
 app.include_router(health_unified.router, prefix=f"{settings.API_V1_STR}/health", tags=["health"])
 app.include_router(search_unified.router, prefix=f"{settings.API_V1_STR}/search", tags=["search"])
-app.include_router(enhanced_processing.router, prefix=f"{settings.API_V1_STR}/enhanced_processing", tags=["enhanced_processing"])
+app.include_router(enhanced_processing.router, prefix=f"{settings.API_V1_STR}/process-enhanced")
 
 # Always initialize logging system according to configuration
 setup_structured_logging()
@@ -260,4 +261,4 @@ async def root():
             </body>
         </html>
         """
-    ) 
+    )

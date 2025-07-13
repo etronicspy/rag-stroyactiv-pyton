@@ -228,16 +228,17 @@ __all__ = [
 ]
 
 # Compatibility note for legacy imports
-def _legacy_import_warning():
-    """Issue warning for legacy imports from parser_module."""
-    import warnings
-    warnings.warn(
-        "Direct imports from 'parser_module' are deprecated. "
-        "Use 'core.parsers' instead. "
-        "Legacy imports will be removed in version 3.0.0.",
-        DeprecationWarning,
-        stacklevel=3
-    )
+# The legacy parser_module has been removed, so this warning is no longer needed.
+# def _legacy_import_warning():
+#     """Issue warning for legacy imports from parser_module."""
+#     import warnings
+#     warnings.warn(
+#         "Direct imports from 'parser_module' are deprecated. "
+#         "Use 'core.parsers' instead. "
+#         "Legacy imports will be removed in version 3.0.0.",
+#         DeprecationWarning,
+#         stacklevel=3
+#     )
 
 # Parser module ready status
 print(f"🔧 Core Parsers Module v{__version__} loaded")

@@ -311,6 +311,10 @@ def get_tags_metadata() -> List[Dict[str, str]]:
             "description": "📦 **Materials Management** - CRUD operations for construction materials catalog with bulk upload support"
         },
         {
+            "name": "enhanced-processing",
+            "description": "⚡ **Enhanced Processing** - Enterprise-grade batch processing system for materials with validation, enrichment, and analytics"
+        },
+        {
             "name": "prices",
             "description": "💰 **Price Management** - Supplier price list upload and management with multiple format support"
         },

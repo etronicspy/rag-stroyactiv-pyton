@@ -20,17 +20,18 @@ from core.config.constants import ParserConstants
 from core.logging.specialized.parsers import get_material_parser_logger
 
 # Legacy compatibility imports
-try:
-    from parser_module.system_prompts import (
-        get_material_parsing_system_prompt,
-        get_material_parsing_user_prompt,
-        get_embeddings_system_prompt,
-        MATERIAL_TYPE_PROMPTS,
-        UNIT_PARSING_PATTERNS
-    )
-    LEGACY_PROMPTS_AVAILABLE = True
-except ImportError:
-    LEGACY_PROMPTS_AVAILABLE = False
+# The legacy parser_module has been removed, so these imports are no longer needed.
+# try:
+#     from parser_module.system_prompts import (
+#         get_material_parsing_system_prompt,
+#         get_material_parsing_user_prompt,
+#         get_embeddings_system_prompt,
+#         MATERIAL_TYPE_PROMPTS,
+#         UNIT_PARSING_PATTERNS
+#     )
+#     LEGACY_PROMPTS_AVAILABLE = True
+# except ImportError:
+#     LEGACY_PROMPTS_AVAILABLE = False
 
 
 class PromptType(Enum):
@@ -173,64 +174,7 @@ class SystemPromptsManager:
     
     def _get_default_system_prompt(self) -> str:
         """Get default system prompt"""
-        if LEGACY_PROMPTS_AVAILABLE:
-            return """
-Ты эксперт по строительным материалам. Анализируй названия товаров и извлекай метрические единицы измерения.
-
-ВОЗВРАЩАЙ ТОЛЬКО ВАЛИДНЫЙ JSON в формате:
-{{
-    "unit_parsed": "единица_измерения",
-    "price_coefficient": число,
-    "confidence": число_от_0_до_1,
-    "color": "цвет_или_null"
-}}
-
-ПОДДЕРЖИВАЕМЫЕ ЕДИНИЦЫ: {common_units}
-
-ВАЖНО! ЛОГИКА КОЭФФИЦИЕНТА:
-price_coefficient = количество метрических единиц в 1 исходной единице
-Примеры:
-- "Цемент 50кг" (продается за мешок) → коэффициент 50 (в 1 мешке = 50 кг)
-- "Кирпич объемом 0.00195 м³" (продается за штуку) → коэффициент 0.00195 (в 1 шт = 0.00195 м³)
-
-ПРАВИЛА ИЗВЛЕЧЕНИЯ:
-1. Явные единицы: "50кг" → кг, коэффициент 50
-2. БЛОЧНЫЕ МАТЕРИАЛЫ → ВСЕГДА м3 (объем):
-   - Кирпич, газобетон, пеноблок, шлакоблок, керамзитобетон
-   - Блоки, камни, бруски, плиты, панели, элементы, модули
-   - Если есть размеры → рассчитать объем в м³
-   - Если нет размеров → стандартный объем (например, кирпич = 0.00195 м³)
-3. Размеры для объема: "600x300x200" → м3, рассчитать объем в м³
-4. Размеры для площади: листы/плиты ≤50мм → м2, рассчитать площадь в м²
-5. Жидкости: "850мл" → л, перевести в литры
-6. Рулоны: "1x15м" → м2, рассчитать площадь
-7. Если единица не извлекается → "шт", коэффициент 1.0
-
-ИЗВЛЕЧЕНИЕ ЦВЕТА:
-8. Ищи цвет в названии материала:
-   - БАЗОВЫЕ ЦВЕТА: белый, черный, серый, красный, синий, зеленый, желтый, коричневый, оранжевый
-   - ОТТЕНКИ: светлый, темный, яркий, матовый, глянцевый
-   - ПРИРОДНЫЕ: бежевый, песочный, терракотовый, кирпичный, древесный
-   - Если цвет НЕ найден → "color": null
-   - Если найден → "color": "название_цвета"
-
-РАСЧЕТЫ:
-- Объем (м³): длина×ширина×высота ÷ 1,000,000,000 (если размеры в мм)
-- Площадь (м²): длина×ширина ÷ 1,000,000 (если размеры в мм)
-- Стандартный кирпич: 250×120×65мм = 0.00195 м³
-- Стандартный газобетонный блок: 600×300×200мм = 0.036 м³
-
-CONFIDENCE:
-- 0.9+ : явные единицы в названии
-- 0.7-0.9 : размеры с явным контекстом или известный блочный материал
-- 0.5-0.7 : размеры без четкого контекста
-- 0.3-0.5 : предположения по типу материала
-- <0.3 : сложные случаи
-
-Отвечай ТОЛЬКО JSON без дополнительного текста.
-"""
-        else:
-            return """
+        return """
 You are an expert in construction materials. Analyze product names and extract metric units.
 
 RETURN ONLY VALID JSON in format:
@@ -252,25 +196,39 @@ Return ONLY JSON without additional text.
     def _get_default_user_prompt(self) -> str:
         """Get default user prompt"""
         return """
-Товар: "{name}"
-Единица в прайсе: "{unit}"
-Цена: Указана за единицу "{unit}"
-{material_hint}
-{block_hint}
+Material Name: {name}
+Original Unit: {unit}
 
-Извлеки метрическую единицу измерения и рассчитай коэффициент для пересчета цены.
+[Optional Context]
+{material_hint}
+{is_block}
+
+Your task is to extract the correct metric unit, the price coefficient (how many metric units are in 1 original unit), and a confidence score.
+
+Example Output:
+{{
+    "unit_parsed": "м2",
+    "price_coefficient": 15.0,
+    "confidence": 0.95,
+    "color": "null"
+}}
 """
     
     def _get_default_embeddings_prompt(self) -> str:
         """Get default embeddings prompt"""
         return """
-Ты создаешь эмбеддинги для строительных материалов. 
-Фокусируйся на ключевых характеристиках материала:
-- Тип материала (цемент, кирпич, утеплитель и т.д.)
-- Назначение (строительство, отделка, изоляция)
-- Основные свойства (прочность, теплоизоляция, водостойкость)
-- Размеры и форма
-- Материал изготовления
+Generate a highly descriptive and concise embedding for the following construction material name, unit, and price coefficient.
+
+The embedding should capture the core characteristics of the material, its common use, and relevant properties for similarity search.
+Focus on keywords related to the material type, function, and measurement.
+
+Material Name: {name}
+Unit: {unit}
+Price Coefficient: {coefficient}
+
+Example: "Цемент 50кг" → "cement, 50kg, construction material, binder, bag"
+
+Output only the descriptive embedding string, nothing else.
 """
     
     def _initialize_specialized_templates(self):
@@ -402,7 +360,7 @@ Return ONLY JSON without additional text.
             name=name,
             unit=unit,
             material_hint=hint_text,
-            block_hint=block_hint
+            is_block=block_hint
         )
         
         # Cache result
@@ -824,53 +782,4 @@ Return ONLY JSON without additional text.
         Returns:
             List[str]: List of template names
         """
-        return list(self._templates.keys())
-
-
-# Service factory
-@lru_cache(maxsize=1)
-def get_prompts_manager() -> SystemPromptsManager:
-    """
-    Get System Prompts Manager instance (singleton).
-    
-    Returns:
-        SystemPromptsManager: Prompts manager instance
-    """
-    return SystemPromptsManager()
-
-
-# Convenience functions
-def get_material_parsing_system_prompt(common_units: List[str]) -> str:
-    """
-    Get system prompt for material parsing.
-    
-    Args:
-        common_units: List of supported units
-        
-    Returns:
-        str: System prompt
-    """
-    manager = get_prompts_manager()
-    return manager.get_system_prompt(common_units)
-
-
-def get_material_parsing_user_prompt(
-    name: str, 
-    unit: str, 
-    material_hint: Optional[str] = None,
-    is_block: bool = False
-) -> str:
-    """
-    Get user prompt for material parsing.
-    
-    Args:
-        name: Material name
-        unit: Original unit
-        material_hint: Material hint
-        is_block: Whether material is a block
-        
-    Returns:
-        str: User prompt
-    """
-    manager = get_prompts_manager()
-    return manager.get_user_prompt(name, unit, material_hint, is_block) 
+        return list(self._templates.keys()) 

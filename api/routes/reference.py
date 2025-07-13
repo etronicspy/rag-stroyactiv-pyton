@@ -7,7 +7,11 @@ from core.database.interfaces import IVectorDatabase
 from core.dependencies.database import get_vector_db_dependency, get_ai_client_dependency
 from core.schemas.response_models import ERROR_RESPONSES
 
-router = APIRouter(responses=ERROR_RESPONSES)
+router = APIRouter(
+    prefix="",
+    tags=["reference"],
+    responses=ERROR_RESPONSES
+)
 
 def get_category_service(
     vector_db: IVectorDatabase = Depends(get_vector_db_dependency)
@@ -31,8 +35,8 @@ def get_color_service(
 @router.post(
     "/categories/",
     response_model=Category,
-    summary="🏷️ Create Category – Создание категории",
-    response_description="Созданная категория",
+    summary="🏷️ Create Category – Create Material Category",
+    response_description="Created material category",
     status_code=201
 )
 async def create_category(
@@ -40,29 +44,29 @@ async def create_category(
     service: CategoryService = Depends(get_category_service)
 ):
     """
-    🏷️ **Create Category** - Создание новой категории материалов
+    🏷️ **Create Category** - Create new material category
     
-    Создает новую категорию использования материалов для классификации и фильтрации.
-    Категории помогают организовать материалы по функциональному назначению.
+    Creates a new material usage category for classification and filtering.
+    Categories help organize materials by functional purpose.
     
-    **Особенности:**
-    - 🆔 Автогенерация UUID для категории
-    - 🔍 Индексация для быстрого поиска
-    - ⏰ Автоматические временные метки
-    - 📝 Валидация уникальности названия
-    - 🗄️ Сохранение в векторную БД
+    **Features:**
+    - 🆔 Auto-generation of UUID for category
+    - 🔍 Indexing for fast search
+    - ⏰ Automatic timestamps
+    - 📝 Name uniqueness validation
+    - 🗄️ Storage in vector database
     
     **Required Fields:**
-    - `name`: Название категории (уникальное)
+    - `name`: Category name (unique)
     
     **Optional Fields:**
-    - `description`: Описание категории
+    - `description`: Category description
     
     **Request Body Example:**
     ```json
     {
-        "name": "Цемент",
-        "description": "Вяжущие материалы на основе портландцемента для создания бетонных смесей"
+        "name": "Cement",
+        "description": "Binding materials based on Portland cement for creating concrete mixtures"
     }
     ```
     
@@ -70,74 +74,74 @@ async def create_category(
     ```json
     {
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "Цемент",
-        "description": "Вяжущие материалы на основе портландцемента для создания бетонных смесей",
+        "name": "Cement",
+        "description": "Binding materials based on Portland cement for creating concrete mixtures",
         "created_at": "2025-06-16T17:30:15.123456Z",
         "updated_at": "2025-06-16T17:30:15.123456Z"
     }
     ```
     
     **Response Status Codes:**
-    - **201 Created**: Категория успешно создана
-    - **400 Bad Request**: Ошибка валидации (дубликат названия)
-    - **500 Internal Server Error**: Ошибка сохранения в БД
+    - **201 Created**: Category created successfully
+    - **400 Bad Request**: Validation error (duplicate name)
+    - **500 Internal Server Error**: Database save error
     
     **Common Categories:**
-    - Цемент, Кирпич, Арматура, Бетон, Песок, Щебень
-    - Утеплители, Гидроизоляция, Металлопрокат
-    - Лакокрасочные материалы, Сухие смеси
+    - Cement, Brick, Reinforcement, Concrete, Sand, Crushed Stone
+    - Insulation, Waterproofing, Metal Products
+    - Paint and Varnish Materials, Dry Mixes
     
     **Use Cases:**
-    - Создание системы классификации материалов
-    - Настройка фильтров для поиска
-    - Организация каталога продукции
-    - Стандартизация номенклатуры
+    - Creating material classification system
+    - Setting up search filters
+    - Organizing product catalog
+    - Standardizing nomenclature
     """
     return await service.create_category(category.name, category.description)
 
 @router.get(
     "/categories/",
     response_model=List[Category],
-    summary="📋 List Categories – Список категорий",
-    response_description="Список категорий материалов"
+    summary="📋 List Categories – Material Categories List",
+    response_description="List of material categories"
 )
 async def get_categories(
     service: CategoryService = Depends(get_category_service)
 ):
     """
-    📋 **List Categories** - Получение всех категорий материалов
+    📋 **List Categories** - Get all material categories
     
-    Возвращает полный список всех доступных категорий материалов в системе.
-    Используется для создания выпадающих списков и фильтров в интерфейсах.
+    Returns complete list of all available material categories in the system.
+    Used for creating dropdown lists and filters in interfaces.
     
-    **Особенности:**
-    - 📊 Полный список без пагинации
-    - ⚡ Быстрая загрузка (кэшируется)
-    - 🔤 Сортировка по алфавиту
-    - 📈 Счетчики использования
-    - 🎯 Готово к использованию в UI
+    **Features:**
+    - 📊 Complete list without pagination
+    - ⚡ Fast loading (cached)
+    - 🔤 Alphabetical sorting
+    - 📈 Usage counters
+    - 🎯 Ready for UI use
     
     **Response Example:**
     ```json
     [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "Арматура",
-            "description": "Стальные стержни для армирования железобетонных конструкций",
+            "name": "Reinforcement",
+            "description": "Steel bars for reinforcing reinforced concrete structures",
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         },
         {
             "id": "550e8400-e29b-41d4-a716-446655440001",
-            "name": "Кирпич",
-            "description": "Керамические и силикатные изделия для кладки стен",
+            "name": "Brick",
+            "description": "Ceramic and silicate products for wall masonry",
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         },
         {
             "id": "550e8400-e29b-41d4-a716-446655440002",
-            "name": "Цемент",
-            "description": "Вяжущие материалы на основе портландцемента",
+            "name": "Cement",
+            "description": "Binding materials based on Portland cement",
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         }
@@ -145,26 +149,26 @@ async def get_categories(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Список возвращен успешно (может быть пустым)
-    - **500 Internal Server Error**: Ошибка получения данных
+    - **200 OK**: List returned successfully (may be empty)
+    - **500 Internal Server Error**: Data retrieval error
     
     **Use Cases:**
-    - Создание выпадающих списков в формах
-    - Фильтрация материалов по категориям
-    - Административные интерфейсы
-    - API для мобильных приложений
-    - Синхронизация с внешними системами
+    - Creating dropdown lists in forms
+    - Filtering materials by categories
+    - Administrative interfaces
+    - API for mobile applications
+    - Synchronization with external systems
     """
     return await service.get_categories()
 
 @router.delete(
     "/categories/{category_id}",
-    summary="🗑️ Delete Category – Удаление категории",
-    response_description="Результат удаления категории",
+    summary="🗑️ Delete Category – Remove Material Category",
+    response_description="Category deletion result",
     responses={
-        200: {"description": "Категория успешно удалена"},
-        404: {"description": "Категория не найдена"},
-        400: {"description": "Некорректный UUID"}
+        200: {"description": "Category deleted successfully"},
+        404: {"description": "Category not found"},
+        400: {"description": "Invalid UUID"}
     }
 )
 async def delete_category(
@@ -172,20 +176,20 @@ async def delete_category(
     service: CategoryService = Depends(get_category_service)
 ):
     """
-    🗑️ **Delete Category** - Удаление категории материалов
+    🗑️ **Delete Category** - Remove material category
     
-    Удаляет категорию из системы. Операция необратимая, требует осторожности.
+    Removes category from system. Irreversible operation, requires caution.
     
-    **⚠️ ВНИМАНИЕ:** Убедитесь, что категория не используется материалами!
+    **⚠️ WARNING:** Ensure category is not used by materials!
     
-    **Особенности:**
-    - 🔥 Полное удаление из векторной БД
-    - ⚠️ Проверка зависимостей не выполняется
-    - ⚡ Мгновенное выполнение
-    - 📊 Обновление индексов
+    **Features:**
+    - 🔥 Complete removal from vector database
+    - ⚠️ Dependency check not performed
+    - ⚡ Instant execution
+    - 📊 Index updates
     
     **Path Parameters:**
-    - `category_id`: UUID категории для удаления
+    - `category_id`: Category UUID for deletion
     
     **Response Example:**
     ```json
@@ -197,20 +201,20 @@ async def delete_category(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Категория успешно удалена
-    - **404 Not Found**: Категория с указанным ID не найдена
-    - **400 Bad Request**: Некорректный формат UUID
-    - **500 Internal Server Error**: Ошибка удаления
+    - **200 OK**: Category deleted successfully
+    - **404 Not Found**: Category with specified ID not found
+    - **400 Bad Request**: Invalid UUID format
+    - **500 Internal Server Error**: Deletion error
     
-    **⚠️ Рекомендации:**
-    - Проверьте использование категории в материалах
-    - Создайте резервную копию перед удалением
-    - Рассмотрите архивацию вместо удаления
+    **⚠️ Recommendations:**
+    - Check category usage in materials
+    - Create backup before deletion
+    - Consider archiving instead of deletion
     
     **Use Cases:**
-    - Удаление устаревших категорий
-    - Очистка тестовых данных
-    - Реорганизация системы классификации
+    - Removing obsolete categories
+    - Cleaning test data
+    - Reorganizing classification system
     """
     success = await service.delete_category(category_id)
     return {"success": success}
@@ -218,8 +222,8 @@ async def delete_category(
 @router.post(
     "/units/",
     response_model=Unit,
-    summary="📏 Create Unit – Создание единицы измерения",
-    response_description="Созданная единица измерения",
+    summary="📏 Create Unit – Create Measurement Unit",
+    response_description="Created measurement unit",
     status_code=201
 )
 async def create_unit(
@@ -227,29 +231,29 @@ async def create_unit(
     service: UnitService = Depends(get_unit_service)
 ):
     """
-    📏 **Create Unit** - Создание новой единицы измерения
+    📏 **Create Unit** - Create new measurement unit
     
-    Создает новую единицу измерения для материалов. Единицы измерения используются
-    для точного указания количества и объемов строительных материалов.
+    Creates a new measurement unit for materials. Measurement units are used
+    for precise specification of quantities and volumes of construction materials.
     
-    **Особенности:**
-    - 🆔 Автогенерация UUID для единицы
-    - 📝 Валидация уникальности названия
-    - 🔍 Индексация для быстрого поиска
-    - ⏰ Автоматические временные метки
-    - 🗄️ Сохранение в векторную БД
+    **Features:**
+    - 🆔 Auto-generation of UUID for unit
+    - 📝 Name uniqueness validation
+    - 🔍 Indexing for fast search
+    - ⏰ Automatic timestamps
+    - 🗄️ Storage in vector database
     
     **Required Fields:**
-    - `name`: Название единицы измерения (уникальное)
+    - `name`: Unit name (unique)
     
     **Optional Fields:**
-    - `description`: Описание единицы измерения
+    - `description`: Unit description
     
     **Request Body Example:**
     ```json
     {
-        "name": "м³",
-        "description": "Кубический метр - единица измерения объема сыпучих материалов"
+        "name": "m³",
+        "description": "Cubic meter - unit for measuring volume of bulk materials"
     }
     ```
     
@@ -257,77 +261,77 @@ async def create_unit(
     ```json
     {
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "м³",
-        "description": "Кубический метр - единица измерения объема сыпучих материалов",
+        "name": "m³",
+        "description": "Cubic meter - unit for measuring volume of bulk materials",
         "created_at": "2025-06-16T17:30:15.123456Z",
         "updated_at": "2025-06-16T17:30:15.123456Z"
     }
     ```
     
     **Response Status Codes:**
-    - **201 Created**: Единица измерения успешно создана
-    - **400 Bad Request**: Ошибка валидации (дубликат названия)
-    - **500 Internal Server Error**: Ошибка сохранения в БД
+    - **201 Created**: Unit created successfully
+    - **400 Bad Request**: Validation error (duplicate name)
+    - **500 Internal Server Error**: Database save error
     
     **Common Units:**
-    - **Объем**: м³, л, дм³
-    - **Масса**: кг, т, г
-    - **Площадь**: м², см², мм²
-    - **Длина**: м, см, мм
-    - **Штучные**: шт, упак, мешок, паллета
-    - **Специальные**: п.м. (погонный метр), м.п. (метр погонный)
+    - **Volume**: m³, l, dm³
+    - **Mass**: kg, t, g
+    - **Area**: m², cm², mm²
+    - **Length**: m, cm, mm
+    - **Piece**: pcs, pack, bag, pallet
+    - **Special**: l.m. (linear meter), m.l. (meter linear)
     
     **Use Cases:**
-    - Стандартизация единиц измерения
-    - Создание выпадающих списков в формах
-    - Расчет количества материалов
-    - Формирование смет и спецификаций
+    - Standardizing measurement units
+    - Creating dropdown lists in forms
+    - Calculating material quantities
+    - Generating estimates and specifications
     """
     return await service.create_unit(unit.name, unit.description)
 
 @router.get(
     "/units/",
     response_model=List[Unit],
-    summary="📐 List Units – Список единиц измерения",
-    response_description="Список единиц измерения"
+    summary="📐 List Units – List Measurement Units",
+    response_description="List of measurement units"
 )
 async def get_units(
     service: UnitService = Depends(get_unit_service)
 ):
     """
-    📋 **List Units** - Получение всех единиц измерения
+    📋 **List Units** - Get all measurement units
     
-    Возвращает полный список всех доступных единиц измерения в системе.
-    Используется для создания выпадающих списков и валидации данных.
+    Returns complete list of all available measurement units in the system.
+    Used for creating dropdown lists and data validation.
     
-    **Особенности:**
-    - 📊 Полный список без пагинации
-    - ⚡ Быстрая загрузка (кэшируется)
-    - 🔤 Сортировка по популярности
-    - 📈 Готово к использованию в UI
-    - 🌐 Поддержка международных стандартов
+    **Features:**
+    - 📊 Complete list without pagination
+    - ⚡ Fast loading (cached)
+    - 🔤 Sorting by popularity
+    - 📈 Ready for UI use
+    - 🌐 International standards support
     
     **Response Example:**
     ```json
     [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "кг",
-            "description": "Килограмм - единица измерения массы",
+            "name": "kg",
+            "description": "Kilogram - mass measurement unit",
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         },
         {
             "id": "550e8400-e29b-41d4-a716-446655440001",
-            "name": "м³",
-            "description": "Кубический метр - единица измерения объема",
+            "name": "m³",
+            "description": "Cubic meter - volume measurement unit",
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         },
         {
             "id": "550e8400-e29b-41d4-a716-446655440002",
-            "name": "шт",
-            "description": "Штука - единица измерения штучных изделий",
+            "name": "pcs",
+            "description": "Piece - quantity measurement unit",
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         }
@@ -335,33 +339,33 @@ async def get_units(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Список возвращен успешно (может быть пустым)
-    - **500 Internal Server Error**: Ошибка получения данных
+    - **200 OK**: List returned successfully (may be empty)
+    - **500 Internal Server Error**: Data retrieval error
     
     **Unit Categories:**
-    - **Объем**: м³, л, дм³
-    - **Масса**: кг, т, г  
-    - **Площадь**: м², см²
-    - **Длина**: м, см, мм
-    - **Количество**: шт, упак, мешок
+    - **Volume**: m³, l, dm³
+    - **Mass**: kg, t, g  
+    - **Area**: m², cm²
+    - **Length**: m, cm, mm
+    - **Quantity**: pcs, pack, bag
     
     **Use Cases:**
-    - Создание выпадающих списков в формах
-    - Валидация единиц измерения
-    - Расчеты в сметах и спецификациях
-    - API для мобильных приложений
-    - Интеграция с ERP системами
+    - Creating dropdown lists in forms
+    - Measurement unit validation
+    - Calculations in estimates and specifications
+    - API for mobile applications
+    - Integration with ERP systems
     """
     return await service.get_units()
 
 @router.delete(
     "/units/{unit_id}",
-    summary="🗑️ Delete Unit – Удаление единицы измерения",
-    response_description="Результат удаления единицы",
+    summary="🗑️ Delete Unit – Delete Measurement Unit",
+    response_description="Unit deletion result",
     responses={
-        200: {"description": "Единица измерения успешно удалена"},
-        404: {"description": "Единица измерения не найдена"},
-        400: {"description": "Некорректный UUID"}
+        200: {"description": "Unit deleted successfully"},
+        404: {"description": "Unit not found"},
+        400: {"description": "Invalid UUID"}
     }
 )
 async def delete_unit(
@@ -369,20 +373,20 @@ async def delete_unit(
     service: UnitService = Depends(get_unit_service)
 ):
     """
-    🗑️ **Delete Unit** - Удаление единицы измерения
+    🗑️ **Delete Unit** - Delete measurement unit
     
-    Удаляет единицу измерения из системы. Операция необратимая, требует осторожности.
+    Removes measurement unit from system. Irreversible operation, requires caution.
     
-    **⚠️ ВНИМАНИЕ:** Убедитесь, что единица не используется материалами!
+    **⚠️ WARNING:** Ensure unit is not used by materials!
     
-    **Особенности:**
-    - 🔥 Полное удаление из векторной БД
-    - ⚠️ Проверка зависимостей не выполняется
-    - ⚡ Мгновенное выполнение
-    - 📊 Обновление индексов
+    **Features:**
+    - 🔥 Complete removal from vector database
+    - ⚠️ Dependency check not performed
+    - ⚡ Instant execution
+    - 📊 Index updates
     
     **Path Parameters:**
-    - `unit_id`: UUID единицы измерения для удаления
+    - `unit_id`: Unit UUID for deletion
     
     **Response Example:**
     ```json
@@ -394,22 +398,22 @@ async def delete_unit(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Единица измерения успешно удалена
-    - **404 Not Found**: Единица с указанным ID не найдена
-    - **400 Bad Request**: Некорректный формат UUID
-    - **500 Internal Server Error**: Ошибка удаления
+    - **200 OK**: Unit deleted successfully
+    - **404 Not Found**: Unit with specified ID not found
+    - **400 Bad Request**: Invalid UUID format
+    - **500 Internal Server Error**: Deletion error
     
-    **⚠️ Рекомендации:**
-    - Проверьте использование единицы в материалах
-    - Создайте резервную копию перед удалением
-    - Рассмотрите архивацию вместо удаления
-    - Используйте стандартные единицы СИ
+    **⚠️ Recommendations:**
+    - Check unit usage in materials
+    - Create backup before deletion
+    - Consider archiving instead of deletion
+    - Use standard SI units
     
     **Use Cases:**
-    - Удаление устаревших единиц измерения
-    - Очистка тестовых данных
-    - Стандартизация системы измерений
-    - Исправление ошибок ввода
+    - Removing obsolete measurement units
+    - Cleaning test data
+    - Standardizing measurement system
+    - Fixing input errors
     """
     success = await service.delete_unit(unit_id)
     return {"success": success}
@@ -417,8 +421,8 @@ async def delete_unit(
 @router.post(
     "/colors/",
     response_model=ColorReference,
-    summary="🎨 Create Color – Создание цвета",
-    response_description="Созданный цвет",
+    summary="🎨 Create Color – Create Color",
+    response_description="Created color",
     status_code=201
 )
 async def create_color(
@@ -426,34 +430,34 @@ async def create_color(
     service: ColorService = Depends(get_color_service)
 ):
     """
-    🎨 **Create Color** - Создание нового справочного цвета
+    🎨 **Create Color** - Create new reference color
     
-    Создает новый цвет в справочнике для классификации материалов.
-    Цвета используются для визуального поиска и фильтрации стройматериалов.
+    Creates a new color in the reference for material classification.
+    Colors are used for visual search and filtering of construction materials.
     
-    **Особенности:**
-    - 🆔 Автогенерация UUID для цвета
-    - 🤖 Генерация AI embedding для семантического поиска
-    - 🌈 Поддержка HEX и RGB форматов
-    - 🏷️ Система синонимов для точного поиска
-    - ⏰ Автоматические временные метки
-    - 🗄️ Сохранение в векторную БД
+    **Features:**
+    - 🆔 Auto-generation of UUID for color
+    - 🤖 AI embedding generation for semantic search
+    - 🌈 HEX and RGB format support
+    - 🏷️ Synonym system for precise search
+    - ⏰ Automatic timestamps
+    - 🗄️ Storage in vector database
     
     **Required Fields:**
-    - `name`: Название цвета на русском языке
+    - `name`: Color name in English
     
     **Optional Fields:**
-    - `hex_code`: HEX код цвета (например, "#FFFFFF")
-    - `rgb_values`: RGB значения [R, G, B] (0-255)
-    - `aliases`: Синонимы и альтернативные названия
+    - `hex_code`: HEX color code (e.g., "#FFFFFF")
+    - `rgb_values`: RGB values [R, G, B] (0-255)
+    - `aliases`: Synonyms and alternative names
     
     **Request Body Example:**
     ```json
     {
-        "name": "белый",
+        "name": "white",
         "hex_code": "#FFFFFF",
         "rgb_values": [255, 255, 255],
-        "aliases": ["светлый", "молочный", "снежный", "кремовый"]
+        "aliases": ["light", "milk", "snow", "cream"]
     }
     ```
     
@@ -461,10 +465,10 @@ async def create_color(
     ```json
     {
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "белый",
+        "name": "white",
         "hex_code": "#FFFFFF",
         "rgb_values": [255, 255, 255],
-        "aliases": ["светлый", "молочный", "снежный", "кремовый"],
+        "aliases": ["light", "milk", "snow", "cream"],
         "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
         "created_at": "2025-06-16T17:30:15.123456Z",
         "updated_at": "2025-06-16T17:30:15.123456Z"
@@ -472,68 +476,68 @@ async def create_color(
     ```
     
     **Response Status Codes:**
-    - **201 Created**: Цвет успешно создан
-    - **400 Bad Request**: Ошибка валидации (некорректный HEX/RGB)
-    - **500 Internal Server Error**: Ошибка сохранения в БД
+    - **201 Created**: Color created successfully
+    - **400 Bad Request**: Validation error (invalid HEX/RGB)
+    - **500 Internal Server Error**: Database save error
     
     **Common Colors:**
-    - **Базовые**: белый, черный, серый, коричневый
-    - **Основные**: красный, синий, зеленый, желтый
-    - **Природные**: бежевый, песочный, терракотовый, охра
-    - **Металлики**: серебристый, золотистый, медный
-    - **Специальные**: прозрачный, матовый, глянцевый
+    - **Basic**: white, black, gray, brown
+    - **Primary**: red, blue, green, yellow
+    - **Natural**: beige, sand, terracotta, ochre
+    - **Metallic**: silver, gold, copper
+    - **Special**: transparent, matte, glossy
     
     **Use Cases:**
-    - Создание цветового справочника материалов
-    - Фильтрация по цветам в каталогах
-    - Визуальный поиск стройматериалов
-    - Стандартизация цветовой номенклатуры
-    - RAG нормализация цветовых описаний
+    - Creating material color reference
+    - Filtering by colors in catalogs
+    - Visual search for construction materials
+    - Standardizing color nomenclature
+    - RAG normalization of color descriptions
     """
     return await service.create_color(color)
 
 @router.get(
     "/colors/",
     response_model=List[ColorReference],
-    summary="🌈 List Colors – Список цветов",
-    response_description="Список цветов материалов"
+    summary="🌈 List Colors – List Colors",
+    response_description="List of material colors"
 )
 async def get_colors(
     service: ColorService = Depends(get_color_service)
 ):
     """
-    🌈 **List Colors** - Получение всех цветов из справочника
+    🌈 **List Colors** - Get all colors from reference
     
-    Возвращает полный список всех доступных цветов в системе.
-    Используется для создания цветовых палитр и фильтров в интерфейсах.
+    Returns complete list of all available colors in the system.
+    Used for creating color palettes and filters in interfaces.
     
-    **Особенности:**
-    - 🎨 Полный список цветов с embeddings
-    - 🌈 Поддержка HEX и RGB форматов
-    - 🏷️ Синонимы для каждого цвета
-    - ⚡ Быстрая загрузка (кэшируется)
-    - 🔤 Сортировка по популярности
-    - 📈 Готово к использованию в UI
+    **Features:**
+    - 🎨 Complete color list with embeddings
+    - 🌈 HEX and RGB format support
+    - 🏷️ Synonyms for each color
+    - ⚡ Fast loading (cached)
+    - 🔤 Sorting by popularity
+    - 📈 Ready for UI use
     
     **Response Example:**
     ```json
     [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "белый",
+            "name": "white",
             "hex_code": "#FFFFFF",
             "rgb_values": [255, 255, 255],
-            "aliases": ["светлый", "молочный", "снежный"],
+            "aliases": ["light", "milk", "snow"],
             "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         },
         {
             "id": "550e8400-e29b-41d4-a716-446655440001",
-            "name": "красный",
+            "name": "red",
             "hex_code": "#FF0000",
             "rgb_values": [255, 0, 0],
-            "aliases": ["алый", "кирпичный", "багряный"],
+            "aliases": ["scarlet", "brick", "crimson"],
             "embedding": [0.4, 0.5, 0.6, "...", "(1536 dimensions)"],
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
@@ -542,33 +546,33 @@ async def get_colors(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Список возвращен успешно (может быть пустым)
-    - **500 Internal Server Error**: Ошибка получения данных
+    - **200 OK**: List returned successfully (may be empty)
+    - **500 Internal Server Error**: Data retrieval error
     
     **Color Categories:**
-    - **Нейтральные**: белый, черный, серый
-    - **Теплые**: красный, оранжевый, желтый
-    - **Холодные**: синий, зеленый, фиолетовый
-    - **Природные**: коричневый, бежевый, терракотовый
-    - **Металлические**: серебристый, золотистый, медный
+    - **Neutral**: white, black, gray
+    - **Warm**: red, orange, yellow
+    - **Cool**: blue, green, purple
+    - **Natural**: brown, beige, terracotta
+    - **Metallic**: silver, gold, copper
     
     **Use Cases:**
-    - Создание цветовых палитр в UI
-    - Фильтрация материалов по цветам
-    - RAG нормализация цветовых описаний
-    - API для мобильных приложений
-    - Интеграция с каталогами поставщиков
+    - Creating color palettes in UI
+    - Filtering materials by colors
+    - RAG normalization of color descriptions
+    - API for mobile applications
+    - Integration with supplier catalogs
     """
     return await service.get_colors()
 
 @router.delete(
     "/colors/{color_id}",
-    summary="🗑️ Delete Color – Удаление цвета",
-    response_description="Результат удаления цвета",
+    summary="🗑️ Delete Color – Delete Color",
+    response_description="Color deletion result",
     responses={
-        200: {"description": "Цвет успешно удален"},
-        404: {"description": "Цвет не найден"},
-        400: {"description": "Некорректный UUID"}
+        200: {"description": "Color deleted successfully"},
+        404: {"description": "Color not found"},
+        400: {"description": "Invalid UUID"}
     }
 )
 async def delete_color(
@@ -576,21 +580,21 @@ async def delete_color(
     service: ColorService = Depends(get_color_service)
 ):
     """
-    🗑️ **Delete Color** - Удаление цвета из справочника
+    🗑️ **Delete Color** - Delete color from reference
     
-    Удаляет цвет из системы. Операция необратимая, требует осторожности.
+    Removes color from system. Irreversible operation, requires caution.
     
-    **⚠️ ВНИМАНИЕ:** Убедитесь, что цвет не используется в материалах!
+    **⚠️ WARNING:** Ensure color is not used in materials!
     
-    **Особенности:**
-    - 🔥 Полное удаление из векторной БД
-    - ⚠️ Проверка зависимостей не выполняется
-    - ⚡ Мгновенное выполнение
-    - 📊 Обновление индексов
-    - 🤖 Удаление AI embeddings
+    **Features:**
+    - 🔥 Complete removal from vector database
+    - ⚠️ Dependency check not performed
+    - ⚡ Instant execution
+    - 📊 Index updates
+    - 🤖 AI embeddings removal
     
     **Path Parameters:**
-    - `color_id`: UUID цвета для удаления
+    - `color_id`: Color UUID for deletion
     
     **Response Example:**
     ```json
@@ -602,23 +606,23 @@ async def delete_color(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: Цвет успешно удален
-    - **404 Not Found**: Цвет с указанным ID не найден
-    - **400 Bad Request**: Некорректный формат UUID
-    - **500 Internal Server Error**: Ошибка удаления
+    - **200 OK**: Color deleted successfully
+    - **404 Not Found**: Color with specified ID not found
+    - **400 Bad Request**: Invalid UUID format
+    - **500 Internal Server Error**: Deletion error
     
-    **⚠️ Рекомендации:**
-    - Проверьте использование цвета в материалах
-    - Создайте резервную копию перед удалением
-    - Рассмотрите архивацию вместо удаления
-    - Используйте стандартные цвета из палитры
+    **⚠️ Recommendations:**
+    - Check color usage in materials
+    - Create backup before deletion
+    - Consider archiving instead of deletion
+    - Use standard colors from palette
     
     **Use Cases:**
-    - Удаление устаревших цветов
-    - Очистка тестовых данных
-    - Стандартизация цветовой палитры
-    - Исправление ошибок ввода
-    - Реорганизация справочника цветов
+    - Removing obsolete colors
+    - Cleaning test data
+    - Standardizing color palette
+    - Fixing input errors
+    - Reorganizing color reference
     """
     success = await service.delete_color(color_id)
     return {"success": success}

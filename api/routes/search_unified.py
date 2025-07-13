@@ -15,7 +15,7 @@ from core.logging import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter(
-    prefix="/api/v1/search",
+    prefix="",
     tags=["search"],
     responses=ERROR_RESPONSES,
 )

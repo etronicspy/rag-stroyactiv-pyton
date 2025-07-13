@@ -1,7 +1,7 @@
 """
 Comprehensive Price Lists Management API.
 
-API для управления прайс-листами поставщиков с поддержкой различных форматов данных.
+API for managing supplier price lists with support for various data formats.
 """
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, Query, BackgroundTasks
@@ -17,61 +17,66 @@ import traceback
 import time
 from datetime import datetime
 from core.schemas.response_models import ERROR_RESPONSES
+from core.database.factories import get_vector_database # Import the correct function
 
-router = APIRouter(responses=ERROR_RESPONSES)
+router = APIRouter(
+    prefix="",
+    tags=["prices"],
+    responses=ERROR_RESPONSES
+)
 logger = get_logger(__name__)
 settings = get_settings()
 
 async def get_qdrant_client():
     """Get Qdrant client instance using centralized configuration"""
-    return get_vector_db_client()
+    return get_vector_database() # Use the correct function
 
 async def get_price_processor():
     """Get price processor instance"""
     return PriceProcessor()
 
 @router.post("/process", 
-            summary="📂 Process Price List - Обработка прайс-листа поставщика",
-            response_description="Результат обработки прайс-листа")
+            summary="📂 Process Price List – Supplier Price List Processing",
+            response_description="Price list processing results")
 async def process_price_list(
-    file: UploadFile = File(..., description="CSV или Excel файл с прайс-листом"),
-    supplier_id: str = Form(..., description="Уникальный идентификатор поставщика"),
-    pricelistid: int = Form(None, description="ID прайс-листа (опционально, будет сгенерирован автоматически)"),
+    file: UploadFile = File(..., description="CSV or Excel file with price list"),
+    supplier_id: str = Form(..., description="Unique supplier identifier"),
+    pricelistid: int = Form(None, description="Price list ID (optional, will be auto-generated)"),
     price_processor: PriceProcessor = Depends(get_price_processor)
 ):
     """
-    📂 **Process Price List** - Обработка и загрузка прайс-листа поставщика
+    📂 **Process Price List** - Supplier price list processing and upload
     
-    Обрабатывает загруженный прайс-лист (CSV или Excel) и сохраняет данные в коллекции, 
-    специфичной для поставщика. Поддерживает только новый расширенный формат сырьевых продуктов.
+    Processes uploaded price list (CSV or Excel) and saves data to supplier-specific
+    collection. Supports only the new extended raw products format.
     
-    **Поддерживаемые форматы файлов:**
+    **Supported File Formats:**
     - 📊 CSV (comma-separated values)
     - 📈 Excel (.xls, .xlsx)
-    - 📋 Максимальный размер файла: 50MB
+    - 📋 Maximum file size: 50MB
     
-    **Новый формат (Raw Products):**
+    **New Format (Raw Products):**
     ```csv
     name,sku,use_category,unit_price,unit_price_currency,calc_unit,count
-    "Кирпич керамический","SKU001","Кирпич",12.50,"RUB","шт",1000
-    "Блок газобетонный","SKU002","Блоки",85.00,"RUB","м3",50
+    "Ceramic Brick","SKU001","Brick",12.50,"RUB","pcs",1000
+    "Aerated Concrete Block","SKU002","Blocks",85.00,"RUB","m3",50
     ```
     
-    **Поля нового формата:**
-    - `name` - Название продукта (обязательно)
-    - `sku` - Артикул продукта (опционально)
-    - `use_category` - Категория продукта (опционально)
-    - `unit_price` - Основная цена (обязательно)
-    - `unit_price_currency` - Валюта основной цены (по умолчанию RUB)
-    - `unit_calc_price` - Расчетная цена (опционально)
-    - `calc_unit` - Единица расчета (обязательно для нового формата)
-    - `count` - Количество (по умолчанию 1)
-    - `date_price_change` - Дата изменения цены (опционально)
+    **New Format Fields:**
+    - `name` - Product name (required)
+    - `sku` - Product SKU (optional)
+    - `use_category` - Product category (optional)
+    - `unit_price` - Main price (required)
+    - `unit_price_currency` - Main price currency (default RUB)
+    - `unit_calc_price` - Calculated price (optional)
+    - `calc_unit` - Calculation unit (required for new format)
+    - `count` - Quantity (default 1)
+    - `date_price_change` - Price change date (optional)
     
     **Response Status Codes:**
-    - **200 OK**: Прайс-лист успешно обработан
-    - **400 Bad Request**: Некорректный формат файла или данных
-    - **500 Internal Server Error**: Ошибка сервера при обработке
+    - **200 OK**: Price list processed successfully
+    - **400 Bad Request**: Invalid file format or data
+    - **500 Internal Server Error**: Server error during processing
     
     **Example Response (New Raw Products Format):**
     ```json
@@ -84,18 +89,18 @@ async def process_price_list(
     }
     ```
     
-    **Практические применения:**
-    - 📦 Массовая загрузка каталогов от поставщиков
-    - 💰 Актуализация цен и наличия товаров
-    - 🔄 Интеграция с ERP-системами поставщиков
-    - 📊 Создание единой базы строительных материалов
-    - 🔍 Подготовка данных для векторного поиска
+    **Practical Applications:**
+    - 📦 Bulk upload of supplier catalogs
+    - 💰 Price and availability updates
+    - 🔄 Integration with supplier ERP systems
+    - 📊 Creation of unified construction materials database
+    - 🔍 Data preparation for vector search
     
-    **Рекомендации:**
-    - Используйте уникальные `supplier_id` для каждого поставщика
-    - Убедитесь в корректности заголовков CSV файла
-    - Проверяйте качество данных перед загрузкой
-    - Регулярно обновляйте прайс-листы для актуальности цен
+    **Recommendations:**
+    - Use unique `supplier_id` for each supplier
+    - Ensure correct CSV file headers
+    - Check data quality before upload
+    - Regularly update price lists for current prices
     """
     logger.info(f"Received file: {file.filename}, content_type: {file.content_type}")
     
@@ -140,33 +145,33 @@ async def process_price_list(
 
 @router.get(
     "/{supplier_id}/latest",
-    summary="📋 Get Latest Price List – Актуальный прайс-лист",
-    response_description="Последний загруженный прайс-лист поставщика"
+    summary="📋 Get Latest Price List – Current Supplier Price List",
+    response_description="Latest uploaded price list for supplier"
 )
 async def get_latest_price_list(
     supplier_id: str,
     price_processor: PriceProcessor = Depends(get_price_processor)
 ):
     """
-    📋 **Get Latest Price List** - Получение актуального прайс-листа поставщика
+    📋 **Get Latest Price List** - Retrieve current supplier price list
     
-    Возвращает последний загруженный прайс-лист для указанного поставщика 
-    с полной информацией о материалах/товарах и их актуальных ценах.
+    Returns the latest uploaded price list for the specified supplier
+    with complete information about materials/products and their current prices.
     
-    **Функциональность:**
-    - 🕐 Автоматический поиск последней загрузки по дате
-    - 📊 Полная информация о всех позициях прайс-листа
-    - 💰 Актуальные цены и единицы измерения
-    - 🏷️ Категоризация товаров и материалов
-    - 📈 Статистика по прайс-листу
+    **Features:**
+    - 🕐 Automatic search for latest upload by date
+    - 📊 Complete information about all price list items
+    - 💰 Current prices and measurement units
+    - 🏷️ Product and material categorization
+    - 📈 Price list statistics
     
     **Path Parameters:**
-    - `supplier_id` - Уникальный идентификатор поставщика
+    - `supplier_id` - Unique supplier identifier
     
     **Response Status Codes:**
-    - **200 OK**: Прайс-лист успешно найден и возвращен
-    - **404 Not Found**: Прайс-листы для поставщика не найдены
-    - **500 Internal Server Error**: Ошибка сервера при получении данных
+    - **200 OK**: Price list found and returned successfully
+    - **404 Not Found**: No price lists found for supplier
+    - **500 Internal Server Error**: Server error retrieving data
     
     **Example Response:**
     ```json
@@ -178,19 +183,19 @@ async def get_latest_price_list(
         "materials": [
             {
                 "id": "prod_001",
-                "name": "Кирпич керамический",
+                "name": "Ceramic Brick",
                 "sku": "SKU001",
-                "use_category": "Кирпич",
+                "use_category": "Brick",
                 "unit_price": 12.50,
                 "unit_price_currency": "RUB",
-                "calc_unit": "шт",
+                "calc_unit": "pcs",
                 "count": 1000,
                 "upload_date": "2025-06-16T19:15:30.123456Z"
             }
         ],
         "statistics": {
             "categories": {
-                "Кирпич": 1
+                "Brick": 1
             },
             "unit_price_range": {
                 "min": 12.5,
@@ -201,18 +206,18 @@ async def get_latest_price_list(
     }
     ```
     
-    **Практические применения:**
-    - 🛒 Отображение актуального каталога товаров
-    - 💰 Расчет стоимости строительных проектов
-    - 📊 Анализ ценовой политики поставщика
-    - 🔍 Поиск конкретных материалов в каталоге
-    - 📈 Мониторинг изменения цен
+    **Practical Applications:**
+    - 🛒 Display current product catalog
+    - 💰 Calculate construction project costs
+    - 📊 Analyze supplier pricing policy
+    - 🔍 Search for specific materials in catalog
+    - 📈 Monitor price changes
     
-    **Использование в интеграциях:**
-    - Синхронизация с системами управления складом
-    - Обновление данных в интернет-магазинах
-    - Формирование коммерческих предложений
-    - Автоматическое ценообразование
+    **Integration Usage:**
+    - Synchronization with warehouse management systems
+    - Update data in online stores
+    - Generate commercial proposals
+    - Automatic pricing
     """
     try:
         result = price_processor.get_latest_price_list(supplier_id)
@@ -232,33 +237,31 @@ async def get_latest_price_list(
 
 @router.get(
     "/{supplier_id}/all",
-    summary="📚 All Price Lists – Все прайс-листы поставщика",
-    response_description="Все прайс-листы поставщика, сгруппированные по дате загрузки"
+    summary="📚 All Price Lists – All Supplier Price Lists",
+    response_description="All supplier price lists grouped by upload date"
 )
 async def get_all_price_lists(
     supplier_id: str,
     price_processor: PriceProcessor = Depends(get_price_processor)
 ):
     """
-    📚 **Get All Price Lists** - Получение всех прайс-листов поставщика
+    📚 **Get All Price Lists** – Retrieve all price lists for a supplier
     
-    Возвращает полную историю всех загруженных прайс-листов для указанного 
-    поставщика, сгруппированных по дате загрузки. Полезно для анализа 
-    изменений цен и ассортимента во времени.
+    Returns the complete history of all uploaded price lists for the specified supplier, grouped by upload date. Useful for analyzing price and assortment changes over time.
     
-    **Функциональность:**
-    - 📅 Хронологическая группировка по дате загрузки
-    - 📊 Статистика по каждому прайс-листу
-    - 🔍 Возможность отслеживания изменений цен
-    - 📈 Аналитика по динамике ассортимента
-    - 🗂️ Архивные данные для исторического анализа
+    **Features:**
+    - 📅 Chronological grouping by upload date
+    - 📊 Statistics for each price list
+    - 🔍 Track price changes over time
+    - 📈 Assortment dynamics analytics
+    - 🗂️ Archive data for historical analysis
     
     **Path Parameters:**
-    - `supplier_id` - Уникальный идентификатор поставщика
+    - `supplier_id`: Unique supplier identifier
     
     **Response Status Codes:**
-    - **200 OK**: Данные успешно получены
-    - **500 Internal Server Error**: Ошибка сервера при получении данных
+    - **200 OK**: Data retrieved successfully
+    - **500 Internal Server Error**: Server error during data retrieval
     
     **Example Response:**
     ```json
@@ -280,17 +283,6 @@ async def get_all_price_lists(
                     "max": 25000,
                     "avg": 5200
                 }
-            },
-            {
-                "upload_date": "2025-05-20T14:22:15.987654Z", 
-                "pricelistid": 11234,
-                "materials_count": 142,
-                "categories_count": 7,
-                "price_range": {
-                    "min": 480,
-                    "max": 24500,
-                    "avg": 5100
-                }
             }
         ],
         "analytics": {
@@ -301,18 +293,18 @@ async def get_all_price_lists(
     }
     ```
     
-    **Практические применения:**
-    - 📊 Анализ динамики цен поставщика
-    - 📈 Исследование изменений ассортимента
-    - 💰 Прогнозирование ценовых трендов
-    - 🔍 Поиск исторических данных по ценам
-    - 📋 Аудит загружаемых прайс-листов
+    **Use Cases:**
+    - 📊 Analyze supplier price trends
+    - 📈 Study assortment changes
+    - 💰 Forecast price trends
+    - 🔍 Search historical price data
+    - 📋 Audit uploaded price lists
     
-    **Аналитические возможности:**
-    - Сравнение прайс-листов разных периодов
-    - Выявление сезонных колебаний цен
-    - Отслеживание появления новых товарных категорий
-    - Анализ стабильности поставщика
+    **Analytics Capabilities:**
+    - Compare price lists across periods
+    - Detect seasonal price fluctuations
+    - Track new product categories
+    - Analyze supplier stability
     """
     try:
         result = price_processor.get_all_price_lists(supplier_id)
@@ -323,38 +315,38 @@ async def get_all_price_lists(
 
 @router.delete(
     "/{supplier_id}",
-    summary="🗑️ Delete Supplier Lists – Удаление прайс-листов",
-    response_description="Подтверждение удаления"
+    summary="🗑️ Delete Supplier Lists – Remove Supplier Price Lists",
+    response_description="Deletion confirmation"
 )
 async def delete_supplier_price_list(
     supplier_id: str,
     price_processor: PriceProcessor = Depends(get_price_processor)
 ):
     """
-    🗑️ **Delete Supplier Price Lists** - Удаление всех прайс-листов поставщика
+    🗑️ **Delete Supplier Price Lists** – Remove all price lists for a supplier
     
-    Полностью удаляет все прайс-листы и связанные данные для указанного поставщика.
-    **ВНИМАНИЕ:** Операция необратима! Все исторические данные будут утеряны.
+    Completely deletes all price lists and related data for the specified supplier.
+    **WARNING:** This operation is irreversible! All historical data will be lost.
     
-    **Что удаляется:**
-    - 📋 Все прайс-листы поставщика
-    - 🗂️ Исторические данные о ценах
-    - 🏷️ Связанные категории и метаданные
-    - 📊 Статистика и аналитика
-    - 🔍 Векторные индексы для поиска
+    **What is deleted:**
+    - 📋 All supplier price lists
+    - 🗂️ Historical price data
+    - 🏷️ Related categories and metadata
+    - 📊 Statistics and analytics
+    - 🔍 Vector indexes for search
     
-    **Безопасность операции:**
-    - ⚠️ Операция необратима
-    - 🔒 Требует подтверждения supplier_id
-    - 📝 Логируется для аудита
-    - 🚫 Не влияет на данные других поставщиков
+    **Operation Safety:**
+    - ⚠️ Irreversible operation
+    - 🔒 Requires supplier_id confirmation
+    - 📝 Logged for audit
+    - 🚫 Does not affect other suppliers' data
     
     **Path Parameters:**
-    - `supplier_id` - Уникальный идентификатор поставщика
+    - `supplier_id`: Unique supplier identifier
     
     **Response Status Codes:**
-    - **200 OK**: Все данные поставщика успешно удалены
-    - **500 Internal Server Error**: Ошибка при удалении данных
+    - **200 OK**: All supplier data deleted successfully
+    - **500 Internal Server Error**: Error during data deletion
     
     **Example Response:**
     ```json
@@ -366,25 +358,25 @@ async def delete_supplier_price_list(
     }
     ```
     
-    **Практические применения:**
-    - 🔄 Подготовка к полному обновлению каталога
-    - 🧹 Очистка данных неактивных поставщиков
-    - ⚖️ Соблюдение требований GDPR
-    - 🗂️ Архивирование и реорганизация данных
-    - 🔧 Устранение поврежденных данных
+    **Use Cases:**
+    - 🔄 Prepare for full catalog update
+    - 🧹 Clean up inactive supplier data
+    - ⚖️ GDPR compliance
+    - 🗂️ Data archiving and reorganization
+    - 🔧 Remove corrupted data
     
-    **Рекомендации перед удалением:**
-    - 💾 Создайте резервную копию данных
-    - 📊 Экспортируйте аналитику при необходимости
-    - ✅ Убедитесь в корректности supplier_id
-    - 👥 Уведомите заинтересованные стороны
-    - 📝 Документируйте причину удаления
+    **Recommendations before deletion:**
+    - 💾 Create a data backup
+    - 📊 Export analytics if needed
+    - ✅ Verify supplier_id correctness
+    - 👥 Notify stakeholders
+    - 📝 Document the reason for deletion
     
-    **После удаления:**
-    - Данные поставщика станут недоступны немедленно
-    - Поиск не будет возвращать результаты по этому поставщику
-    - API запросы к удаленному поставщику вернут 404 ошибку
-    - Освободится место в векторной базе данных
+    **After deletion:**
+    - Supplier data becomes immediately unavailable
+    - Search will not return results for this supplier
+    - API requests to deleted supplier will return 404
+    - Space is freed in the vector database
     """
     try:
         success = price_processor.delete_supplier_prices(supplier_id)
@@ -405,8 +397,8 @@ async def delete_supplier_price_list(
 
 @router.get(
     "/{supplier_id}/pricelist/{pricelistid}",
-    summary="📋 Price List Products – Продукты по ID прайс-листа",
-    response_description="Продукты из конкретного прайс-листа"
+    summary="📋 Price List Products – Products by Price List ID",
+    response_description="Products from specific price list"
 )
 async def get_raw_products_by_pricelist(
     supplier_id: str,
@@ -414,26 +406,25 @@ async def get_raw_products_by_pricelist(
     price_processor: PriceProcessor = Depends(get_price_processor)
 ):
     """
-    📋 **Get Products by Price List ID** - Получение продуктов по конкретному ID прайс-листа
+    📋 **Get Products by Price List ID** – Retrieve products by specific price list ID
     
-    Возвращает все продукты из конкретного прайс-листа, идентифицированного 
-    по уникальному ID. Позволяет получить точную версию каталога на определенную дату.
+    Returns all products from a specific price list identified by its unique ID. Allows you to get the exact catalog version for a specific date.
     
-    **Функциональность:**
-    - 🎯 Точная выборка по ID прайс-листа
-    - 📅 Получение исторических данных
-    - 🔍 Детальная информация о каждом продукте
-    - 💰 Цены на конкретную дату
-    - 📊 Статистика по выбранному прайс-листу
+    **Features:**
+    - 🎯 Precise selection by price list ID
+    - 📅 Retrieve historical data
+    - 🔍 Detailed information for each product
+    - 💰 Prices for a specific date
+    - 📊 Statistics for the selected price list
     
     **Path Parameters:**
-    - `supplier_id` - Уникальный идентификатор поставщика
-    - `pricelistid` - Уникальный ID прайс-листа
+    - `supplier_id`: Unique supplier identifier
+    - `pricelistid`: Unique price list ID
     
     **Response Status Codes:**
-    - **200 OK**: Прайс-лист найден и данные возвращены
-    - **404 Not Found**: Прайс-лист с указанным ID не найден
-    - **500 Internal Server Error**: Ошибка сервера при получении данных
+    - **200 OK**: Price list found and data returned
+    - **404 Not Found**: Price list with specified ID not found
+    - **500 Internal Server Error**: Server error during data retrieval
     
     **Example Response:**
     ```json
@@ -445,25 +436,14 @@ async def get_raw_products_by_pricelist(
         "products": [
             {
                 "id": "prod_001",
-                "name": "Кирпич керамический",
+                "name": "Ceramic Brick",
                 "sku": "SKU001",
-                "category": "Кирпич",
+                "category": "Brick",
                 "unit_price": 12.50,
                 "currency": "RUB",
-                "calc_unit": "шт",
+                "calc_unit": "pcs",
                 "count": 1000,
-                "description": "Кирпич керамический полнотелый"
-            },
-            {
-                "id": "prod_002",
-                "name": "Блок газобетонный", 
-                "sku": "SKU002",
-                "category": "Блоки",
-                "unit_price": 85.00,
-                "currency": "RUB",
-                "calc_unit": "м3",
-                "count": 50,
-                "description": "Блок газобетонный D500"
+                "description": "Solid ceramic brick"
             }
         ],
         "metadata": {
@@ -475,18 +455,18 @@ async def get_raw_products_by_pricelist(
     }
     ```
     
-    **Практические применения:**
-    - 📈 Анализ исторических цен
-    - 🔍 Получение данных на конкретную дату
-    - 📊 Сравнение прайс-листов разных периодов
-    - 💾 Восстановление архивных данных
-    - 📋 Аудит изменений цен
+    **Use Cases:**
+    - 📈 Analyze historical prices
+    - 🔍 Retrieve data for a specific date
+    - 📊 Compare price lists across periods
+    - 💾 Restore archived data
+    - 📋 Audit price changes
     
-    **Сценарии использования:**
-    - Просмотр цен на определенную дату в прошлом
-    - Сравнение цен между разными версиями прайс-листов
-    - Восстановление данных после обновления
-    - Формирование отчетов по историческим данным
+    **Integration Scenarios:**
+    - View prices for a specific past date
+    - Compare prices between different price list versions
+    - Restore data after updates
+    - Generate reports on historical data
     """
     try:
         # For now, use the existing method but add filtering logic in processor
@@ -519,8 +499,8 @@ async def get_raw_products_by_pricelist(
 
 @router.patch(
     "/{supplier_id}/product/{product_id}/process",
-    summary="✅ Process Product – Отметить продукт обработанным",
-    response_description="Подтверждение обработки продукта"
+    summary="✅ Process Product – Mark Product as Processed",
+    response_description="Product processing confirmation"
 )
 async def mark_product_as_processed(
     supplier_id: str,
@@ -528,26 +508,25 @@ async def mark_product_as_processed(
     price_processor: PriceProcessor = Depends(get_price_processor)
 ):
     """
-    ✅ **Mark Product as Processed** - Отметить конкретный продукт как обработанный
+    ✅ **Mark Product as Processed** – Mark a specific product as processed
     
-    Помечает конкретный продукт из прайс-листа как обработанный. Используется 
-    для отслеживания прогресса обработки продуктов и предотвращения повторной обработки.
+    Marks a specific product from the price list as processed. Used to track processing progress and prevent duplicate processing.
     
-    **Функциональность:**
-    - ✅ Изменение статуса продукта на "обработан"
-    - 📅 Фиксация времени обработки
-    - 🔍 Возможность фильтрации по статусу
-    - 📊 Отслеживание прогресса обработки
-    - 🔄 Предотвращение дублирования работы
+    **Features:**
+    - ✅ Change product status to "processed"
+    - 📅 Record processing time
+    - 🔍 Filter by status
+    - 📊 Track processing progress
+    - 🔄 Prevent duplicate work
     
     **Path Parameters:**
-    - `supplier_id` - Уникальный идентификатор поставщика
-    - `product_id` - Уникальный идентификатор продукта
+    - `supplier_id`: Unique supplier identifier
+    - `product_id`: Unique product identifier
     
     **Response Status Codes:**
-    - **200 OK**: Продукт успешно помечен как обработанный
-    - **404 Not Found**: Продукт не найден
-    - **500 Internal Server Error**: Ошибка сервера при обновлении статуса
+    - **200 OK**: Product marked as processed successfully
+    - **404 Not Found**: Product not found
+    - **500 Internal Server Error**: Server error updating status
     
     **Example Response:**
     ```json
@@ -566,26 +545,26 @@ async def mark_product_as_processed(
     }
     ```
     
-    **Практические применения:**
-    - 🔄 Управление workflow обработки продуктов
-    - 📊 Отслеживание прогресса массовой обработки
-    - 🚫 Предотвращение повторной обработки
-    - 📈 Мониторинг производительности системы
-    - 🎯 Контроль качества обработки данных
+    **Use Cases:**
+    - 🔄 Manage product processing workflow
+    - 📊 Track progress of bulk processing
+    - 🚫 Prevent duplicate processing
+    - 📈 Monitor system performance
+    - 🎯 Control data processing quality
     
-    **Интеграционные сценарии:**
-    - Автоматическая обработка после импорта
-    - Ручное подтверждение качества данных
-    - Интеграция с внешними системами ERP
-    - Workflow управления каталогом
-    - Аудит обработки данных
+    **Integration Scenarios:**
+    - Automatic processing after import
+    - Manual data quality confirmation
+    - Integration with external ERP systems
+    - Catalog management workflow
+    - Data processing audit
     
-    **Статусы продуктов:**
-    - `pending` - Ожидает обработки
-    - `processing` - В процессе обработки
-    - `processed` - Успешно обработан
-    - `failed` - Ошибка при обработке
-    - `skipped` - Пропущен (дубликат или некорректные данные)
+    **Product Statuses:**
+    - `pending`: Awaiting processing
+    - `processing`: In process
+    - `processed`: Successfully processed
+    - `failed`: Processing error
+    - `skipped`: Skipped (duplicate or invalid data)
     """
     try:
         # Add method to price processor for marking as processed
@@ -600,159 +579,4 @@ async def mark_product_as_processed(
         raise
     except Exception as e:
         logger.error(f"Error marking product as processed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-@router.post(
-    "/upload",
-    response_model=PriceUploadResponse,
-    summary="💰 Upload Prices – Price List Upload",
-    response_description="Price file processing and upload results"
-)
-async def upload_prices(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    supplier_id: Optional[UUID] = Query(None, description="ID поставщика"),
-    supplier_name: Optional[str] = Query(None, description="Название поставщика"),
-    process_async: bool = Query(True, description="Обработать асинхронно")
-):
-    """
-    💰 **Upload Prices** - Bulk price list upload
-    
-    Uploads and processes files containing construction material prices. Supports
-    CSV and Excel formats with automatic material matching and data validation.
-    
-    **Supported Formats:**
-    - 📊 **CSV**: Delimiters (,;|), encodings (UTF-8, Windows-1251)
-    - 📋 **Excel**: .xlsx, .xls files with multiple sheets
-    - 🔍 **Auto-detection**: Automatic format and structure detection
-    
-    **Required Fields:**
-    - `name`: Product name (required)
-    - `unit_price`: Main price (positive number, required)
-    - `calc_unit`: Calculation unit (e.g., "шт", "м³")
-    - `sku`: Stock Keeping Unit (optional)
-    - `use_category`: Category (optional)
-    - `count`: Quantity (defaults to 1)
-    - `unit_price_currency`: Currency code (defaults to "RUB")
-    - `date_price_change`: Date of price update (optional)
-    
-    **Processing Features:**
-    - 🔍 Intelligent material matching by name/SKU
-    - 💱 Automatic currency detection
-    - 📊 Price and date validation
-    - ⚡ Batch processing for large price lists
-    - 🔄 Existing price updates
-    - 📈 Price trend analysis
-    
-    **Request Example:**
-    ```bash
-    curl -X POST -F "file=@path/to/price_list.xlsx" -F "supplier_id=supplier_001" -F "supplier_name=BuildTrade LLC" -F "process_async=true" http://localhost:8000/prices/upload
-    ```
-    
-    **Response Status Codes:**
-    - **200 OK**: File processed successfully (may have warnings)
-    - **400 Bad Request**: Unsupported format or empty file
-    - **413 Request Entity Too Large**: File size exceeded (50MB)
-    - **422 Unprocessable Entity**: Data validation errors
-    - **500 Internal Server Error**: File processing error
-    
-    **File Requirements:**
-    - **Size**: Maximum 50MB
-    - **Encoding**: UTF-8 (recommended), Windows-1251
-    - **Structure**: First row contains column headers
-    - **Data**: Minimum 1 price row required
-    
-    **Processing Statistics:**
-    - `total_processed`: Total number of processed records
-    - `successful`: Successfully uploaded prices
-    - `failed`: Number of errors
-    - `matched_materials`: Matched materials count
-    - `updated_prices`: Updated existing prices count
-    
-    **Use Cases:**
-    - Supplier price list uploads
-    - Catalog price updates
-    - ERP system data import
-    - External source synchronization
-    - Bulk price updates
-    """
-    # Проверка расширения файла
-    filename = file.filename
-    if not filename:
-        raise HTTPException(status_code=400, detail="Имя файла отсутствует")
-    
-    # Получаем расширение файла
-    file_ext = os.path.splitext(filename)[1].lower()
-    if file_ext not in ['.csv', '.xlsx', '.xls']:
-        raise HTTPException(
-            status_code=400, 
-            detail="Неподдерживаемый формат файла. Поддерживаются только CSV и Excel (.xlsx, .xls)"
-        )
-    
-    # Проверка размера файла
-    file_size = 0
-    contents = await file.read()
-    file_size = len(contents)
-    await file.seek(0)  # Сбрасываем указатель чтения в начало
-    
-    if file_size > settings.MAX_UPLOAD_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Размер файла превышает максимально допустимый ({settings.MAX_UPLOAD_SIZE // (1024*1024)} МБ)"
-        )
-    
-    # Создаем процессор для обработки прайс-листа
-    processor = PriceProcessor()
-    
-    try:
-        # Если асинхронная обработка
-        if process_async:
-            # Сохраняем файл во временную директорию
-            temp_file_path = f"temp/{filename}"
-            os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
-            
-            with open(temp_file_path, "wb") as buffer:
-                buffer.write(contents)
-            
-            # Добавляем задачу в фоновые задачи
-            background_tasks.add_task(
-                processor.process_file_async,
-                file_path=temp_file_path,
-                supplier_id=supplier_id,
-                supplier_name=supplier_name
-            )
-            
-            logger.info(f"Файл {filename} добавлен в очередь на асинхронную обработку")
-            
-            return PriceUploadResponse(
-                filename=filename,
-                size=file_size,
-                status=PriceProcessingStatus.QUEUED,
-                message="Файл добавлен в очередь на обработку"
-            )
-        
-        # Синхронная обработка
-        result = await processor.process_file(
-            file=file,
-            supplier_id=supplier_id,
-            supplier_name=supplier_name
-        )
-        
-        logger.info(f"Файл {filename} успешно обработан. Загружено {result.processed_count} материалов")
-        
-        return PriceUploadResponse(
-            filename=filename,
-            size=file_size,
-            status=PriceProcessingStatus.COMPLETED,
-            message=f"Файл успешно обработан. Загружено {result.processed_count} материалов",
-            processed_count=result.processed_count,
-            error_count=result.error_count,
-            duplicate_count=result.duplicate_count
-        )
-        
-    except Exception as e:
-        logger.error(f"Ошибка при обработке файла {filename}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка при обработке файла: {str(e)}"
-        ) 
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") 

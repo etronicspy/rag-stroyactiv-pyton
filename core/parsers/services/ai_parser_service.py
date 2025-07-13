@@ -18,6 +18,8 @@ from contextlib import asynccontextmanager
 from core.config.parsers import ParserConfig, get_parser_config
 from core.database.factories import get_ai_client
 from core.logging import get_logger
+from core.parsers.config.system_prompts_manager import get_prompts_manager
+from core.parsers.config.units_config_manager import get_units_manager
 
 # Parser interface imports
 from ..interfaces import (
@@ -31,24 +33,6 @@ from ..interfaces import (
     InputType,
     OutputType
 )
-
-# Legacy compatibility imports
-try:
-    from parser_module.units_config import (
-        normalize_unit, 
-        is_metric_unit, 
-        validate_unit_coefficient,
-        get_common_units_for_ai,
-        get_material_hint,
-        is_block_material
-    )
-    from parser_module.system_prompts import (
-        get_material_parsing_system_prompt,
-        get_material_parsing_user_prompt
-    )
-    LEGACY_IMPORTS_AVAILABLE = True
-except ImportError:
-    LEGACY_IMPORTS_AVAILABLE = False
 
 
 @dataclass
@@ -150,7 +134,6 @@ class AIParserService:
             "client_available": self.client is not None,
             "config_available": self.config is not None,
             "cache_size": len(self.cache),
-            "legacy_imports": LEGACY_IMPORTS_AVAILABLE,
             "metrics": None  # Simplified for production deployment
         }
     
@@ -303,15 +286,6 @@ class AIParserService:
         Returns:
             AI response or None if failed
         """
-        if not LEGACY_IMPORTS_AVAILABLE:
-            self.logger.warning("Legacy imports not available, using basic response")
-            return {
-                "unit_parsed": "шт",
-                "price_coefficient": 1.0,
-                "confidence": 0.5,
-                "color": None
-            }
-        
         try:
             # Build prompt
             prompt = self._build_prompt(name, unit)
@@ -366,21 +340,15 @@ class AIParserService:
     
     def _get_system_prompt(self) -> str:
         """Get system prompt for AI"""
-        if not LEGACY_IMPORTS_AVAILABLE:
-            return "You are a construction materials parser. Extract unit and price information from material names."
-        
-        common_units = get_common_units_for_ai()
-        return get_material_parsing_system_prompt(common_units)
+        common_units = get_units_manager().get_common_units_for_ai()
+        return get_prompts_manager().get_system_prompt(common_units)
     
     def _build_prompt(self, name: str, unit: str) -> str:
         """Build prompt for specific material"""
-        if not LEGACY_IMPORTS_AVAILABLE:
-            return f"Parse this material: {name}"
+        material_hint = get_units_manager().get_material_hint(name)
+        is_block = get_units_manager().is_block_material(name)
         
-        material_hint = get_material_hint(name)
-        is_block = is_block_material(name)
-        
-        return get_material_parsing_user_prompt(
+        return get_prompts_manager().get_user_prompt(
             name=name,
             unit=unit,
             material_hint=material_hint,
@@ -423,27 +391,26 @@ class AIParserService:
                 color = ai_response.get("color", None)
                 
                 # Validate and normalize
-                if LEGACY_IMPORTS_AVAILABLE:
-                    unit_parsed = normalize_unit(unit_parsed)
-                    if self._validate_parsing_result(unit_parsed, price_coefficient):
-                        material_data.unit_parsed = unit_parsed
-                        material_data.price_coefficient = price_coefficient
-                        material_data.color = color
-                        material_data.price_parsed = (
-                            parsed_input["price"] / price_coefficient 
-                            if price_coefficient != 0 and parsed_input["price"] != 0
-                            else parsed_input["price"]
-                        )
-                        material_data.parsing_method = "ai_gpt"
-                        material_data.confidence = confidence
-                        
-                        return AIParseResult(
-                            status=ParseStatus.SUCCESS,
-                            data=material_data,
-                            confidence=confidence,
-                            processing_time=context.get_elapsed_time(),
-                            request_id=request.request_id
-                        )
+                unit_parsed = get_units_manager().normalize_unit(unit_parsed)
+                if self._validate_parsing_result(unit_parsed, price_coefficient):
+                    material_data.unit_parsed = unit_parsed
+                    material_data.price_coefficient = price_coefficient
+                    material_data.color = color
+                    material_data.price_parsed = (
+                        parsed_input["price"] / price_coefficient 
+                        if price_coefficient != 0 and parsed_input["price"] != 0
+                        else parsed_input["price"]
+                    )
+                    material_data.parsing_method = "ai_gpt"
+                    material_data.confidence = confidence
+                    
+                    return AIParseResult(
+                        status=ParseStatus.SUCCESS,
+                        data=material_data,
+                        confidence=confidence,
+                        processing_time=context.get_elapsed_time(),
+                        request_id=request.request_id
+                    )
                 
             except Exception as e:
                 self.logger.error(f"Error processing AI response: {e}")
@@ -469,10 +436,6 @@ class AIParserService:
         Returns:
             bool: True if valid, False otherwise
         """
-        if not LEGACY_IMPORTS_AVAILABLE:
-            return True  # Basic validation without legacy imports
-        
-        # Check if unit is supported
         if not unit_parsed:
             return False
         
@@ -485,7 +448,7 @@ class AIParserService:
             return False
         
         # Check unit-specific validation
-        if not validate_unit_coefficient(unit_parsed, price_coefficient):
+        if not get_units_manager().validate_unit_coefficient(unit_parsed, price_coefficient):
             return False
         
         return True

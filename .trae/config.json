@@ -1,0 +1,174 @@
+{
+  "$schema": "https://trae.ai/schemas/config.json",
+  "version": "1.0.0",
+  "project": {
+    "name": "RAG Construction Materials API",
+    "description": "AI-powered construction materials search and analysis API",
+    "type": "python-fastapi",
+    "language": "python"
+  },
+  "rules": {
+    "enabled": true,
+    "autoLoad": true,
+    "priority": "project",
+    "files": [
+      {
+        "path": ".trae/rules/unified_project_rules.md",
+        "type": "project",
+        "priority": "high",
+        "description": "Основные правила проекта - консолидированные из .cursor/rules"
+      },
+      {
+        "path": ".trae/rules/trae_ide_config.md",
+        "type": "ide-config",
+        "priority": "high",
+        "description": "Специальная конфигурация и шаблоны для Trae IDE"
+      }
+    ],
+    "validation": {
+      "filenameConflicts": true,
+      "securityRules": true,
+      "codeQuality": true,
+      "architecturePatterns": true
+    }
+  },
+  "ai": {
+    "codeGeneration": {
+      "useProjectRules": true,
+      "enforcePatterns": true,
+      "suggestAlternatives": true
+    },
+    "autoCompletion": {
+      "contextAware": true,
+      "rulesBased": true,
+      "securityFirst": true
+    },
+    "validation": {
+      "realTime": true,
+      "onSave": true,
+      "preCommit": true
+    }
+  },
+  "templates": {
+    "fastapi": {
+      "enabled": true,
+      "source": ".trae/rules/trae_ide_config.md",
+      "patterns": ["fastapi-route", "pydantic-model", "repository-class"]
+    },
+    "python": {
+      "enabled": true,
+      "enforceTypeHints": true,
+      "enforceDocstrings": true,
+      "enforceAsyncPatterns": true
+    }
+  },
+  "fileNaming": {
+    "validation": {
+      "enabled": true,
+      "preventConflicts": true,
+      "suggestAlternatives": true
+    },
+    "forbidden": [
+      "config.py",
+      "logging.py",
+      "os.py",
+      "sys.py",
+      "json.py",
+      "time.py",
+      "datetime.py",
+      "uuid.py",
+      "random.py",
+      "string.py",
+      "re.py",
+      "math.py",
+      "collections.py",
+      "itertools.py",
+      "functools.py",
+      "operator.py",
+      "pathlib.py",
+      "urllib.py",
+      "http.py",
+      "email.py",
+      "base64.py",
+      "hashlib.py",
+      "hmac.py",
+      "secrets.py",
+      "ssl.py",
+      "socket.py",
+      "threading.py",
+      "multiprocessing.py",
+      "asyncio.py",
+      "concurrent.py",
+      "queue.py",
+      "heapq.py",
+      "bisect.py",
+      "array.py",
+      "copy.py",
+      "pickle.py",
+      "csv.py",
+      "xml.py",
+      "html.py",
+      "sqlite3.py",
+      "dbm.py",
+      "zlib.py",
+      "gzip.py",
+      "bz2.py",
+      "lzma.py",
+      "zipfile.py",
+      "tarfile.py"
+    ],
+    "suggestions": {
+      "config.py": "app_config.py",
+      "logging.py": "log_config.py",
+      "models.py": "*_models.py",
+      "utils.py": "*_utils.py",
+      "helpers.py": "*_helpers.py",
+      "base.py": "*_base.py",
+      "exceptions.py": "*_exceptions.py"
+    }
+  },
+  "security": {
+    "enforceEnvironmentVariables": true,
+    "preventHardcodedSecrets": true,
+    "validateInputs": true,
+    "enforceHTTPS": true
+  },
+  "performance": {
+    "enforceBatching": true,
+    "suggestOptimizations": true,
+    "monitorComplexity": true
+  },
+  "testing": {
+    "enforceTestFiles": true,
+    "suggestTestCases": true,
+    "validateCoverage": false
+  },
+  "documentation": {
+    "enforceDocstrings": true,
+    "generateAPIDoc": true,
+    "updateReadme": true
+  },
+  "git": {
+    "enforceCommitFormat": true,
+    "validateBranchNames": true,
+    "preCommitHooks": true
+  },
+  "extensions": {
+    "recommended": [
+      "python",
+      "fastapi",
+      "pydantic",
+      "sqlalchemy",
+      "pytest",
+      "black",
+      "isort",
+      "mypy"
+    ]
+  },
+  "workspace": {
+    "autoSave": true,
+    "formatOnSave": true,
+    "lintOnSave": true,
+    "organizeImportsOnSave": true
+  }
+}

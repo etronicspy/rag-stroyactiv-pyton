@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 settings = get_settings()
 
 router = APIRouter(
-    prefix="/api/v1/health",
+    prefix="",
     tags=["health"],
     responses=ERROR_RESPONSES,
 )
@@ -100,7 +100,7 @@ async def basic_health():
     - Kubernetes liveness probes
     - Service availability monitoring
     - Quick API status diagnostics
-    - CI/CD pipeline проверки
+    - CI/CD pipeline checks
     """
 
     return _basic_health()

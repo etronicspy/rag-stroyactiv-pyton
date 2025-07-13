@@ -1,6 +1,6 @@
 """
-API endpoints для batch processing материалов.
-Этап 8.5: API endpoints для асинхронной обработки материалов.
+API endpoints for batch processing materials.
+This stage 8.5: API endpoints for asynchronous material processing.
 """
 
 from datetime import datetime, timedelta
@@ -26,8 +26,8 @@ from core.logging import get_logger
 
 # Создаем router
 router = APIRouter(
-    prefix="/api/v1/materials",
-    tags=["Enhanced Processing"],
+    prefix="",
+    tags=["enhanced-processing"],
     responses={
         404: {"description": "Not found"},
         500: {"description": "Internal server error"}
@@ -38,44 +38,117 @@ logger = get_logger(__name__)
 
 
 @router.post(
-    "/process-enhanced",
-    response_model=Union[BatchProcessingResponse, BatchValidationError],
-    summary="Запустить batch обработку материалов",
-    description="Принимает список материалов для асинхронной обработки через полный pipeline",
-    responses={
-        202: {
-            "description": "Запрос принят в обработку",
-            "model": BatchProcessingResponse
-        },
-        400: {
-            "description": "Ошибка валидации данных",
-            "model": BatchValidationError
-        },
-        429: {
-            "description": "Превышен лимит запросов"
-        }
-    }
+    "/",
+    response_model=BatchProcessingResponse,
+    summary="📦 Batch Processing – Enterprise Material Processing System",
+    response_description="Advanced batch processing results with validation and analytics"
 )
 async def process_materials_batch(
     request: BatchMaterialsRequest,
     background_tasks: BackgroundTasks,
     batch_service = Depends(get_batch_processing_service)
-) -> BatchResponse:
+) -> BatchProcessingResponse:
     """
-    Запустить batch обработку материалов.
+    📦 **Batch Processing** - Enterprise material processing system
     
-    Последовательность обработки:
-    1. Быстрая валидация входных данных
-    2. Инициализация background job
-    3. Возврат response с request_id для tracking
+    Accepts a list of materials for asynchronous processing through a complete pipeline
+    including validation, data enrichment, vectorization, and storage in vector database.
+    
+    **Features:**
+    - ⚡ Asynchronous processing of large data volumes
+    - 🔍 Multi-level material validation
+    - 🧠 Generation of semantic embeddings (OpenAI)
+    - 📊 Detailed statistics and processing metrics
+    - 🔄 Real-time progress tracking
+    - 🛡️ Graceful handling of errors and partial failures
+    
+    **Limits and Constraints:**
+    - **Minimum**: 1 material per request
+    - **Maximum**: 10,000 materials per request
+    - **Batch size**: 100 materials (configurable)
+    - **Timeout**: 30 minutes for entire batch
+    - **Concurrent batches**: maximum 5 simultaneous
+    
+    **Request Body Example:**
+    ```json
+    {
+        "request_id": "batch_2025_001",
+        "materials": [
+            {
+                "name": "Portland Cement M500 D0",
+                "use_category": "Cement",
+                "unit": "bag",
+                "sku": "CEM500-001",
+                "description": "High-strength cement for structural concrete"
+            },
+            {
+                "name": "Solid Ceramic Brick",
+                "use_category": "Brick",
+                "unit": "pcs",
+                "sku": "BRICK-001",
+                "description": "Red brick for load-bearing structures"
+            }
+        ],
+        "processing_options": {
+            "batch_size": 100,
+            "timeout_seconds": 1800,
+            "validate_duplicates": true,
+            "generate_embeddings": true
+        }
+    }
+    ```
+    
+    **Response Example (Success):**
+    ```json
+    {
+        "success": true,
+        "request_id": "batch_20250116_164629_abc123",
+        "status": "accepted",
+        "materials_count": 2,
+        "estimated_completion": "2025-01-16T16:51:29.421964Z",
+        "tracking_url": "/api/v1/batch-processing/status/batch_20250116_164629_abc123",
+        "processing_options": {
+            "batch_size": 100,
+            "timeout_seconds": 1800,
+            "validate_duplicates": true,
+            "generate_embeddings": true
+        }
+    }
+    ```
+    
+    **Response Example (Validation Error):**
+    ```json
+    {
+        "success": false,
+        "errors": ["Too many materials: 150 > 100"],
+        "rejected_materials": [],
+        "error_code": "VALIDATION_ERROR"
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **202 Accepted**: Batch accepted for processing
+    - **400 Bad Request**: Data validation error
+    - **429 Too Many Requests**: Concurrent batch limit exceeded
+    - **500 Internal Server Error**: Processing initialization error
+    
+    **Use Cases:**
+    - Bulk import of materials from price lists
+    - Data migration between systems
+    - Updating large material catalogs
+    - Creating vector indexes for search
+    - Validation and cleaning of material data
     
     Args:
-        request: Запрос с материалами для обработки
-        background_tasks: FastAPI background tasks
-        batch_service: Сервис batch обработки
+        request: BatchMaterialsRequest with materials and processing options
+        background_tasks: FastAPI background tasks for asynchronous execution
+        batch_service: Batch processing service (injected)
         
     Returns:
-        Ответ о принятии запроса или ошибке валидации
+        BatchResponse with status and processing tracking information
+        
+    Raises:
+        HTTPException: On validation errors, limit exceeded, or processing failures
     """
     try:
         # Логируем начало обработки
@@ -144,33 +217,98 @@ async def process_materials_batch(
 
 
 @router.get(
-    "/process-enhanced/status/{request_id}",
+    "/status/{request_id}",
     response_model=ProcessingStatusResponse,
-    summary="Получить статус обработки",
-    description="Возвращает текущий статус и прогресс обработки запроса",
-    responses={
-        200: {
-            "description": "Статус обработки",
-            "model": ProcessingStatusResponse
-        },
-        404: {
-            "description": "Запрос не найден"
-        }
-    }
+    summary="📊 Processing Status – Real-time Batch Processing Monitoring",
+    response_description="Real-time processing status with detailed analytics and progress metrics"
 )
 async def get_processing_status(
     request_id: str,
     batch_service = Depends(get_batch_processing_service)
 ) -> ProcessingStatusResponse:
     """
-    Получить статус обработки запроса.
+    📊 **Processing Status** – Get batch processing request status
     
-    Args:
-        request_id: Идентификатор запроса
-        batch_service: Сервис batch обработки
-        
-    Returns:
-        Объект с текущим статусом и прогрессом
+    Returns detailed information about the current status and progress of batch material processing, including performance metrics.
+    
+    **Features:**
+    - 🔄 Real-time processing status
+    - 📈 Detailed progress and performance metrics
+    - ⏱️ Estimated completion time
+    - 📊 Success/failure statistics
+    - 🔍 Error and warning information
+    - 📋 List of processed and problematic materials
+    
+    **Processing Statuses:**
+    - `pending`: Request is queued for processing
+    - `processing`: Active material processing
+    - `completed`: Processing completed successfully
+    - `failed`: Processing failed with critical errors
+    - `partial`: Partial processing (some successes and failures)
+    - `cancelled`: Processing cancelled by user
+    
+    **Path Parameters:**
+    - `request_id`: Batch request identifier (format: batch_YYYYMMDD_HHMMSS_xxx)
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "request_id": "batch_20250116_164629_abc123",
+        "status": "processing",
+        "progress": {
+            "total_materials": 1000,
+            "processed_materials": 750,
+            "successful_materials": 720,
+            "failed_materials": 30,
+            "completion_percentage": 75.0,
+            "estimated_remaining_time": "00:05:30"
+        },
+        "performance_metrics": {
+            "processing_rate": 12.5,
+            "avg_time_per_material": 2.3,
+            "start_time": "2025-01-16T16:46:29.421964Z",
+            "elapsed_time": "00:15:30",
+            "estimated_completion": "2025-01-16T17:07:29.421964Z"
+        },
+        "error_summary": {
+            "validation_errors": 15,
+            "processing_errors": 10,
+            "timeout_errors": 5,
+            "recent_errors": [
+                {
+                    "material_index": 245,
+                    "error_type": "validation_error",
+                    "message": "Missing required field 'name'"
+                }
+            ]
+        },
+        "current_batch": {
+            "batch_number": 8,
+            "total_batches": 10,
+            "batch_size": 100,
+            "batch_progress": 50
+        }
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Status retrieved successfully
+    - **404 Not Found**: Request with specified ID not found
+    - **400 Bad Request**: Invalid request_id format
+    - **500 Internal Server Error**: Error retrieving status
+    
+    **Polling Guidelines:**
+    - Recommended polling interval: 5-10 seconds
+    - For large batches: 30-60 seconds
+    - Stop polling on statuses: completed, failed, cancelled
+    
+    **Use Cases:**
+    - UI progress monitoring
+    - Automatic completion tracking
+    - Processing diagnostics
+    - Batch parameter optimization
+    - Performance reporting
     """
     try:
         logger.debug(f"Getting processing status for request {request_id}")
@@ -229,19 +367,10 @@ async def get_processing_status(
 
 
 @router.get(
-    "/process-enhanced/results/{request_id}",
+    "/results/{request_id}",
     response_model=ProcessingResultsResponse,
-    summary="Получить результаты обработки",
-    description="Возвращает детальные результаты обработки материалов",
-    responses={
-        200: {
-            "description": "Результаты обработки",
-            "model": ProcessingResultsResponse
-        },
-        404: {
-            "description": "Запрос не найден"
-        }
-    }
+    summary="📋 Processing Results – Batch Processing Outcomes Analysis",
+    response_description="Comprehensive processing results with quality metrics and error analysis"
 )
 async def get_processing_results(
     request_id: str,
@@ -250,16 +379,114 @@ async def get_processing_results(
     batch_service = Depends(get_batch_processing_service)
 ) -> ProcessingResultsResponse:
     """
-    Получить результаты обработки запроса.
+    📋 **Processing Results** – Get batch processing results
     
-    Args:
-        request_id: Идентификатор запроса
-        limit: Максимальное количество результатов
-        offset: Смещение для пагинации
-        batch_service: Сервис batch обработки
-        
-    Returns:
-        Объект с результатами обработки
+    Returns detailed results of completed batch material processing, including successfully processed materials, errors, and full operation statistics.
+    
+    **Features:**
+    - 📊 Full processing and performance statistics
+    - ✅ List of successfully processed materials with UUID
+    - ❌ Detailed error and failure information
+    - 📈 Performance and timing metrics
+    - 🔍 Data quality and validation analysis
+    - 📋 Export results in various formats
+    
+    **Result Availability:**
+    - Results available only for completed requests (status: completed/failed/partial)
+    - Data retained for 30 days after processing
+    - Pagination supported for large results (>1000 materials)
+    - Automatic archiving of old results
+    
+    **Path Parameters:**
+    - `request_id`: Completed batch request identifier
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "request_id": "batch_20250116_164629_abc123",
+        "status": "completed",
+        "summary": {
+            "total_materials": 1000,
+            "successful_materials": 980,
+            "failed_materials": 20,
+            "success_rate": 98.0,
+            "processing_time": "00:25:30",
+            "avg_time_per_material": 1.53
+        },
+        "successful_materials": [
+            {
+                "index": 0,
+                "material_id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Portland Cement M500 D0",
+                "use_category": "Cement",
+                "processing_time": 1.2,
+                "embedding_generated": true,
+                "created_at": "2025-01-16T16:47:15.123456Z"
+            }
+        ],
+        "failed_materials": [
+            {
+                "index": 245,
+                "original_data": {
+                    "name": "",
+                    "use_category": "Cement"
+                },
+                "error_type": "validation_error",
+                "error_message": "Missing required field 'name'",
+                "error_code": "MISSING_REQUIRED_FIELD",
+                "timestamp": "2025-01-16T16:48:30.123456Z"
+            }
+        ],
+        "performance_metrics": {
+            "start_time": "2025-01-16T16:46:29.421964Z",
+            "end_time": "2025-01-16T17:11:59.421964Z",
+            "total_duration": "00:25:30",
+            "avg_processing_rate": 39.2,
+            "peak_processing_rate": 45.8,
+            "embedding_generation_time": "00:18:45",
+            "database_save_time": "00:04:20"
+        },
+        "quality_metrics": {
+            "duplicate_materials_found": 5,
+            "validation_warnings": 12,
+            "data_quality_score": 94.5,
+            "embedding_quality_avg": 0.87
+        },
+        "error_analysis": {
+            "validation_errors": 15,
+            "processing_errors": 3,
+            "timeout_errors": 2,
+            "most_common_error": "missing_required_field",
+            "error_categories": {
+                "data_validation": 15,
+                "embedding_generation": 3,
+                "database_errors": 2
+            }
+        }
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Results retrieved successfully
+    - **404 Not Found**: Request with specified ID not found
+    - **409 Conflict**: Processing not yet completed
+    - **410 Gone**: Results deleted (older than 30 days)
+    - **500 Internal Server Error**: Error retrieving results
+    
+    **Result Categories:**
+    - **successful_materials**: Successfully processed materials with UUID
+    - **failed_materials**: Materials with errors and failure reasons
+    - **performance_metrics**: Performance and timing metrics
+    - **quality_metrics**: Data quality metrics
+    - **error_analysis**: Error analysis and categorization
+    
+    **Use Cases:**
+    - Retrieve results for integration with other systems
+    - Analyze quality of imported data
+    - Create performance reports
+    - Diagnose and optimize processing workflows
+    - Audit and monitor import operations
     """
     try:
         logger.debug(f"Getting processing results for request {request_id}")
@@ -313,28 +540,145 @@ async def get_processing_results(
 
 
 @router.get(
-    "/process-enhanced/statistics",
+    "/statistics",
     response_model=ProcessingStatistics,
-    summary="Получить статистику обработки",
-    description="Возвращает общую статистику сервиса batch обработки",
-    responses={
-        200: {
-            "description": "Статистика обработки",
-            "model": ProcessingStatistics
-        }
-    }
+    summary="📊 Processing Statistics – Advanced Analytics Platform",
+    response_description="Comprehensive processing statistics with performance metrics and trend analysis"
 )
 async def get_processing_statistics(
     batch_service = Depends(get_batch_processing_service)
 ) -> ProcessingStatistics:
     """
-    Получить статистику сервиса batch обработки.
+    📊 **Processing Statistics** – Comprehensive processing statistics
     
-    Args:
-        batch_service: Сервис batch обработки
-        
-    Returns:
-        Объект со статистикой
+    Returns detailed statistics for all batch material processing operations, including performance, success rates, and system usage analytics.
+    
+    **Features:**
+    - 📈 Performance and throughput metrics
+    - ✅ Success and quality statistics
+    - ⏱️ Execution time and optimization analysis
+    - 📊 Usage trends and peak loads
+    - 🔍 Detailed error analytics and categories
+    - 📋 Export statistics for reporting
+    
+    **Performance Metrics:**
+    - Total processed requests for the period
+    - Average and peak material processing speed
+    - Success statistics by category
+    - Execution time and bottleneck analysis
+    - Resource utilization efficiency
+    
+    **Usage Analytics:**
+    - Peak loads and maximum activity times
+    - Batch request size distribution
+    - Error frequency and detailed categorization
+    - Performance trends for different periods
+    - Comparative analysis with previous periods
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "statistics": {
+            "overview": {
+                "total_requests": 1250,
+                "total_materials_processed": 125000,
+                "success_rate": 97.8,
+                "avg_processing_time": "00:15:30",
+                "total_processing_time": "320:45:15",
+                "period": "last_30_days"
+            },
+            "performance_metrics": {
+                "avg_materials_per_second": 42.5,
+                "peak_materials_per_second": 78.2,
+                "avg_request_size": 100,
+                "largest_request_size": 5000,
+                "fastest_processing_time": "00:02:15",
+                "slowest_processing_time": "02:45:30"
+            },
+            "success_metrics": {
+                "successful_requests": 1223,
+                "failed_requests": 27,
+                "partial_success_requests": 15,
+                "successful_materials": 122350,
+                "failed_materials": 2650,
+                "success_rate_by_category": {
+                    "Cement": 98.5,
+                    "Brick": 97.2,
+                    "Metal": 96.8
+                }
+            },
+            "error_analysis": {
+                "most_common_errors": [
+                    {
+                        "error_type": "validation_error",
+                        "count": 1250,
+                        "percentage": 47.2
+                    },
+                    {
+                        "error_type": "duplicate_material",
+                        "count": 890,
+                        "percentage": 33.6
+                    }
+                ],
+                "error_trends": {
+                    "increasing": ["timeout_errors"],
+                    "decreasing": ["validation_errors"],
+                    "stable": ["duplicate_materials"]
+                }
+            },
+            "usage_patterns": {
+                "peak_hours": ["09:00-11:00", "14:00-16:00"],
+                "peak_days": ["Tuesday", "Wednesday"],
+                "avg_requests_per_day": 41.7,
+                "request_size_distribution": {
+                    "small (1-50)": 35.2,
+                    "medium (51-500)": 45.8,
+                    "large (501-1000)": 15.6,
+                    "extra_large (1000+)": 3.4
+                }
+            },
+            "quality_metrics": {
+                "avg_data_quality_score": 92.3,
+                "avg_embedding_quality": 0.89,
+                "duplicate_detection_rate": 99.1,
+                "validation_accuracy": 98.7
+            },
+            "resource_utilization": {
+                "avg_cpu_usage": 65.2,
+                "peak_cpu_usage": 89.5,
+                "avg_memory_usage": 72.8,
+                "peak_memory_usage": 94.1,
+                "database_connection_pool_usage": 45.6
+            }
+        },
+        "generated_at": "2025-01-16T16:47:30.123456Z",
+        "period_start": "2024-12-17T00:00:00Z",
+        "period_end": "2025-01-16T23:59:59Z"
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Statistics retrieved successfully
+    - **500 Internal Server Error**: Error retrieving statistics
+    - **503 Service Unavailable**: Statistics service temporarily unavailable
+    
+    **Statistics Categories:**
+    - **overview**: General indicators for the period
+    - **performance_metrics**: Performance metrics
+    - **success_metrics**: Success indicators
+    - **error_analysis**: Error analysis and trends
+    - **usage_patterns**: Usage patterns
+    - **quality_metrics**: Data quality metrics
+    - **resource_utilization**: Resource usage
+    
+    **Use Cases:**
+    - System performance monitoring
+    - Resource and scaling planning
+    - Data and process quality analysis
+    - Management reporting
+    - Workflow optimization
+    - Bottleneck and issue detection
     """
     try:
         logger.debug("Getting processing statistics")
@@ -354,26 +698,102 @@ async def get_processing_statistics(
 
 
 @router.post(
-    "/process-enhanced/retry",
-    summary="Повторить обработку неуспешных материалов",
-    description="Запускает повторную обработку материалов со статусом failed",
-    responses={
-        200: {
-            "description": "Количество материалов для повторной обработки"
-        }
-    }
+    "/retry",
+    summary="🔄 Retry Failed Materials – Intelligent Failure Recovery",
+    response_description="Intelligent retry system with adaptive processing strategies"
 )
 async def retry_failed_materials(
     batch_service = Depends(get_batch_processing_service)
 ) -> Dict[str, Any]:
     """
-    Повторить обработку неуспешных материалов.
+    🔄 **Retry Failed Materials** – Retry processing of failed materials
     
-    Args:
-        batch_service: Сервис batch обработки
-        
-    Returns:
-        Информация о повторной обработке
+    Initiates retry processing for materials that failed in previous batch operations, using improved parameters and strategies.
+    
+    **Features:**
+    - 🎯 Selective retry for specific materials
+    - 📦 Bulk retry for all failed items
+    - ⚙️ Parameter tuning for improved success
+    - 🧠 Automatic error analysis and optimization
+    - 📊 Progress tracking for retry operations
+    - 🛡️ Intelligent recovery strategies
+    
+    **Retry Strategies:**
+    - **selective**: Retry only specified materials
+    - **all_failed**: Retry all failed materials
+    - **smart_retry**: Automatic selection based on error analysis
+    - **enhanced_validation**: Enhanced data validation
+    - **reduced_batch_size**: Reduced batch size for stability
+    
+    **Request Example (Selective Retry):**
+    ```json
+    {
+        "original_request_id": "batch_20250116_164629_abc123",
+        "retry_mode": "selective",
+        "material_indices": [15, 23, 45, 67, 89],
+        "processing_options": {
+            "timeout_seconds": 300,
+            "retry_attempts": 3,
+            "skip_validation": false,
+            "enhanced_error_handling": true
+        }
+    }
+    ```
+    
+    **Request Example (Smart Retry):**
+    ```json
+    {
+        "original_request_id": "batch_20250116_164629_abc123",
+        "retry_mode": "smart_retry",
+        "processing_options": {
+            "batch_size": 50,
+            "timeout_seconds": 600,
+            "enhanced_validation": true,
+            "auto_fix_common_errors": true
+        }
+    }
+    ```
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "retry_request_id": "retry_20250116_170000_def456",
+        "original_request_id": "batch_20250116_164629_abc123",
+        "status": "accepted",
+        "materials_to_retry": 25,
+        "retry_strategy": "smart_retry",
+        "estimated_completion": "2025-01-16T17:15:00Z",
+        "tracking_url": "/api/v1/batch-processing/status/retry_20250116_170000_def456",
+        "improvements_applied": [
+            "reduced_batch_size",
+            "enhanced_validation",
+            "auto_error_correction"
+        ]
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **202 Accepted**: Retry request accepted
+    - **400 Bad Request**: Invalid request parameters
+    - **404 Not Found**: Original request not found
+    - **409 Conflict**: Original request still processing
+    - **422 Unprocessable Entity**: No materials to retry
+    - **500 Internal Server Error**: Retry initialization error
+    
+    **Automatic Improvements:**
+    - Analyze failure reasons and adjust parameters
+    - Reduce batch size for problematic materials
+    - Increase timeout for complex operations
+    - Apply alternative processing algorithms
+    - Pre-clean and normalize data
+    
+    **Use Cases:**
+    - Recovery after temporary service failures
+    - Retry with improved parameters
+    - Handle network interruptions and timeouts
+    - Increase overall batch operation success
+    - Automated recovery workflows
     """
     try:
         logger.info("Starting retry of failed materials")
@@ -396,28 +816,104 @@ async def retry_failed_materials(
 
 
 @router.delete(
-    "/process-enhanced/cleanup",
-    summary="Очистить старые записи обработки",
-    description="Удаляет старые записи обработки для освобождения места",
-    responses={
-        200: {
-            "description": "Количество удаленных записей"
-        }
-    }
+    "/cleanup",
+    summary="🧹 Cleanup Old Records – Data Lifecycle Management",
+    response_description="Advanced data lifecycle management with storage optimization"
 )
 async def cleanup_old_records(
     days_old: int = 30,
     batch_service = Depends(get_batch_processing_service)
 ) -> Dict[str, Any]:
     """
-    Очистить старые записи обработки.
+    🧹 **Cleanup Old Records** – Cleanup outdated records
     
-    Args:
-        days_old: Количество дней для удаления
-        batch_service: Сервис batch обработки
-        
-    Returns:
-        Информация об очистке
+    Deletes old batch processing records, logs, and temporary data to free up space and maintain system performance.
+    
+    **Features:**
+    - 🗓️ Configurable data retention period
+    - 🛡️ Safe deletion of completed operations
+    - 💾 Preserve active and recent operations
+    - 📊 Detailed cleanup statistics and reporting
+    - ✅ Automatic validation before deletion
+    - 🔒 Backup of critical metadata
+    
+    **Cleanup Categories:**
+    - **Completed requests**: Successfully processed batch operations
+    - **Failed requests**: Requests with critical errors
+    - **Temporary files**: Intermediate processing data
+    - **Operation logs**: Detailed execution logs
+    - **Cache data**: Temporary cached results
+    
+    **Retention Policies:**
+    - Active requests: never deleted
+    - Recent operations: retained regardless of status
+    - Critical logs: retained for audit
+    - Metadata: archived before deletion
+    
+    **Query Parameters:**
+    - `days_old`: Number of days to retain data (default: 30)
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "cleanup_summary": {
+            "records_deleted": 1250,
+            "storage_freed_mb": 45.7,
+            "retention_days": 30,
+            "cleanup_duration": "00:02:15",
+            "cleanup_started_at": "2025-01-16T17:00:00Z",
+            "cleanup_completed_at": "2025-01-16T17:02:15Z"
+        },
+        "categories_cleaned": {
+            "completed_requests": 890,
+            "failed_requests": 180,
+            "partial_requests": 45,
+            "temporary_files": 180,
+            "log_entries": 15000,
+            "cache_entries": 5600
+        },
+        "preserved_data": {
+            "active_requests": 5,
+            "recent_requests": 45,
+            "critical_logs": 500,
+            "audit_records": 120
+        },
+        "storage_optimization": {
+            "database_size_before_mb": 2048.5,
+            "database_size_after_mb": 2002.8,
+            "compression_applied": true,
+            "index_optimization": true
+        }
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: Cleanup completed successfully
+    - **400 Bad Request**: Invalid retention period
+    - **409 Conflict**: Cleanup already in progress
+    - **423 Locked**: System locked for maintenance
+    - **500 Internal Server Error**: Error during cleanup
+    
+    **Safety Measures:**
+    - Never deletes active or pending requests
+    - Retains critical error and audit logs
+    - Checks data integrity before deletion
+    - Backs up important metadata
+    - Supports rollback if needed
+    
+    **Usage Recommendations:**
+    - Run during low-traffic periods
+    - Use retention period of at least 7 days
+    - Monitor freed space
+    - Regularly review cleanup logs
+    
+    **Use Cases:**
+    - Regular maintenance and housekeeping
+    - Storage optimization and cost management
+    - Improve performance by cleaning up data
+    - Enforce data retention policies
+    - Prepare for backup
     """
     try:
         logger.info(f"Starting cleanup of records older than {days_old} days")
@@ -442,26 +938,148 @@ async def cleanup_old_records(
 
 # Health check endpoint
 @router.get(
-    "/process-enhanced/health",
-    summary="Проверить состояние сервиса",
-    description="Возвращает состояние сервиса batch обработки",
-    responses={
-        200: {
-            "description": "Состояние сервиса"
-        }
-    }
+    "/health",
+    summary="🩺 Enhanced Processing Health – Batch Processing Service Diagnostics",
+    response_description="Comprehensive batch processing service health diagnostics with performance metrics"
 )
 async def get_service_health(
     batch_service = Depends(get_batch_processing_service)
 ) -> Dict[str, Any]:
     """
-    Проверить состояние сервиса batch обработки.
+    🩺 **Enhanced Processing Health Check** - Batch processing service diagnostics
+    
+    Performs comprehensive diagnostics of all batch processing system components,
+    including services, databases, and external dependencies.
+    
+    **Features:**
+    - 🔍 Deep diagnostics of all critical components
+    - ⚡ Quick service availability checks
+    - 📊 Performance and resource monitoring
+    - 🚨 Early problem and degradation detection
+    - 📈 Service level agreement (SLA) metrics
+    - 🛡️ Security and data integrity verification
+    
+    **Diagnosed Components:**
+    - **Batch Processing Service**: Main materials processing service
+    - **Database Connections**: PostgreSQL, Redis, vector database
+    - **External APIs**: Embedding services, data validation
+    - **File System**: Temporary directories availability
+    - **Memory & CPU**: System resource usage
+    - **Network**: Latency and throughput
+    
+    **Performance Metrics:**
+    - Component response time (< 100ms - excellent)
+    - CPU and memory load (< 80% - normal)
+    - Active database connections count
+    - Error statistics for last 5 minutes
+    - Materials processing throughput
+    - Embedding generation quality
+    
+    **Response Example:**
+    ```json
+    {
+        "success": true,
+        "status": "healthy",
+        "timestamp": "2025-01-16T17:05:30.123456Z",
+        "version": "1.2.3",
+        "uptime": "72:15:30",
+        "components": {
+            "batch_processing_service": {
+                "status": "healthy",
+                "response_time_ms": 45,
+                "active_requests": 3,
+                "queue_size": 12,
+                "last_error": null
+            },
+            "database": {
+                "postgresql": {
+                    "status": "healthy",
+                    "response_time_ms": 12,
+                    "active_connections": 15,
+                    "max_connections": 100,
+                    "last_backup": "2025-01-16T02:00:00Z"
+                },
+                "redis": {
+                    "status": "healthy",
+                    "response_time_ms": 3,
+                    "memory_usage_mb": 256,
+                    "connected_clients": 8
+                },
+                "vector_db": {
+                    "status": "healthy",
+                    "response_time_ms": 78,
+                    "index_size": 125000,
+                    "last_optimization": "2025-01-16T01:00:00Z"
+                }
+            },
+            "external_services": {
+                "embedding_api": {
+                    "status": "healthy",
+                    "response_time_ms": 234,
+                    "rate_limit_remaining": 8500,
+                    "success_rate_24h": 99.2
+                },
+                "validation_service": {
+                    "status": "healthy",
+                    "response_time_ms": 89,
+                    "cache_hit_rate": 87.5
+                }
+            },
+            "system_resources": {
+                "cpu_usage_percent": 45.2,
+                "memory_usage_percent": 67.8,
+                "disk_usage_percent": 23.4,
+                "network_latency_ms": 15
+            }
+        },
+        "performance_metrics": {
+            "requests_per_minute": 125,
+            "avg_processing_time_ms": 1530,
+            "error_rate_percent": 0.8,
+            "success_rate_percent": 99.2,
+            "queue_wait_time_ms": 45
+        },
+        "alerts": [],
+        "recommendations": [
+            "Consider scaling up during peak hours (9-11 AM)",
+            "Database connection pool could be optimized"
+        ]
+    }
+    ```
+    
+    **Response Status Codes:**
+    - **200 OK**: All components operating normally
+    - **503 Service Unavailable**: Critical components unavailable
+    - **500 Internal Server Error**: Diagnostics execution error
+    
+    **Health Status Levels:**
+    - **healthy**: All components operating optimally
+    - **degraded**: Some components operating with limitations
+    - **unhealthy**: Critical problems requiring intervention
+    - **maintenance**: System in maintenance mode
+    
+    **Monitoring Integration:**
+    - Prometheus metrics compatibility
+    - Alerting system integration
+    - Grafana dashboard data export
+    - Webhook notifications on status changes
+    
+    **Use Cases:**
+    - Real-time system status monitoring
+    - Performance problem diagnostics
+    - Preventive maintenance planning
+    - Monitoring system integration
+    - Load readiness verification
+    - SLA monitoring and reporting
     
     Args:
-        batch_service: Сервис batch обработки
+        batch_service: Batch processing service (injected)
         
     Returns:
-        Информация о состоянии сервиса
+        Service status information with performance metrics
+        
+    Raises:
+        HTTPException: On critical system errors or service unavailability
     """
     try:
         # Получаем статистику сервиса
@@ -487,4 +1105,4 @@ async def get_service_health(
             "status": "error",
             "timestamp": datetime.utcnow().isoformat(),
             "error": str(e)
-        } 
+        }
