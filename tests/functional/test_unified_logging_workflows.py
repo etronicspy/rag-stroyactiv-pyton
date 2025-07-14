@@ -16,13 +16,62 @@ Created: 2024
 import pytest
 import asyncio
 import uuid
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 
 # Core imports
 from main import app
 from core.monitoring.context import CorrelationContext, get_correlation_id
 from services.materials import MaterialsService
+from core.repositories.base import BaseRepository
+
+client = TestClient(app)
+
+class TestUnitAPI:
+    def test_create_unit_success(self):
+        """Проверка успешного создания юнита с embedding через AI"""
+        unit_data = {"name": "кг"}
+        from services.materials import UnitService
+        service = UnitService.__new__(UnitService)
+        from unittest.mock import AsyncMock
+        vector_db_mock = AsyncMock()
+        vector_db_mock.collection_exists = AsyncMock(return_value=True)
+        vector_db_mock.create_collection = AsyncMock(return_value=None)
+        vector_db_mock.upsert = AsyncMock(return_value=None)
+        vector_db_mock.get_embedding = AsyncMock(return_value=[0.1]*384)
+        service.vector_db = vector_db_mock
+        service.collection_name = "units_v2"
+        # Переопределяем Depends(get_unit_service) на наш мок
+        from api.routes.reference import get_unit_service
+        from main import app
+        app.dependency_overrides[get_unit_service] = lambda: service
+        response = client.post("/api/v1/reference/units/", json=unit_data)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "кг"
+        assert isinstance(data["embedding"], list)
+        assert len(data["embedding"]) == 384
+        app.dependency_overrides = {}
+
+    def test_create_unit_ai_failure(self):
+        """Проверка ошибки при невозможности сгенерировать embedding для юнита"""
+        unit_data = {"name": "кг"}
+        from services.materials import UnitService
+        service = UnitService.__new__(UnitService)
+        from unittest.mock import AsyncMock
+        vector_db_mock = AsyncMock()
+        vector_db_mock.collection_exists = AsyncMock(return_value=True)
+        vector_db_mock.create_collection = AsyncMock(return_value=None)
+        vector_db_mock.upsert = AsyncMock(return_value=None)
+        vector_db_mock.get_embedding = AsyncMock(side_effect=Exception("AI error"))
+        service.vector_db = vector_db_mock
+        service.collection_name = "units_v2"
+        from api.routes.reference import get_unit_service
+        from main import app
+        app.dependency_overrides[get_unit_service] = lambda: service
+        response = client.post("/api/v1/reference/units/", json=unit_data)
+        assert response.status_code in (400, 422, 500)
+        app.dependency_overrides = {}
 
 
 class TestMaterialManagementWorkflows:

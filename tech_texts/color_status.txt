@@ -1,0 +1,37 @@
+ПРОВЕРКА ЛОГИКИ ДОБАВЛЕНИЯ ЦВЕТА:
+1. API-слой (/api/v1/reference/colors/)
+Ожидает на вход объект ColorCreate:
+{
+    "name": "желтый"
+    // hex_code, rgb_values, aliases — опционально
+}
+Apply to health_unifi...
+}
+Передаёт этот объект в сервис ColorService.create_color.
+2. Pydantic-модель ColorCreate
+Требует только поле name.
+Остальные поля (hex_code, rgb_values, aliases) опциональны.
+3. Сервисный слой (ColorService.create_color)
+НЕ выполняет enrichment (обогащение) по имени цвета:
+Если не переданы hex_code, rgb_values, aliases — они останутся None/[].
+Нет автоматического определения hex/rgb/aliases по имени цвета.
+Генерирует embedding по строке:
+color_text = f"{color_data.name} {' '.join(color_data.aliases)}"
+Если embedding не удаётся получить через AI — fallback на hash-based embedding.
+Сохраняет всё в Qdrant.
+4. Итоговое поведение
+Если вы отправите только { "name": "желтый" }, то в базе будет:
+name: "желтый"
+hex_code: None
+rgb_values: None
+aliases: []
+embedding: [AI/vector]
+created_at, updated_at: timestamps
+Автоматического enrichment (hex, rgb, aliases) по имени цвета — НЕТ.
+ВЫВОД
+Сейчас enrichment (hex, rgb, aliases) по имени цвета не реализован.
+Если вы хотите, чтобы при добавлении только имени цвета происходило автоматическое обогащение (например, для "желтый" подставлялись hex/rgb/aliases), нужно реализовать отдельную enrichment-процедуру (например, через AI или справочник).
+Жду дальнейших указаний:
+Реализовать enrichment по имени цвета?
+Использовать AI или справочник для enrichment?
+Какой формат enrichment-результата желателен?
