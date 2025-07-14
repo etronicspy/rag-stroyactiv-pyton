@@ -555,19 +555,100 @@ class SearchAnalytics(BaseModel):
         }
     )
 
+class CategoryCreate(BaseModel):
+    """Schema for creating a new category."""
+    name: str = Field(
+        ..., min_length=1, max_length=100, description="Category name", example="Цемент"
+    )
+    description: Optional[str] = Field(
+        None, description="Category description", example="Строительные цементы и вяжущие материалы"
+    )
+    aliases: List[str] = Field(
+        default=[], description="Alternative names and synonyms", example=["цемент", "cement", "вяжущие"]
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Цемент",
+                "description": "Строительные цементы и вяжущие материалы",
+                "aliases": ["цемент", "cement", "вяжущие"]
+            }
+        }
+    )
+
 class Category(BaseModel):
+    """Complete category model with AI embedding and metadata.
+    
+    Comprehensive category representation including name, description, aliases,
+    AI embedding for semantic search, and system-generated metadata.
+    """
     id: Optional[str] = None  # UUID from Qdrant
     name: str
     description: Optional[str] = None
+    aliases: List[str] = []
+    embedding: Optional[List[float]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Цемент",
+                "description": "Строительные цементы и вяжущие материалы",
+                "aliases": ["цемент", "cement", "вяжущие"],
+                "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
+                "created_at": "2025-06-16T17:30:15.123456Z",
+                "updated_at": "2025-06-16T17:30:15.123456Z"
+            }
+        }
+    )
+
+class UnitCreate(BaseModel):
+    """Schema for creating a new unit (measurement unit)."""
+    name: str = Field(
+        ..., min_length=1, max_length=50, description="Short unit name (abbreviation)", example="кг"
+    )
+    description: Optional[str] = Field(
+        None, description="Unit description", example="Килограмм — единица массы"
+    )
+    aliases: List[str] = Field(
+        default=[], description="Alternative names and abbreviations", example=["килограмм", "kg", "кг."]
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "кг",
+                "description": "Килограмм — единица массы",
+                "aliases": ["килограмм", "kg", "кг."]
+            }
+        }
+    )
 
 class Unit(BaseModel):
     id: Optional[str] = None  # UUID from Qdrant
     name: str
     description: Optional[str] = None
+    aliases: List[str] = []
+    embedding: Optional[List[float]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "кг",
+                "description": "Килограмм — единица массы",
+                "aliases": ["килограмм", "kg", "кг."],
+                "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
+                "created_at": "2025-06-16T17:30:15.123456Z",
+                "updated_at": "2025-06-16T17:30:15.123456Z"
+            }
+        }
+    )
 
 class MaterialBatchCreate(BaseModel):
     materials: List[MaterialCreate] = Field(..., min_items=1, max_items=1000)

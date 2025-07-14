@@ -33,6 +33,78 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     
+    # === OPENAPI DOCUMENTATION ===
+    DESCRIPTION: str = """
+    🏗️ **RAG Construction Materials API** - AI-Powered Semantic Search & Management System
+    
+    ## Features
+    - 🔍 **Semantic Search**: AI-powered vector search for construction materials
+    - 📊 **Reference Data**: Categories, units, and colors management
+    - 📈 **Batch Processing**: Efficient bulk operations with progress tracking
+    - 🔐 **Security**: Rate limiting, input validation, and CORS protection
+    - 📝 **Documentation**: Interactive API documentation with examples
+    
+    ## Quick Start
+    1. **Search Materials**: `GET /api/v1/materials/search?query=cement`
+    2. **Create Category**: `POST /api/v1/reference/categories/`
+    3. **Upload Prices**: `POST /api/v1/prices/upload`
+    
+    ## Authentication
+    Currently supports API key authentication (configure via environment variables).
+    
+    ## Support
+    For technical support, contact the development team.
+    """
+    
+    CONTACT: Dict[str, str] = {
+        "name": "RAG Construction Materials API Team",
+        "email": "support@construction-materials-api.com",
+        "url": "https://github.com/construction-materials-api"
+    }
+    
+    LICENSE_INFO: Dict[str, str] = {
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT"
+    }
+    
+    SERVERS: List[Dict[str, str]] = [
+        {
+            "url": "http://localhost:8000",
+            "description": "Development server"
+        },
+        {
+            "url": "https://api.construction-materials.com",
+            "description": "Production server"
+        }
+    ]
+    
+    OPENAPI_TAGS: List[Dict[str, str]] = [
+        {
+            "name": "materials",
+            "description": "Material management operations"
+        },
+        {
+            "name": "reference", 
+            "description": "Reference data management (categories, units, colors)"
+        },
+        {
+            "name": "prices",
+            "description": "Price list processing and management"
+        },
+        {
+            "name": "search",
+            "description": "Semantic search operations"
+        },
+        {
+            "name": "health",
+            "description": "Health check and monitoring endpoints"
+        },
+        {
+            "name": "tunnel",
+            "description": "SSH tunnel management"
+        }
+    ]
+    
     # === ENVIRONMENT SETTINGS ===
     ENVIRONMENT: Environment = Field(
         default=Environment.DEVELOPMENT, 

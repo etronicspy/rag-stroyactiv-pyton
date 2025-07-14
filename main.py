@@ -6,9 +6,7 @@ Main FastAPI application module for construction materials API with AI-powered s
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 
 # Import logging
 from core.logging import get_logger
@@ -26,28 +24,22 @@ from api.routes import (
 from core.config import get_settings
 from core.middleware.factory import setup_middleware
 
-# Import English API documentation
-from docs.api_description import get_fastapi_config
-
 # Initialize logging and configuration
 logger = get_logger(__name__)
 settings = get_settings()
 
-# Get English API configuration
-api_config = get_fastapi_config(settings)
-
 # Create FastAPI application with English documentation
 app = FastAPI(
-    title=api_config["title"],
-    version=api_config["version"],
-    description=api_config["description"],
-    contact=api_config["contact"],
-    license_info=api_config["license_info"],
-    servers=api_config["servers"],
-    openapi_tags=api_config["openapi_tags"],
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None,
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description=settings.DESCRIPTION,
+    contact=settings.CONTACT,
+    license_info=settings.LICENSE_INFO,
+    servers=settings.SERVERS,
+    openapi_tags=settings.OPENAPI_TAGS,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 # Setup CORS
@@ -116,71 +108,6 @@ async def shutdown_event():
             logger.info("SSH tunnel service stopped successfully")
         except Exception as e:
             logger.error(f"Error stopping SSH tunnel: {e}")
-
-
-@app.get("/docs", include_in_schema=False)
-async def custom_swagger_ui_html(request: Request) -> HTMLResponse:
-    """Custom Swagger UI page with English documentation."""
-    return get_swagger_ui_html(
-        openapi_url=f"{settings.API_V1_STR}/openapi.json",
-        title="RAG Construction Materials API - Interactive Documentation",
-        oauth2_redirect_url=f"{settings.API_V1_STR}/docs/oauth2-redirect",
-        swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js",
-        swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css",
-        swagger_favicon_url="https://fastapi.tiangolo.com/img/favicon.png",
-        swagger_ui_parameters={
-            "deepLinking": True,
-            "displayRequestDuration": True,
-            "docExpansion": "none",
-            "operationsSorter": "method",
-            "filter": True,
-            "showExtensions": True,
-            "showCommonExtensions": True,
-            "tryItOutEnabled": True
-        }
-    )
-
-
-@app.get("/redoc", include_in_schema=False)
-async def redoc_html() -> HTMLResponse:
-    """Alternative ReDoc documentation."""
-    return HTMLResponse(f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>RAG Construction Materials API - ReDoc</title>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
-        <style>
-            body {{ margin: 0; padding: 0; }}
-        </style>
-    </head>
-    <body>
-        <redoc spec-url='{settings.API_V1_STR}/openapi.json'></redoc>
-        <script src="https://cdn.jsdelivr.net/npm/redoc@2.1.3/bundles/redoc.standalone.js"></script>
-    </body>
-    </html>
-    """)
-
-
-@app.get(f"{settings.API_V1_STR}/openapi.json", include_in_schema=False)
-@with_correlation_context
-async def get_openapi_endpoint():
-    """OpenAPI schema endpoint with English documentation."""
-    with CorrelationContext.with_correlation_id():
-        return JSONResponse(
-            get_openapi(
-                title=api_config["title"],
-                version=api_config["version"],
-                description=api_config["description"],
-                contact=api_config["contact"],
-                license_info=api_config["license_info"],
-                servers=api_config["servers"],
-                tags=api_config["openapi_tags"],
-                routes=app.routes,
-            )
-        )
 
 
 @app.get("/", include_in_schema=False)

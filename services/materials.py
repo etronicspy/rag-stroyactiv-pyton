@@ -15,7 +15,7 @@ from datetime import datetime
 
 from core.schemas.materials import (
     Material, MaterialCreate, MaterialUpdate, MaterialBatchResponse, MaterialImportItem,
-    Category, Unit
+    Category, CategoryCreate, Unit
 )
 from core.schemas.colors import ColorReference, ColorCreate
 from core.database.interfaces import IVectorDatabase
@@ -866,13 +866,13 @@ class MaterialsService(BaseRepository):
 
 # === Separate Services for Categories and Units ===
 
-class CategoryService:
-    """Service for managing material categories with Qdrant persistence."""
+class CategoryService(BaseRepository):
+    """Service for managing material categories with Qdrant persistence and AI embedding."""
     
-    def __init__(self, vector_db: IVectorDatabase = None):
-        self.vector_db = vector_db
-        self.collection_name = "categories_v2"
-        logger.info("CategoryService initialized with Qdrant persistence")
+    def __init__(self, vector_db: IVectorDatabase = None, ai_client=None):
+        super().__init__(vector_db=vector_db, ai_client=ai_client)
+        self.collection_name = "categories_v3"  # Новая коллекция с 1536
+        logger.info("CategoryService initialized with Qdrant persistence and AI embedding support")
     
     async def _ensure_collection_exists(self) -> None:
         """Ensure categories collection exists in Qdrant."""
@@ -885,15 +885,25 @@ class CategoryService:
                     # Create collection if it doesn't exist
                     await self.vector_db.create_collection(
                         name=self.collection_name,
-                        vector_size=384,
+                        vector_size=1536,  # OpenAI text-embedding-3-small
                         distance_metric="cosine"
                     )
                     logger.debug(f"Categories collection '{self.collection_name}' created")
         except Exception as e:
             logger.error(f"Failed to ensure categories collection: {e}")
     
-    async def create_category(self, name: str, description: Optional[str] = None) -> Category:
-        """Create a new category and save to Qdrant."""
+    async def create_category(self, category_data: CategoryCreate) -> Category:
+        """Create a new category and save to Qdrant. Supports description and aliases.
+        
+        Args:
+            category_data: CategoryCreate object with name, description, and aliases
+            
+        Returns:
+            Category: Created category with AI embedding and metadata
+            
+        Raises:
+            Exception: If vector database or AI client not available
+        """
         try:
             if not self.vector_db:
                 raise Exception("Vector database not available")
@@ -902,35 +912,43 @@ class CategoryService:
             await self._ensure_collection_exists()
             
             # Generate UUID for Qdrant ID
-            import hashlib
             import uuid
             category_id = str(uuid.uuid4())
             
-            category = Category(id=category_id, name=name, description=description)
+            if not self.ai_client:
+                raise Exception("AI client not available for embedding generation")
             
-            # Create a simple embedding for the category (using name + description)
-            category_text = f"{name} {description or ''}"
+            # Формируем текст для embedding: name + description + aliases
+            embedding_text = category_data.name
+            if category_data.description:
+                embedding_text += f" {category_data.description}"
+            if category_data.aliases:
+                embedding_text += " " + " ".join(category_data.aliases)
             
-            # Generate a simple hash-based vector for category
-            hash_obj = hashlib.md5(category_text.encode())
-            hash_hex = hash_obj.hexdigest()
+            # Generate AI embedding using BaseRepository method
+            embedding = await self.get_embedding(embedding_text)
             
-            # Create 384-dimensional vector
-            vector = []
-            for i in range(384):
-                byte_index = i % len(hash_hex)
-                value = int(hash_hex[byte_index], 16) / 15.0 - 0.5
-                vector.append(value)
+            if not embedding or not isinstance(embedding, list) or len(embedding) == 0:
+                raise Exception("Failed to generate embedding for category")
+            
+            category = Category(
+                id=category_id,
+                name=category_data.name,
+                description=category_data.description,
+                aliases=category_data.aliases,
+                embedding=embedding
+            )
             
             # Save to Qdrant
             await self.vector_db.upsert(
                 collection_name=self.collection_name,
                 vectors=[{
                     "id": category_id,
-                    "vector": vector,
+                    "vector": embedding,
                     "payload": {
-                        "name": name,
-                        "description": description,
+                        "name": category_data.name,
+                        "description": category_data.description,
+                        "aliases": category_data.aliases,
                         "type": "category",
                         "created_at": category.created_at.isoformat(),
                         "updated_at": category.updated_at.isoformat()
@@ -938,14 +956,14 @@ class CategoryService:
                 }]
             )
             
-            logger.info(f"Category '{name}' created and saved to Qdrant with ID {category_id}")
+            logger.info(f"Category '{category_data.name}' created and saved to Qdrant with ID {category_id}")
             return category
         except Exception as e:
-            logger.error(f"Failed to create category {name}: {e}")
+            logger.error(f"Failed to create category {getattr(category_data, 'name', None)}: {e}")
             raise e
     
     async def get_categories(self) -> List[Category]:
-        """Get all categories from Qdrant."""
+        """Get all categories from Qdrant, including description, aliases, and embedding."""
         try:
             if not self.vector_db:
                 logger.warning("Vector DB not available, returning empty categories list")
@@ -958,7 +976,7 @@ class CategoryService:
             results = await self.vector_db.scroll_all(
                 collection_name=self.collection_name,
                 with_payload=True,
-                with_vectors=False
+                with_vectors=True
             )
             
             categories = []
@@ -969,10 +987,15 @@ class CategoryService:
                         id=result.get("id"),
                         name=payload.get("name"),
                         description=payload.get("description"),
+                        aliases=payload.get("aliases", []),
+                        embedding=result.get("vector"),
                         created_at=datetime.fromisoformat(payload.get("created_at", datetime.utcnow().isoformat())),
                         updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
                     )
                     categories.append(category)
+            
+            # Сортируем по дате создания (старые сначала, новые в конце)
+            categories.sort(key=lambda x: x.created_at)
             
             return categories
             
@@ -1004,104 +1027,90 @@ class CategoryService:
         except Exception as e:
             logger.error(f"Failed to delete category {category_id}: {e}")
             return False
-    
 
 
 
-class UnitService:
-    """Service for managing material units with Qdrant persistence."""
-    
-    def __init__(self, vector_db: IVectorDatabase = None):
-        self.vector_db = vector_db
-        self.collection_name = "units_v2"
-        logger.info("UnitService initialized with Qdrant persistence")
-    
+
+class UnitService(BaseRepository):
+    """Service for managing material units with Qdrant persistence and AI embedding."""
+    def __init__(self, vector_db: IVectorDatabase = None, ai_client=None):
+        super().__init__(vector_db=vector_db, ai_client=ai_client)
+        self.collection_name = "units_v3"  # Изменено: новая коллекция с 1536
+        logger.info("UnitService initialized with Qdrant persistence and AI embedding support")
+
     async def _ensure_collection_exists(self) -> None:
-        """Ensure units collection exists in Qdrant."""
         try:
             if self.vector_db:
-                # Check if collection exists
                 exists = await self.vector_db.collection_exists(self.collection_name)
-                
                 if not exists:
-                    # Create collection if it doesn't exist
                     await self.vector_db.create_collection(
                         name=self.collection_name,
-                        vector_size=384,
+                        vector_size=1536,  # Исправлено: теперь 1536
                         distance_metric="cosine"
                     )
                     logger.debug(f"Units collection '{self.collection_name}' created")
         except Exception as e:
             logger.error(f"Failed to ensure units collection: {e}")
-    
-    async def create_unit(self, name: str, description: Optional[str] = None) -> Unit:
-        """Create a new unit and save to Qdrant."""
+
+    async def create_unit(self, unit_data: Unit) -> Unit:
+        """Create a new unit and save to Qdrant. Supports description and aliases."""
         try:
-            # Ensure collection exists
             await self._ensure_collection_exists()
-            
-            # Generate UUID for Qdrant ID
-            import hashlib
             import uuid
             unit_id = str(uuid.uuid4())
+            if not self.ai_client:
+                raise Exception("AI client not available for embedding generation")
+            # Формируем текст для embedding: name + description + aliases
+            embedding_text = unit_data.name
+            if unit_data.description:
+                embedding_text += f" {unit_data.description}"
+            if unit_data.aliases:
+                embedding_text += " " + " ".join(unit_data.aliases)
             
-            unit = Unit(id=unit_id, name=name, description=description)
+            # Generate AI embedding using BaseRepository method
+            embedding = await self.get_embedding(embedding_text)
             
-            # Save to Qdrant
-            if self.vector_db:
-                # Create a simple embedding for the unit (using name + description)
-                unit_text = f"{name} {description or ''}"
-                
-                # Generate a simple hash-based vector for unit
-                hash_obj = hashlib.md5(unit_text.encode())
-                hash_hex = hash_obj.hexdigest()
-                
-                # Create 384-dimensional vector
-                vector = []
-                for i in range(384):
-                    byte_index = i % len(hash_hex)
-                    value = int(hash_hex[byte_index], 16) / 15.0 - 0.5
-                    vector.append(value)
-                
-                # Save to Qdrant
-                await self.vector_db.upsert(
-                    collection_name=self.collection_name,
-                    vectors=[{
-                        "id": unit_id,
-                        "vector": vector,
-                        "payload": {
-                            "name": name,
-                            "description": description,
-                            "type": "unit",
-                            "created_at": unit.created_at.isoformat(),
-                            "updated_at": unit.updated_at.isoformat()
-                        }
-                    }]
-                )
-                logger.info(f"Unit '{name}' created and saved to Qdrant with ID {unit_id}")
-            
+            if not embedding or not isinstance(embedding, list) or len(embedding) == 0:
+                raise Exception("Failed to generate embedding for unit")
+            unit = Unit(
+                id=unit_id,
+                name=unit_data.name,
+                description=unit_data.description,
+                aliases=unit_data.aliases,
+                embedding=embedding
+            )
+            await self.vector_db.upsert(
+                collection_name=self.collection_name,
+                vectors=[{
+                    "id": unit_id,
+                    "vector": embedding,
+                    "payload": {
+                        "name": unit_data.name,
+                        "description": unit_data.description,
+                        "aliases": unit_data.aliases,
+                        "type": "unit",
+                        "created_at": unit.created_at.isoformat(),
+                        "updated_at": unit.updated_at.isoformat()
+                    }
+                }]
+            )
             return unit
         except Exception as e:
-            logger.error(f"Failed to create unit {name}: {e}")
+            logger.error(f"Failed to create unit {getattr(unit_data, 'name', None)}: {e}")
             raise e
-    
+
     async def get_units(self) -> List[Unit]:
-        """Get all units from Qdrant."""
+        """Get all units from Qdrant, including description, aliases, and embedding."""
         try:
             if not self.vector_db:
                 logger.warning("Vector DB not available, returning empty units list")
                 return []
-            
-            # Ensure collection exists
             await self._ensure_collection_exists()
-            
-            # Get all units from Qdrant using scroll_all
             results = await self.vector_db.scroll_all(
                 collection_name=self.collection_name,
                 with_payload=True,
-                with_vectors=False
+                with_vectors=True  # Теперь получаем embedding
             )
-            
             units = []
             for result in results:
                 payload = result.get("payload", {})
@@ -1110,42 +1119,38 @@ class UnitService:
                         id=result.get("id"),
                         name=payload.get("name"),
                         description=payload.get("description"),
+                        aliases=payload.get("aliases", []),
+                        embedding=result.get("vector"),
                         created_at=datetime.fromisoformat(payload.get("created_at", datetime.utcnow().isoformat())),
                         updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
                     )
                     units.append(unit)
             
+            # Сортируем по дате создания (старые сначала, новые в конце)
+            units.sort(key=lambda x: x.created_at)
             return units
-            
         except Exception as e:
             logger.error(f"Failed to get units: {e}")
-            # Return empty list instead of raising error
             return []
-    
+
     async def delete_unit(self, unit_id: str) -> bool:
-        """Delete a unit from Qdrant by ID."""
         try:
             if not self.vector_db:
                 logger.warning("Vector DB not available")
                 return False
-            
-            # Delete from Qdrant using the provided ID
             deleted = await self.vector_db.delete(
                 collection_name=self.collection_name,
                 vector_id=unit_id
             )
-            
             if deleted:
                 logger.info(f"Unit with ID '{unit_id}' deleted from Qdrant")
                 return True
             else:
                 logger.warning(f"Failed to delete unit with ID '{unit_id}' from Qdrant")
                 return False
-                
         except Exception as e:
             logger.error(f"Failed to delete unit {unit_id}: {e}")
             return False
-    
 
 
 class ColorService(BaseRepository):
@@ -1165,9 +1170,8 @@ class ColorService(BaseRepository):
             try:
                 from core.database.factories import AIClientFactory
                 ai_client = AIClientFactory.create_ai_client()
-                logger.info("✅ AI client successfully created for ColorService")
             except Exception as e:
-                logger.error(f"❌ Failed to create AI client for ColorService: {e}")
+                logger.error(f"Failed to create AI client for ColorService: {e}")
                 ai_client = None
         
         super().__init__(vector_db=vector_db, ai_client=ai_client)
@@ -1211,7 +1215,6 @@ class ColorService(BaseRepository):
             # Use AI client to generate embedding (inherited from BaseRepository)
             try:
                 embedding = await self.get_embedding(color_text)
-                logger.debug(f"Generated embedding for color '{color_data.name}': {len(embedding)} dimensions")
             except Exception as e:
                 logger.error(f"Failed to generate embedding for color '{color_data.name}': {e}")
                 # Use fallback hash-based vector
@@ -1292,6 +1295,9 @@ class ColorService(BaseRepository):
                         updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
                     )
                     colors.append(color_ref)
+            
+            # Сортируем по дате создания (старые сначала, новые в конце)
+            colors.sort(key=lambda x: x.created_at)
             
             logger.info(f"Retrieved {len(colors)} colors from Qdrant")
             return colors

@@ -1,11 +1,12 @@
 from typing import List
 from fastapi import APIRouter, Depends
-from core.schemas.materials import Category, Unit
+from core.schemas.materials import Category, Unit, CategoryCreate
 from core.schemas.colors import ColorReference, ColorCreate
 from services.materials import CategoryService, UnitService, ColorService
 from core.database.interfaces import IVectorDatabase
 from core.dependencies.database import get_vector_db_dependency, get_ai_client_dependency
 from core.schemas.response_models import ERROR_RESPONSES
+from core.schemas.materials import UnitCreate
 
 router = APIRouter(
     prefix="",
@@ -14,16 +15,18 @@ router = APIRouter(
 )
 
 def get_category_service(
-    vector_db: IVectorDatabase = Depends(get_vector_db_dependency)
+    vector_db: IVectorDatabase = Depends(get_vector_db_dependency),
+    ai_client = Depends(get_ai_client_dependency)
 ) -> CategoryService:
     """Get CategoryService with dependency injection."""
-    return CategoryService(vector_db=vector_db)
+    return CategoryService(vector_db=vector_db, ai_client=ai_client)
 
 def get_unit_service(
-    vector_db: IVectorDatabase = Depends(get_vector_db_dependency)
+    vector_db: IVectorDatabase = Depends(get_vector_db_dependency),
+    ai_client = Depends(get_ai_client_dependency)
 ) -> UnitService:
     """Get UnitService with dependency injection."""
-    return UnitService(vector_db=vector_db)
+    return UnitService(vector_db=vector_db, ai_client=ai_client)
 
 def get_color_service(
     vector_db: IVectorDatabase = Depends(get_vector_db_dependency),
@@ -40,7 +43,7 @@ def get_color_service(
     status_code=201
 )
 async def create_category(
-    category: Category,
+    category: CategoryCreate,
     service: CategoryService = Depends(get_category_service)
 ):
     """
@@ -51,6 +54,7 @@ async def create_category(
     
     **Features:**
     - 🆔 Auto-generation of UUID for category
+    - 🤖 AI embedding generation (1536 dimensions)
     - 🔍 Indexing for fast search
     - ⏰ Automatic timestamps
     - 📝 Name uniqueness validation
@@ -61,12 +65,14 @@ async def create_category(
     
     **Optional Fields:**
     - `description`: Category description
+    - `aliases`: Alternative names and synonyms
     
     **Request Body Example:**
     ```json
     {
-        "name": "Cement",
-        "description": "Binding materials based on Portland cement for creating concrete mixtures"
+        "name": "Цемент",
+        "description": "Строительные цементы и вяжущие материалы",
+        "aliases": ["цемент", "cement", "вяжущие"]
     }
     ```
     
@@ -74,8 +80,10 @@ async def create_category(
     ```json
     {
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "Cement",
-        "description": "Binding materials based on Portland cement for creating concrete mixtures",
+        "name": "Цемент",
+        "description": "Строительные цементы и вяжущие материалы",
+        "aliases": ["цемент", "cement", "вяжущие"],
+        "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
         "created_at": "2025-06-16T17:30:15.123456Z",
         "updated_at": "2025-06-16T17:30:15.123456Z"
     }
@@ -97,7 +105,7 @@ async def create_category(
     - Organizing product catalog
     - Standardizing nomenclature
     """
-    return await service.create_category(category.name, category.description)
+    return await service.create_category(category)
 
 @router.get(
     "/categories/",
@@ -117,8 +125,9 @@ async def get_categories(
     **Features:**
     - 📊 Complete list without pagination
     - ⚡ Fast loading (cached)
-    - 🔤 Alphabetical sorting
-    - 📈 Usage counters
+    - 📅 Sorted by creation date (oldest first)
+    - 🤖 AI embeddings included (1536 dimensions)
+    - 📝 Aliases and descriptions included
     - 🎯 Ready for UI use
     
     **Response Example:**
@@ -128,6 +137,8 @@ async def get_categories(
             "id": "550e8400-e29b-41d4-a716-446655440000",
             "name": "Reinforcement",
             "description": "Steel bars for reinforcing reinforced concrete structures",
+            "aliases": ["арматура", "reinforcement", "steel bars"],
+            "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         },
@@ -135,6 +146,8 @@ async def get_categories(
             "id": "550e8400-e29b-41d4-a716-446655440001",
             "name": "Brick",
             "description": "Ceramic and silicate products for wall masonry",
+            "aliases": ["кирпич", "brick", "ceramic"],
+            "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         },
@@ -142,6 +155,8 @@ async def get_categories(
             "id": "550e8400-e29b-41d4-a716-446655440002",
             "name": "Cement",
             "description": "Binding materials based on Portland cement",
+            "aliases": ["цемент", "cement", "вяжущие"],
+            "embedding": [0.1, 0.2, 0.3, "...", "(1536 dimensions)"],
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         }
@@ -227,33 +242,35 @@ async def delete_category(
     status_code=201
 )
 async def create_unit(
-    unit: Unit,
+    unit: UnitCreate,
     service: UnitService = Depends(get_unit_service)
 ):
     """
     📏 **Create Unit** - Create new measurement unit
     
-    Creates a new measurement unit for materials. Measurement units are used
-    for precise specification of quantities and volumes of construction materials.
+    Creates a new measurement unit for materials with AI-generated embedding.
+    Units are used for material classification and measurement standardization.
     
     **Features:**
     - 🆔 Auto-generation of UUID for unit
-    - 📝 Name uniqueness validation
-    - 🔍 Indexing for fast search
+    - 🤖 AI embedding generation for semantic search (1536 dimensions)
     - ⏰ Automatic timestamps
+    - 📝 Name uniqueness validation
     - 🗄️ Storage in vector database
     
     **Required Fields:**
-    - `name`: Unit name (unique)
+    - `name`: Unit abbreviation/short name (e.g., "кг", "м³", "шт")
     
     **Optional Fields:**
-    - `description`: Unit description
+    - `description`: Unit description (e.g., "Килограмм — единица массы")
+    - `aliases`: Alternative names and abbreviations (e.g., ["килограмм", "kg", "кг."])
     
     **Request Body Example:**
     ```json
     {
-        "name": "m³",
-        "description": "Cubic meter - unit for measuring volume of bulk materials"
+        "name": "кг",
+        "description": "Килограмм — единица массы",
+        "aliases": ["килограмм", "kg", "кг."]
     }
     ```
     
@@ -261,8 +278,10 @@ async def create_unit(
     ```json
     {
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "name": "m³",
-        "description": "Cubic meter - unit for measuring volume of bulk materials",
+        "name": "кг",
+        "description": "Килограмм — единица массы",
+        "aliases": ["килограмм", "kg", "кг."],
+        "embedding": [0.123, 0.456, ...],  // 1536-dimensional vector
         "created_at": "2025-06-16T17:30:15.123456Z",
         "updated_at": "2025-06-16T17:30:15.123456Z"
     }
@@ -270,24 +289,24 @@ async def create_unit(
     
     **Response Status Codes:**
     - **201 Created**: Unit created successfully
-    - **400 Bad Request**: Validation error (duplicate name)
-    - **500 Internal Server Error**: Database save error
-    
-    **Common Units:**
-    - **Volume**: m³, l, dm³
-    - **Mass**: kg, t, g
-    - **Area**: m², cm², mm²
-    - **Length**: m, cm, mm
-    - **Piece**: pcs, pack, bag, pallet
-    - **Special**: l.m. (linear meter), m.l. (meter linear)
+    - **400 Bad Request**: Invalid input data
+    - **422 Validation Error**: Schema validation failed
+    - **500 Internal Server Error**: Creation error
     
     **Use Cases:**
-    - Standardizing measurement units
-    - Creating dropdown lists in forms
-    - Calculating material quantities
-    - Generating estimates and specifications
+    - Adding new measurement units to the system
+    - Standardizing unit abbreviations
+    - Supporting multiple unit variants (aliases)
+    - Semantic search for unit matching
+    - Material classification by units
+    
+    **Technical Details:**
+    - Embedding model: text-embedding-3-small (1536 dimensions)
+    - Vector database: Qdrant with cosine similarity
+    - Text for embedding: name + description + aliases
+    - Collection: units_v3
     """
-    return await service.create_unit(unit.name, unit.description)
+    return await service.create_unit(unit)
 
 @router.get(
     "/units/",
@@ -310,28 +329,26 @@ async def get_units(
     - 🔤 Sorting by popularity
     - 📈 Ready for UI use
     - 🌐 International standards support
+    - 🤖 Full embedding vectors (1536 dimensions)
     
     **Response Example:**
     ```json
     [
         {
             "id": "550e8400-e29b-41d4-a716-446655440000",
-            "name": "kg",
-            "description": "Kilogram - mass measurement unit",
+            "name": "кг",
+            "description": "Килограмм — единица массы",
+            "aliases": ["килограмм", "kg", "кг."],
+            "embedding": [0.123, 0.456, ...],  // 1536-dimensional vector
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         },
         {
             "id": "550e8400-e29b-41d4-a716-446655440001",
-            "name": "m³",
-            "description": "Cubic meter - volume measurement unit",
-            "created_at": "2025-06-16T17:30:15.123456Z",
-            "updated_at": "2025-06-16T17:30:15.123456Z"
-        },
-        {
-            "id": "550e8400-e29b-41d4-a716-446655440002",
-            "name": "pcs",
-            "description": "Piece - quantity measurement unit",
+            "name": "м³",
+            "description": "Кубический метр — единица объёма",
+            "aliases": ["кубометр", "куб.м", "m3"],
+            "embedding": [0.789, 0.012, ...],  // 1536-dimensional vector
             "created_at": "2025-06-16T17:30:15.123456Z",
             "updated_at": "2025-06-16T17:30:15.123456Z"
         }
@@ -339,22 +356,21 @@ async def get_units(
     ```
     
     **Response Status Codes:**
-    - **200 OK**: List returned successfully (may be empty)
-    - **500 Internal Server Error**: Data retrieval error
-    
-    **Unit Categories:**
-    - **Volume**: m³, l, dm³
-    - **Mass**: kg, t, g  
-    - **Area**: m², cm²
-    - **Length**: m, cm, mm
-    - **Quantity**: pcs, pack, bag
+    - **200 OK**: Units retrieved successfully
+    - **500 Internal Server Error**: Database error
     
     **Use Cases:**
-    - Creating dropdown lists in forms
-    - Measurement unit validation
-    - Calculations in estimates and specifications
-    - API for mobile applications
-    - Integration with ERP systems
+    - Populating unit selection dropdowns
+    - Validating unit input in forms
+    - Displaying available units in UI
+    - Unit normalization and standardization
+    - Semantic unit matching
+    
+    **Technical Details:**
+    - Embedding model: text-embedding-3-small (1536 dimensions)
+    - Vector database: Qdrant with cosine similarity
+    - Collection: units_v3
+    - Includes full embedding vectors for semantic operations
     """
     return await service.get_units()
 
@@ -373,7 +389,7 @@ async def delete_unit(
     service: UnitService = Depends(get_unit_service)
 ):
     """
-    🗑️ **Delete Unit** - Delete measurement unit
+    ️ **Delete Unit** - Delete measurement unit
     
     Removes measurement unit from system. Irreversible operation, requires caution.
     
@@ -384,6 +400,7 @@ async def delete_unit(
     - ⚠️ Dependency check not performed
     - ⚡ Instant execution
     - 📊 Index updates
+    - 🤖 AI embeddings removal
     
     **Path Parameters:**
     - `unit_id`: Unit UUID for deletion
