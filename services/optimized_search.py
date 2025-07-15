@@ -218,32 +218,32 @@ class OptimizedSearchService(AdvancedSearchService):
         search_type: str, 
         query: AdvancedSearchQuery
     ) -> SearchTaskResult:
-        """Create and execute a search task with performance monitoring."""
+        """Create and execute a search task with performance monitoring (через fallback manager)."""
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
         async with self._search_semaphore:
             start_time = time.time()
-            
+            fallback_manager = get_fallback_manager()
             try:
                 if search_type == 'vector':
-                    results = await self._vector_search(query)
+                    results = await fallback_manager.vector_search(query.query, query.pagination.page_size * 5, query.fuzzy_threshold or 0.7)
                 elif search_type == 'sql':
-                    results = await self._sql_search(query)
+                    results = await fallback_manager.sql_search(query.query, query.pagination.page_size * 5)
                 elif search_type == 'fuzzy':
-                    results = await self._fuzzy_search(query)
+                    results = await fallback_manager.fuzzy_search(query.query, query.pagination.page_size * 5, query.fuzzy_threshold or 0.8)
                 else:
                     raise ValueError(f"Unknown search type: {search_type}")
-                
                 execution_time = time.time() - start_time
-                
                 return SearchTaskResult(
                     search_type=search_type,
                     results=results,
                     execution_time=execution_time
                 )
-                
+            except AllDatabasesUnavailableError as e:
+                logger.error(f"All databases unavailable for {search_type} search: {e.errors}")
+                raise
             except Exception as e:
                 execution_time = time.time() - start_time
                 logger.error(f"{search_type} search failed: {e}")
-                
                 return SearchTaskResult(
                     search_type=search_type,
                     results=[],

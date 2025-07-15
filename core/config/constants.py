@@ -118,3 +118,15 @@ class ParserDefaults:
     RETRY_ATTEMPTS = 3
     CONFIDENCE_THRESHOLD = 0.85
     CACHE_TTL = 3600  # 1 hour 
+
+
+class ParserConstants:
+    """Constants for parser configuration and defaults (legacy compatibility)."""
+    OPENAI_MODEL = "gpt-4o-mini"
+    EMBEDDING_MODEL = "text-embedding-3-small"
+    EMBEDDING_DIMENSIONS = 1536
+    CONFIDENCE_THRESHOLD = 0.85
+    BATCH_SIZE = 10
+    TIMEOUT = 30
+    RETRY_ATTEMPTS = 3
+    CACHE_TTL = 3600 

@@ -352,49 +352,19 @@ class MaterialsService(BaseRepository):
     # === Search Operations ===
     
     @with_correlation_context
-    @log_database_operation_decorator("qdrant", "search_materials")  # Используем новый декоратор
+    @log_database_operation_decorator("qdrant", "search_materials")
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
-        """Search materials using semantic search with fallback.
-        
-        Implements fallback strategy: vector search → SQL LIKE search if 0 results
-        
-        Args:
-            query: Search query
-            limit: Maximum number of results
-            
-        Returns:
-            List of matching materials
-            
-        Raises:
-            DatabaseError: If search fails
-        """
+        """Search materials using centralized fallback manager (vector → SQL LIKE)."""
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
         get_correlation_id()
-        logger.debug(f"Performing vector search for: '{query}'")
-        
         with self.performance_tracker.time_operation("materials_service", "search_materials", limit):
+            fallback_manager = get_fallback_manager()
             try:
-                await self._ensure_collection_exists()
-                
-                # Check if vector_db is available
-                if self.vector_db is None:
-                    logger.warning("Vector DB not available, returning empty results")
-                    return []
-                
-                # Primary: Vector semantic search
-                logger.debug(f"Performing vector search for: '{query}'")
-                vector_results = await self._search_vector(query, limit)
-                
-                if vector_results:
-                    logger.info(f"Vector search returned {len(vector_results)} results")
-                    return vector_results
-                
-                # Fallback: Text search (будет реализовано с PostgreSQL)
-                logger.info("Vector search returned 0 results, fallback not yet implemented")
-                return []
-                
-            except Exception as e:
-                logger.error(f"Failed to search materials for query '{query}': {e}")
-                await self._handle_database_error("search_materials", e)
+                results = await fallback_manager.search_materials(query, limit)
+                return results
+            except AllDatabasesUnavailableError as e:
+                logger.error(f"All databases unavailable for search_materials: {e.errors}")
+                raise
     
     async def _search_vector(self, query: str, limit: int) -> List[Material]:
         """Perform vector semantic search."""
@@ -1343,7 +1313,7 @@ class ColorService(BaseRepository):
                 logger.error(f"Failed to generate embedding for color '{color_data.name}': {e}")
                 # Use fallback hash-based vector
                 import hashlib
-                hash_obj = hashlib.md5(color_text.encode())
+                hash_obj = hashlib.md5(color_data.name.encode())
                 hash_hex = hash_obj.hexdigest()
                 embedding = []
                 for i in range(1536):

@@ -34,6 +34,7 @@ from ..interfaces import (
     OutputType
 )
 
+print("DEBUG: core/parsers/services/ai_parser_service.py loaded")
 
 @dataclass
 class AIParseContext:
@@ -60,6 +61,7 @@ class AIParserService:
     """
     
     def __init__(self, config: Optional[ParserConfig] = None):
+        print("DEBUG: AIParserService __init__ called")
         """
         Initialize AI parser service.
         

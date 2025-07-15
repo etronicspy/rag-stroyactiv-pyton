@@ -3,6 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, ConfigDict
+from fastapi.responses import JSONResponse
 
 from core.schemas.materials import (
     Material, AdvancedSearchQuery, SearchResponse as CoreSearchResponse,

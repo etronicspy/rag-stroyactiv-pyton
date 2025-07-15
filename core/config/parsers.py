@@ -17,6 +17,8 @@ from core.config.constants import (
     DefaultConfidenceThresholds
 )
 
+print("DEBUG: core/config/parsers.py loaded")
+
 
 class ParserConstants:
     """Constants specific to parser operations."""

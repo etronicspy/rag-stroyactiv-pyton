@@ -15,34 +15,15 @@ logger = get_logger(__name__)
 
 
 class CollectionInitializerService:
-    """Service for initializing vector collections with reference data.
-    
-    Сервис для инициализации векторных коллекций со справочными данными.
-    """
-    
-    def __init__(self, vector_db: IVectorDatabase, embedding_generator: Optional[Callable] = None):
-        """Initialize the collection initializer service.
-        
-        Args:
-            vector_db: Vector database instance
-            embedding_generator: Function to generate embeddings
-        """
-        self.vector_db = vector_db
+    """Service for initializing vector collections with reference data (через fallback manager)."""
+    def __init__(self, embedding_generator: Optional[Callable] = None):
         self.embedding_generator = embedding_generator
         self.settings = get_settings()
         self.logger = logger
-        
+
     async def initialize_all_collections(self, force_recreate: bool = False) -> Dict[str, Any]:
-        """Initialize all reference collections.
-        
-        Инициализировать все справочные коллекции.
-        
-        Args:
-            force_recreate: Whether to recreate existing collections
-            
-        Returns:
-            Initialization results
-        """
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        fallback_manager = get_fallback_manager()
         results = {
             "colors": {"success": False, "message": "", "count": 0},
             "units": {"success": False, "message": "", "count": 0},
@@ -50,54 +31,38 @@ class CollectionInitializerService:
             "total_collections": 0,
             "successful_collections": 0
         }
-        
         try:
-            # Initialize colors collection
             self.logger.info("Initializing colors collection...")
             colors_result = await self.initialize_colors_collection(force_recreate)
             results["colors"] = colors_result
-            
-            # Initialize units collection
             self.logger.info("Initializing units collection...")
             units_result = await self.initialize_units_collection(force_recreate)
             results["units"] = units_result
-            
-            # Calculate overall results
             results["total_collections"] = 2
             results["successful_collections"] = sum(1 for r in [colors_result, units_result] if r["success"])
             results["overall_success"] = results["successful_collections"] == results["total_collections"]
-            
             if results["overall_success"]:
                 self.logger.info("All collections initialized successfully!")
             else:
                 self.logger.warning(f"Only {results['successful_collections']}/{results['total_collections']} collections initialized successfully")
-                
+        except AllDatabasesUnavailableError as e:
+            self.logger.error(f"All databases unavailable: {e}")
+            results["overall_success"] = False
+            results["error"] = str(e)
         except Exception as e:
             self.logger.error(f"Failed to initialize collections: {e}")
             results["overall_success"] = False
             results["error"] = str(e)
-        
         return results
-    
+
     async def initialize_colors_collection(self, force_recreate: bool = False) -> Dict[str, Any]:
-        """Initialize colors collection with reference data.
-        
-        Инициализировать коллекцию цветов со справочными данными.
-        
-        Args:
-            force_recreate: Whether to recreate existing collection
-            
-        Returns:
-            Initialization result
-        """
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        fallback_manager = get_fallback_manager()
         collection_name = ColorCollection.collection_name
-        
         try:
-            # Check if collection exists
-            collection_exists = await self._collection_exists(collection_name)
-            
+            collection_exists = await fallback_manager.collection_exists(collection_name)
             if collection_exists and not force_recreate:
-                count = await self._get_collection_count(collection_name)
+                count = await fallback_manager.get_collection_count(collection_name)
                 self.logger.info(f"Colors collection already exists with {count} items")
                 return {
                     "success": True,
@@ -105,39 +70,35 @@ class CollectionInitializerService:
                     "count": count,
                     "action": "skipped"
                 }
-            
-            # Create or recreate collection
             if collection_exists and force_recreate:
-                await self._delete_collection(collection_name)
+                await fallback_manager.delete_collection(collection_name)
                 self.logger.info(f"Deleted existing colors collection")
-            
-            # Create collection
             collection_config = ColorCollection.get_collection_config()
-            await self._create_collection(collection_config)
+            await fallback_manager.create_collection(collection_config)
             self.logger.info(f"Created colors collection: {collection_name}")
-            
-            # Generate colors data with embeddings
             colors_data = ColorCollection.generate_colors_data(self.embedding_generator)
-            
-            # Insert data in batches
             batch_size = 50
             total_inserted = 0
-            
             for i in range(0, len(colors_data), batch_size):
                 batch = colors_data[i:i + batch_size]
-                await self._insert_batch(collection_name, batch)
+                await fallback_manager.insert_batch(collection_name, batch)
                 total_inserted += len(batch)
                 self.logger.debug(f"Inserted {len(batch)} colors, total: {total_inserted}")
-            
             self.logger.info(f"Successfully initialized colors collection with {total_inserted} items")
-            
             return {
                 "success": True,
                 "message": f"Successfully initialized with {total_inserted} items",
                 "count": total_inserted,
                 "action": "created" if not collection_exists else "recreated"
             }
-            
+        except AllDatabasesUnavailableError as e:
+            self.logger.error(f"All databases unavailable: {e}")
+            return {
+                "success": False,
+                "message": f"All databases unavailable: {str(e)}",
+                "count": 0,
+                "action": "failed"
+            }
         except Exception as e:
             self.logger.error(f"Failed to initialize colors collection: {e}")
             return {
@@ -146,26 +107,15 @@ class CollectionInitializerService:
                 "count": 0,
                 "action": "failed"
             }
-    
+
     async def initialize_units_collection(self, force_recreate: bool = False) -> Dict[str, Any]:
-        """Initialize units collection with reference data.
-        
-        Инициализировать коллекцию единиц со справочными данными.
-        
-        Args:
-            force_recreate: Whether to recreate existing collection
-            
-        Returns:
-            Initialization result
-        """
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        fallback_manager = get_fallback_manager()
         collection_name = UnitsCollection.collection_name
-        
         try:
-            # Check if collection exists
-            collection_exists = await self._collection_exists(collection_name)
-            
+            collection_exists = await fallback_manager.collection_exists(collection_name)
             if collection_exists and not force_recreate:
-                count = await self._get_collection_count(collection_name)
+                count = await fallback_manager.get_collection_count(collection_name)
                 self.logger.info(f"Units collection already exists with {count} items")
                 return {
                     "success": True,
@@ -173,39 +123,35 @@ class CollectionInitializerService:
                     "count": count,
                     "action": "skipped"
                 }
-            
-            # Create or recreate collection
             if collection_exists and force_recreate:
-                await self._delete_collection(collection_name)
+                await fallback_manager.delete_collection(collection_name)
                 self.logger.info(f"Deleted existing units collection")
-            
-            # Create collection
             collection_config = UnitsCollection.get_collection_config()
-            await self._create_collection(collection_config)
+            await fallback_manager.create_collection(collection_config)
             self.logger.info(f"Created units collection: {collection_name}")
-            
-            # Generate units data with embeddings
             units_data = UnitsCollection.generate_units_data(self.embedding_generator)
-            
-            # Insert data in batches
             batch_size = 50
             total_inserted = 0
-            
             for i in range(0, len(units_data), batch_size):
                 batch = units_data[i:i + batch_size]
-                await self._insert_batch(collection_name, batch)
+                await fallback_manager.insert_batch(collection_name, batch)
                 total_inserted += len(batch)
                 self.logger.debug(f"Inserted {len(batch)} units, total: {total_inserted}")
-            
             self.logger.info(f"Successfully initialized units collection with {total_inserted} items")
-            
             return {
                 "success": True,
                 "message": f"Successfully initialized with {total_inserted} items",
                 "count": total_inserted,
                 "action": "created" if not collection_exists else "recreated"
             }
-            
+        except AllDatabasesUnavailableError as e:
+            self.logger.error(f"All databases unavailable: {e}")
+            return {
+                "success": False,
+                "message": f"All databases unavailable: {str(e)}",
+                "count": 0,
+                "action": "failed"
+            }
         except Exception as e:
             self.logger.error(f"Failed to initialize units collection: {e}")
             return {

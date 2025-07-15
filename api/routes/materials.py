@@ -6,6 +6,7 @@ Refactored materials API routes with new multi-database architecture.
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
 from datetime import datetime
+from fastapi.responses import JSONResponse
 
 from core.logging import get_logger
 from core.schemas.materials import (
@@ -216,6 +217,7 @@ async def create_material(
     - Importing data from price lists
     - Creating material reference books
     """
+    from core.database.factories import AllDatabasesUnavailableError
     try:
         logger.info(f"Creating material: {material.name}")
         result = await service.create_material(material)
@@ -224,6 +226,8 @@ async def create_material(
     except DatabaseError as e:
         logger.error(f"Database error creating material: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
     except Exception as e:
         logger.error(f"Unexpected error creating material: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
@@ -287,6 +291,8 @@ async def get_material(
     except DatabaseError as e:
         logger.error(f"Database error getting material: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
     except Exception as e:
         logger.error(f"Unexpected error getting material: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
@@ -359,6 +365,8 @@ async def get_materials(
     except DatabaseError as e:
         logger.error(f"Database error getting materials: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
     except Exception as e:
         logger.error(f"Unexpected error getting materials: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
@@ -447,6 +455,8 @@ async def update_material(
     except DatabaseError as e:
         logger.error(f"Database error updating material: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
     except Exception as e:
         logger.error(f"Unexpected error updating material: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
@@ -524,6 +534,8 @@ async def delete_material(
     except DatabaseError as e:
         logger.error(f"Database error deleting material: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
     except Exception as e:
         logger.error(f"Unexpected error deleting material: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
@@ -637,6 +649,8 @@ async def create_materials_batch(
     except DatabaseError as e:
         logger.error(f"Database error in batch create: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
     except Exception as e:
         logger.error(f"Unexpected error in batch create: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
@@ -760,6 +774,8 @@ async def import_materials_from_json(
     except DatabaseError as e:
         logger.error(f"Database error in import: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
     except Exception as e:
         logger.error(f"Unexpected error in import: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

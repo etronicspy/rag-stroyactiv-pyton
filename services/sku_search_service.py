@@ -88,25 +88,13 @@ class SKUSearchService:
         max_candidates: Optional[int] = None
     ) -> SKUSearchResponse:
         """
-        Main method: Find SKU using two-phase search
-        
-        Args:
-            material_name: Material name to search for
-            unit: Unit to match (must match exactly with 'unit' field)
-            normalized_color: Kept for compatibility but ignored (no color field in DB)
-            material_embedding: Pre-computed embedding (optional)
-            similarity_threshold: Override default threshold
-            max_candidates: Override default max candidates
-            
-        Returns:
-            SKU search response with found SKU or None
+        Main method: Find SKU using two-phase search (now via centralized fallback manager)
         """
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
         start_time = time.time()
         threshold = similarity_threshold or self.config.similarity_threshold
         max_cands = max_candidates or self.config.max_candidates
-        
         self.logger.info(f"🔍 Starting SKU search for: {material_name} [{unit}]")
-        
         # Check cache first
         if self.config.cache_enabled:
             cache_key = self._generate_cache_key(material_name, unit, None, threshold)
@@ -114,76 +102,23 @@ class SKUSearchService:
             if cached_result:
                 self.logger.debug(f"📋 Cache hit for SKU search: {material_name}")
                 return cached_result
-        
+        fallback_manager = get_fallback_manager()
         try:
-            logger.debug(f"🔍 Searching SKU for: {material_name} [{unit}]")
-            
-            # Stage 1: Generate combined embedding (without color since it's not in DB)
-            embedding_result = await self.embedding_service.generate_material_embedding(
+            response = await fallback_manager.find_sku_by_material_data(
                 material_name=material_name,
-                normalized_unit=unit,
-                normalized_color=None  # No color field in actual DB
+                unit=unit,
+                normalized_color=normalized_color,
+                material_embedding=material_embedding,
+                similarity_threshold=threshold,
+                max_candidates=max_cands
             )
-            
-            if not embedding_result.success:
-                logger.error(f"Failed to generate embedding for {material_name}")
-                return SKUSearchResponse(
-                    found_sku=None,
-                    candidates_evaluated=0,
-                    search_time=time.time() - start_time,
-                    success=False
-                )
-            
-            # ЭТАП 1: Векторный поиск похожих материалов
-            candidates = await self._phase1_vector_search(
-                embedding_result.material_embedding, 
-                threshold, 
-                max_cands
-            )
-            
-            self.logger.debug(f"📊 Phase 1: Found {len(candidates)} vector candidates")
-            
-            # ЭТАП 2: Фильтрация по атрибутам (только по unit, без цвета)
-            matching_candidates = self._phase2_attribute_filtering(
-                candidates,
-                unit,
-                None  # No color filtering since field doesn't exist in DB
-            )
-            
-            self.logger.debug(f"🔍 Phase 2: {len(matching_candidates)} candidates passed filtering")
-            
-            # Выбор лучшего результата
-            best_match = self._select_best_match(matching_candidates)
-            found_sku = best_match.sku if best_match else None
-            
-            # Создание результата
-            response = SKUSearchResponse(
-                found_sku=found_sku,
-                search_successful=True,
-                candidates_evaluated=len(candidates),
-                matching_candidates=len(matching_candidates),
-                best_match=best_match,
-                search_method="two_phase_vector_filtering",
-                processing_time=time.time() - start_time,
-                all_candidates=matching_candidates[:10]  # Первые 10 для debug
-            )
-            
             # Cache result
             if self.config.cache_enabled:
                 self._cache_result(cache_key, response)
-            
-            self.logger.info(
-                f"✅ SKU search completed: {material_name} -> {found_sku} "
-                f"(similarity: {best_match.similarity_score:.3f}, time: {response.processing_time:.2f}s)"
-                if best_match else 
-                f"❌ No SKU found for: {material_name} (time: {response.processing_time:.2f}s)"
-            )
-            
             return response
-            
-        except Exception as e:
-            self.logger.error(f"💥 SKU search failed for {material_name}: {e}")
-            return self._create_error_response(str(e), start_time)
+        except AllDatabasesUnavailableError as e:
+            self.logger.error(f"All databases unavailable for SKU search: {e.errors}")
+            raise
     
     async def _phase1_vector_search(
         self, 

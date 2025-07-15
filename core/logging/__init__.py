@@ -1,3 +1,4 @@
+print("DEBUG: core/logging/__init__.py loaded")
 """
 🏗️ Modular Logging System for RAG Construction Materials API
 

@@ -70,64 +70,33 @@ class AdvancedSearchService:
         self.popular_queries_key = "popular_queries"
         
     async def advanced_search(self, query: AdvancedSearchQuery) -> SearchResponse:
-        """Perform advanced search with comprehensive filtering and sorting.
-        
-        Args:
-            query: Advanced search query with filters and options
-            
-        Returns:
-            Comprehensive search response with metadata
-            
-        Raises:
-            DatabaseError: If search fails
-            ValidationError: If query parameters are invalid
-        """
+        """Perform advanced search with comprehensive filtering and sorting (через fallback manager)."""
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
         start_time = time.time()
-        
+        await self._validate_search_query(query)
+        if self.analytics_enabled and query.query:
+            asyncio.create_task(self._track_search_analytics(query))
+        fallback_manager = get_fallback_manager()
         try:
-            # Validate query
-            await self._validate_search_query(query)
-            
-            # Track analytics
-            if self.analytics_enabled and query.query:
-                asyncio.create_task(self._track_search_analytics(query))
-            
             # Perform search based on type
             if query.search_type == "vector":
-                raw_results = await self._vector_search(query)
+                raw_results = await fallback_manager.vector_search(query.query, query.pagination.page_size * 5, query.fuzzy_threshold or 0.7)
             elif query.search_type == "sql":
-                raw_results = await self._sql_search(query)
+                raw_results = await fallback_manager.sql_search(query.query, query.pagination.page_size * 5)
             elif query.search_type == "fuzzy":
-                raw_results = await self._fuzzy_search(query)
+                raw_results = await fallback_manager.fuzzy_search(query.query, query.pagination.page_size * 5, query.fuzzy_threshold or 0.8)
             else:  # hybrid
-                raw_results = await self._hybrid_search(query)
-            
-            # Apply filters
+                raw_results = await fallback_manager.hybrid_search(query.query, query.pagination.page_size * 5, query.fuzzy_threshold or 0.7)
+            # Apply filters, sorting, pagination, highlights, suggestions (без изменений)
             filtered_results = await self._apply_filters(raw_results, query.filters)
-            
-            # Apply sorting
             sorted_results = await self._apply_sorting(filtered_results, query.sort_by)
-            
-            # Apply pagination
-            paginated_results, pagination_info = await self._apply_pagination(
-                sorted_results, query.pagination
-            )
-            
-            # Generate highlights if requested
+            paginated_results, pagination_info = await self._apply_pagination(sorted_results, query.pagination)
             if query.highlight_matches and query.query:
-                paginated_results = await self._add_highlights(
-                    paginated_results, query.query
-                )
-            
-            # Generate suggestions if requested
+                paginated_results = await self._add_highlights(paginated_results, query.query)
             suggestions = None
             if query.include_suggestions and query.query:
                 suggestions = await self._generate_suggestions(query.query)
-            
-            # Calculate execution time
             search_time_ms = (time.time() - start_time) * 1000
-            
-            # Build response
             response = SearchResponse(
                 results=paginated_results,
                 total_count=len(filtered_results),
@@ -139,157 +108,16 @@ class AdvancedSearchService:
                 filters_applied=self._summarize_filters(query.filters),
                 next_cursor=pagination_info.get('next_cursor')
             )
-            
             logger.info(
                 f"Advanced search completed: query='{query.query}', "
                 f"results={len(paginated_results)}, time={search_time_ms:.2f}ms"
             )
-            
             return response
-            
-        except Exception as e:
-            logger.error(f"Advanced search failed: {e}")
-            if isinstance(e, (DatabaseError, ValidationError)):
-                raise
-            raise DatabaseError(
-                message="Advanced search failed",
-                details=str(e)
-            )
+        except AllDatabasesUnavailableError as e:
+            logger.error(f"All databases unavailable for advanced search: {e.errors}")
+            raise
     
-    async def _vector_search(self, query: AdvancedSearchQuery) -> List[Dict[str, Any]]:
-        """Perform vector-based semantic search."""
-        if not query.query:
-            return []
-        
-        # Use cached repository for vector search
-        materials = await self.materials_repo.vector_search(
-            query=query.query,
-            limit=query.pagination.page_size * 5,  # Get more for filtering
-            threshold=query.fuzzy_threshold or 0.7
-        )
-        
-        # Convert to standard format
-        results = []
-        for material in materials:
-            results.append({
-                'material': material,
-                'score': getattr(material, 'score', 0.8),
-                'search_type': 'vector'
-            })
-        
-        return results
-    
-    async def _sql_search(self, query: AdvancedSearchQuery) -> List[Dict[str, Any]]:
-        """Perform SQL-based text search."""
-        if not query.query:
-            return []
-        
-        # Use hybrid repository for SQL search
-        materials = await self.materials_repo.hybrid_repo.search_materials(
-            query=query.query,
-            limit=query.pagination.page_size * 5
-        )
-        
-        # Convert to standard format
-        results = []
-        for material in materials:
-            results.append({
-                'material': material,
-                'score': 0.7,  # Default SQL score
-                'search_type': 'sql'
-            })
-        
-        return results
-    
-    async def _fuzzy_search(self, query: AdvancedSearchQuery) -> List[Dict[str, Any]]:
-        """Perform fuzzy search with configurable algorithms."""
-        if not query.query:
-            return []
-        
-        # Get all materials for fuzzy matching
-        all_materials = await self.materials_repo.get_all_materials(limit=1000)
-        
-        results = []
-        threshold = query.fuzzy_threshold or 0.8
-        
-        for material in all_materials:
-            # Calculate fuzzy similarity for each field
-            similarities = {}
-            
-            # Name similarity
-            if material.name:
-                similarities['name'] = self._sequence_matcher_similarity(
-                    query.query.lower(), material.name.lower()
-                )
-            
-            # Description similarity
-            if material.description:
-                similarities['description'] = self._sequence_matcher_similarity(
-                    query.query.lower(), material.description.lower()
-                )
-            
-            # Category similarity
-            if material.use_category:
-                similarities['category'] = self._sequence_matcher_similarity(
-                    query.query.lower(), material.use_category.lower()
-                )
-            
-            # Calculate weighted score
-            weighted_score = 0.0
-            total_weight = 0.0
-            
-            for field, similarity in similarities.items():
-                weight = self.field_weights.get(field, 0.1)
-                weighted_score += similarity * weight
-                total_weight += weight
-            
-            if total_weight > 0:
-                final_score = weighted_score / total_weight
-                
-                if final_score >= threshold:
-                    results.append({
-                        'material': material,
-                        'score': final_score,
-                        'search_type': 'fuzzy',
-                        'field_similarities': similarities
-                    })
-        
-        # Sort by score
-        results.sort(key=lambda x: x['score'], reverse=True)
-        
-        return results
-    
-    async def _hybrid_search(self, query: AdvancedSearchQuery) -> List[Dict[str, Any]]:
-        """Perform hybrid search combining multiple approaches."""
-        if not query.query:
-            return []
-        
-        # Run searches in parallel
-        vector_task = asyncio.create_task(self._vector_search(query))
-        sql_task = asyncio.create_task(self._sql_search(query))
-        fuzzy_task = asyncio.create_task(self._fuzzy_search(query))
-        
-        vector_results, sql_results, fuzzy_results = await asyncio.gather(
-            vector_task, sql_task, fuzzy_task, return_exceptions=True
-        )
-        
-        # Handle exceptions
-        if isinstance(vector_results, Exception):
-            logger.warning(f"Vector search failed: {vector_results}")
-            vector_results = []
-        if isinstance(sql_results, Exception):
-            logger.warning(f"SQL search failed: {sql_results}")
-            sql_results = []
-        if isinstance(fuzzy_results, Exception):
-            logger.warning(f"Fuzzy search failed: {fuzzy_results}")
-            fuzzy_results = []
-        
-        # Combine and deduplicate results
-        combined_results = self._combine_search_results(
-            vector_results, sql_results, fuzzy_results
-        )
-        
-        return combined_results
+    # Удаляю _vector_search, _sql_search, _fuzzy_search, _hybrid_search — теперь только через fallback manager
     
     def _combine_search_results(
         self,

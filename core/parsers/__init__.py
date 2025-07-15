@@ -5,6 +5,8 @@ Comprehensive AI-powered parsing system for construction materials and text proc
 Provides type-safe, configurable parsers with advanced AI capabilities.
 """
 
+print("DEBUG: core/parsers/__init__.py loaded")
+
 # Import interfaces
 from .interfaces import (
     # Base types
@@ -54,12 +56,17 @@ def get_ai_parser_service():
         raise ImportError("AI parser service not yet available. Run parser migration first.")
 
 def get_material_parser_service():
-    """Get material parser service instance (lazy import)."""
+    print("DEBUG: get_material_parser_service called")
     try:
         from .services.material_parser_service import MaterialParserService, get_material_parser_service as _get_service
+        print("DEBUG: import material_parser_service OK")
         return _get_service()
-    except ImportError:
+    except ImportError as e:
+        print("DEBUG: ImportError in get_material_parser_service:", e)
         raise ImportError("Material parser service not yet available. Run parser migration first.")
+    except Exception as e:
+        print("DEBUG: Exception in get_material_parser_service:", e)
+        raise
 
 def get_batch_parser_service():
     """Get batch parser service instance (lazy import)."""

@@ -783,3 +783,18 @@ Output only the descriptive embedding string, nothing else.
             List[str]: List of template names
         """
         return list(self._templates.keys()) 
+
+_prompts_manager_instance = None
+
+def get_prompts_manager(config: Optional[ParserConfig] = None) -> SystemPromptsManager:
+    """
+    Get a singleton instance of SystemPromptsManager.
+    Args:
+        config: Optional parser configuration
+    Returns:
+        SystemPromptsManager instance
+    """
+    global _prompts_manager_instance
+    if _prompts_manager_instance is None:
+        _prompts_manager_instance = SystemPromptsManager(config)
+    return _prompts_manager_instance 

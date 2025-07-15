@@ -42,6 +42,7 @@ from core.parsers.config.units_config_manager import get_units_manager
 # except ImportError:
 #     LEGACY_IMPORTS_AVAILABLE = False
 
+print("DEBUG: material_parser_service.py loaded")
 
 @dataclass
 class MaterialParseContext:
@@ -78,6 +79,7 @@ class MaterialParserService:
     """
     
     def __init__(self, config: Optional[ParserConfig] = None):
+        print("DEBUG: MaterialParserService __init__ called")
         """
         Initialize Material Parser Service.
         

@@ -468,39 +468,41 @@ class MaterialProcessingPipeline:
         result: ProcessingResult
     ) -> DatabaseSaveResult:
         """
-        Stage 4: Database Save - Save processed material to database
-        
-        Args:
-            request: Material processing request
-            result: Processing result so far
-            
-        Returns:
-            Database save result
+        Stage 4: Database Save - Save processed material to database (через fallback manager)
         """
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
         stage_start = time.time()
-        
+        fallback_manager = get_fallback_manager()
         try:
-            self.logger.debug(f"Database Save stage for: {request.name}")
-            
-            # TODO: Implement actual database save logic
-            # This is a placeholder that will be implemented in Stage 7
-            
-            # For now, return a mock result
-            db_result = DatabaseSaveResult(
-                success=False,  # No actual save implemented yet
-                saved_id=None,
+            # Формируем данные для сохранения
+            material_data = {
+                'request_id': request.request_id,
+                'id': result.request_id,  # record_id
+                'name': request.name,
+                'unit': request.unit,
+                # ... другие необходимые поля ...
+            }
+            # Сохраняем через fallback manager
+            success = await fallback_manager.save_processed_material(
+                record_id=result.request_id,
+                material_data=material_data,
+                status=result.processing_status,
+                sku=result.sku,
+                similarity_score=getattr(result, 'similarity_score', None),
+                error_message=getattr(result, 'error_message', None),
+                normalized_color=getattr(result, 'normalized_color', None),
+                normalized_unit=getattr(result, 'normalized_unit', None),
+                unit_coefficient=getattr(result, 'unit_coefficient', None)
+            )
+            return DatabaseSaveResult(
+                success=success,
+                saved_id=result.request_id if success else None,
                 processing_time=time.time() - stage_start,
-                error_message="Database save not implemented yet - placeholder for Stage 7"
+                error_message=None if success else "Failed to save processing result"
             )
-            
-            self.logger.info(
-                f"Database Save completed for {request.name}: "
-                f"success={db_result.success}, saved_id={db_result.saved_id}, "
-                f"time={db_result.processing_time:.2f}s"
-            )
-            
-            return db_result
-            
+        except AllDatabasesUnavailableError as e:
+            self.logger.error(f"All databases unavailable for database save: {e.errors}")
+            raise
         except Exception as e:
             self.logger.error(f"Database Save stage failed for {request.name}: {e}")
             return DatabaseSaveResult(

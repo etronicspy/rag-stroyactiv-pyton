@@ -69,8 +69,8 @@ class Settings(BaseSettings):
     
     SERVERS: List[Dict[str, str]] = [
         {
-            "url": "http://localhost:8000",
-            "description": "Development server"
+            "url": "/",
+            "description": "Current host"
         },
         {
             "url": "https://api.construction-materials.com",

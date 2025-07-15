@@ -19,6 +19,26 @@ from core.config.parsers import ParserConfig, get_parser_config
 from core.config.constants import ParserConstants
 from core.logging.specialized.parsers import get_material_parser_logger
 
+print("DEBUG: core/parsers/config/units_config_manager.py loaded")
+
+class UnitType(Enum):
+    WEIGHT = "weight"
+    VOLUME = "volume"
+    AREA = "area"
+    LENGTH = "length"
+    COUNT = "count"
+    PACKAGING = "packaging"
+    LIQUID = "liquid"
+
+@dataclass
+class UnitInfo:
+    name: str
+    symbol: str
+    unit_type: UnitType
+    base_unit: Optional[str] = None
+    coefficient: float = 1.0
+    aliases: List[str] = field(default_factory=list)
+
 
 @dataclass
 class UnitValidationRule:

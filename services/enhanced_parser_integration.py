@@ -49,6 +49,7 @@ class EnhancedParserIntegrationService:
     """
     
     def __init__(self, config: Optional[ParserIntegrationConfig] = None):
+        print("DEBUG: EnhancedParserIntegrationService __init__ called")
         """
         Initialize the enhanced parser integration service.
         

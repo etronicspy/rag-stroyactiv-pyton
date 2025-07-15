@@ -150,6 +150,7 @@ async def process_materials_batch(
     Raises:
         HTTPException: On validation errors, limit exceeded, or processing failures
     """
+    from core.database.factories import AllDatabasesUnavailableError
     try:
         # Логируем начало обработки
         logger.info(f"Received batch processing request {request.request_id} with {len(request.materials)} materials")
@@ -214,6 +215,8 @@ async def process_materials_batch(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during request processing"
         )
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
 
 
 @router.get(
@@ -310,6 +313,7 @@ async def get_processing_status(
     - Batch parameter optimization
     - Performance reporting
     """
+    from core.database.factories import AllDatabasesUnavailableError
     try:
         logger.debug(f"Getting processing status for request {request_id}")
         
@@ -364,6 +368,8 @@ async def get_processing_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error while getting processing status"
         )
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
 
 
 @router.get(
@@ -488,6 +494,7 @@ async def get_processing_results(
     - Diagnose and optimize processing workflows
     - Audit and monitor import operations
     """
+    from core.database.factories import AllDatabasesUnavailableError
     try:
         logger.debug(f"Getting processing results for request {request_id}")
         
@@ -537,6 +544,8 @@ async def get_processing_results(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error while getting processing results"
         )
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
 
 
 @router.get(
@@ -680,6 +689,7 @@ async def get_processing_statistics(
     - Workflow optimization
     - Bottleneck and issue detection
     """
+    from core.database.factories import AllDatabasesUnavailableError
     try:
         logger.debug("Getting processing statistics")
         
@@ -695,6 +705,8 @@ async def get_processing_statistics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error while getting statistics"
         )
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
 
 
 @router.post(
@@ -795,6 +807,7 @@ async def retry_failed_materials(
     - Increase overall batch operation success
     - Automated recovery workflows
     """
+    from core.database.factories import AllDatabasesUnavailableError
     try:
         logger.info("Starting retry of failed materials")
         
@@ -813,6 +826,8 @@ async def retry_failed_materials(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during retry"
         )
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
 
 
 @router.delete(
@@ -915,6 +930,7 @@ async def cleanup_old_records(
     - Enforce data retention policies
     - Prepare for backup
     """
+    from core.database.factories import AllDatabasesUnavailableError
     try:
         logger.info(f"Starting cleanup of records older than {days_old} days")
         
@@ -934,6 +950,8 @@ async def cleanup_old_records(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during cleanup"
         )
+    except AllDatabasesUnavailableError as e:
+        return JSONResponse(status_code=503, content={"detail": "All databases are unavailable. Please try again later.", "error": str(e)})
 
 
 # Health check endpoint

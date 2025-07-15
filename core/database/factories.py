@@ -4,7 +4,7 @@
 """
 
 from functools import lru_cache
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from core.logging import get_logger
 
 from core.config import settings, DatabaseType, AIProvider
@@ -361,6 +361,226 @@ class AIClientFactory:
         }
 
 
+class AllDatabasesUnavailableError(Exception):
+    """Raised when all databases are unavailable for operation."""
+    def __init__(self, errors: Dict[str, str]):
+        super().__init__("All databases are unavailable")
+        self.errors = errors
+
+class DatabaseFallbackManager:
+    """
+    Centralized fallback manager for database operations.
+
+    Tracks health of vector and relational DBs, provides unified DB operations with fallback,
+    and raises a controlled error if all DBs are unavailable.
+
+    Args:
+        sql_client: Relational DB client implementing IRelationalDatabase
+        vector_client: Vector DB client implementing IVectorDatabase
+    """
+    def __init__(self, sql_client: Optional[Any], vector_client: Optional[Any]):
+        self.sql_client = sql_client
+        self.vector_client = vector_client
+        self.status = {'sql': sql_client is not None, 'vector': vector_client is not None}
+        self.logger = get_logger("core.database.factories.DatabaseFallbackManager")
+
+    def _try(self, op: str, *args, **kwargs):
+        """
+        Try to perform operation `op` on available DBs, fallback if one fails.
+        If all fail, raise AllDatabasesUnavailableError.
+        """
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if self.status[db] and client is not None:
+                try:
+                    return getattr(client, op)(*args, **kwargs)
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB operation '{op}' failed: {e}")
+        if errors:
+            self.logger.error(f"All DBs down for operation '{op}': {errors}")
+            raise AllDatabasesUnavailableError(errors)
+
+    # Example unified methods (to be expanded)
+    def search(self, *args, **kwargs):
+        return self._try('search', *args, **kwargs)
+
+    def upsert(self, *args, **kwargs):
+        return self._try('upsert', *args, **kwargs)
+
+    def get_by_id(self, *args, **kwargs):
+        return self._try('get_by_id', *args, **kwargs)
+
+    def get_processing_statistics(self, *args, **kwargs):
+        """
+        Unified method to get processing statistics from the relational DB.
+        Returns:
+            ProcessingStatistics object from the relational DB.
+        Raises:
+            AllDatabasesUnavailableError: If all DBs are unavailable.
+        """
+        if self.sql_client is not None:
+            try:
+                return self.sql_client.get_processing_statistics(*args, **kwargs)
+            except Exception as e:
+                self.status['sql'] = False
+                self.logger.error(f"Relational DB get_processing_statistics failed: {e}")
+        self.logger.error("All DBs down for get_processing_statistics")
+        raise AllDatabasesUnavailableError({'sql': 'Unavailable for get_processing_statistics'})
+
+    async def search_materials(self, query: str, limit: int = 10) -> list:
+        """
+        Search materials using fallback: vector search → SQL LIKE search if 0 results.
+        Args:
+            query: Search query
+            limit: Max results
+        Returns:
+            List of materials (dicts or models)
+        Raises:
+            AllDatabasesUnavailableError: if all DBs are unavailable
+        """
+        errors = {}
+        # Try vector search first
+        if self.vector_client is not None:
+            try:
+                results = await self.vector_client.search_materials(query, limit)
+                if results:
+                    return results
+            except Exception as e:
+                self.status['vector'] = False
+                self.logger.error(f"Vector DB search_materials failed: {e}")
+                errors['vector'] = str(e)
+        # Fallback: SQL LIKE search
+        if self.sql_client is not None:
+            try:
+                results = await self.sql_client.search_materials(query, limit)
+                if results:
+                    return results
+            except Exception as e:
+                self.status['sql'] = False
+                self.logger.error(f"SQL DB search_materials failed: {e}")
+                errors['sql'] = str(e)
+        if errors or (self.vector_client is None and self.sql_client is None):
+            self.logger.error(f"All DBs down for search_materials: {errors}")
+            raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+        return []
+
+    async def find_sku_by_material_data(self, *args, **kwargs):
+        """
+        Unified SKU search with fallback. Currently only vector DB is supported.
+        Args:
+            *args, **kwargs: forwarded to vector_client.find_sku_by_material_data
+        Returns:
+            SKUSearchResponse
+        Raises:
+            AllDatabasesUnavailableError: if all DBs are unavailable
+        """
+        errors = {}
+        if self.vector_client is not None:
+            try:
+                return await self.vector_client.find_sku_by_material_data(*args, **kwargs)
+            except Exception as e:
+                self.status['vector'] = False
+                self.logger.error(f"Vector DB find_sku_by_material_data failed: {e}")
+                errors['vector'] = str(e)
+        # (Можно добавить SQL fallback в будущем)
+        if errors or self.vector_client is None:
+            self.logger.error(f"All DBs down for find_sku_by_material_data: {errors}")
+            raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def save_processed_material(self, *args, **kwargs):
+        """
+        Unified save for processed material with fallback. Currently only sql_client is supported.
+        Args:
+            *args, **kwargs: forwarded to sql_client.save_processed_material
+        Returns:
+            DatabaseSaveResult
+        Raises:
+            AllDatabasesUnavailableError: if all DBs are unavailable
+        """
+        errors = {}
+        if self.sql_client is not None:
+            try:
+                return await self.sql_client.save_processed_material(*args, **kwargs)
+            except Exception as e:
+                self.status['sql'] = False
+                self.logger.error(f"SQL DB save_processed_material failed: {e}")
+                errors['sql'] = str(e)
+        # (Можно добавить vector fallback в будущем)
+        if errors or self.sql_client is None:
+            self.logger.error(f"All DBs down for save_processed_material: {errors}")
+            raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def vector_search(self, query: str, limit: int = 10, threshold: float = 0.7) -> list:
+        """Vector search with fallback."""
+        errors = {}
+        if self.vector_client is not None:
+            try:
+                return await self.vector_client.vector_search(query=query, limit=limit, threshold=threshold)
+            except Exception as e:
+                self.status['vector'] = False
+                self.logger.error(f"Vector DB vector_search failed: {e}")
+                errors['vector'] = str(e)
+        if errors or self.vector_client is None:
+            self.logger.error(f"All DBs down for vector_search: {errors}")
+            raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def sql_search(self, query: str, limit: int = 10) -> list:
+        """SQL search with fallback."""
+        errors = {}
+        if self.sql_client is not None:
+            try:
+                return await self.sql_client.sql_search(query=query, limit=limit)
+            except Exception as e:
+                self.status['sql'] = False
+                self.logger.error(f"SQL DB sql_search failed: {e}")
+                errors['sql'] = str(e)
+        if errors or self.sql_client is None:
+            self.logger.error(f"All DBs down for sql_search: {errors}")
+            raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def fuzzy_search(self, query: str, limit: int = 10, threshold: float = 0.8) -> list:
+        """Fuzzy search with fallback."""
+        errors = {}
+        if self.sql_client is not None:
+            try:
+                return await self.sql_client.fuzzy_search(query=query, limit=limit, threshold=threshold)
+            except Exception as e:
+                self.status['sql'] = False
+                self.logger.error(f"SQL DB fuzzy_search failed: {e}")
+                errors['sql'] = str(e)
+        if errors or self.sql_client is None:
+            self.logger.error(f"All DBs down for fuzzy_search: {errors}")
+            raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def hybrid_search(self, query: str, limit: int = 10, threshold: float = 0.7) -> list:
+        """Hybrid search: vector + sql + fuzzy with fallback."""
+        errors = {}
+        results = []
+        try:
+            vector_results = await self.vector_search(query, limit, threshold)
+            results.extend(vector_results)
+        except Exception as e:
+            errors['vector'] = str(e)
+        try:
+            sql_results = await self.sql_search(query, limit)
+            results.extend(sql_results)
+        except Exception as e:
+            errors['sql'] = str(e)
+        try:
+            fuzzy_results = await self.fuzzy_search(query, limit, threshold)
+            results.extend(fuzzy_results)
+        except Exception as e:
+            errors['fuzzy'] = str(e)
+        if not results:
+            self.logger.error(f"All DBs down for hybrid_search: {errors}")
+            raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+        return results
+
+    # ... add more as needed for your DB interface ...
+
+
 # Convenience functions for easy access
 @lru_cache(maxsize=1)
 def get_vector_database() -> IVectorDatabase:
@@ -380,3 +600,24 @@ def get_ai_client() -> Any:
         Default AI client
     """
     return AIClientFactory.create_ai_client() 
+
+
+@lru_cache(maxsize=1)
+def get_fallback_manager() -> DatabaseFallbackManager:
+    """
+    Get a singleton instance of DatabaseFallbackManager with current DB clients.
+    Returns:
+        DatabaseFallbackManager: Centralized fallback manager for DB operations.
+    """
+    # Получаем клиентов через существующие фабрики
+    try:
+        vector_db = DatabaseFactory.create_vector_database()
+    except Exception as e:
+        logger.error(f"Vector DB unavailable: {e}")
+        vector_db = None
+    try:
+        sql_db = DatabaseFactory.create_relational_database()
+    except Exception as e:
+        logger.error(f"Relational DB unavailable: {e}")
+        sql_db = None
+    return DatabaseFallbackManager(sql_client=sql_db, vector_client=vector_db) 

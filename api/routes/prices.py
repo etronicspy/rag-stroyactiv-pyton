@@ -18,6 +18,7 @@ import time
 from datetime import datetime
 from core.schemas.response_models import ERROR_RESPONSES
 from core.database.factories import get_vector_database # Import the correct function
+from fastapi.responses import JSONResponse
 
 router = APIRouter(
     prefix="",

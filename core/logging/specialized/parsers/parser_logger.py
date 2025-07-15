@@ -219,6 +219,10 @@ class ParserLogger:
             "total_operations": sum(self._operation_counts.values())
         }
 
+    def info(self, msg: str, *args, **kwargs) -> None:
+        """Log an info-level message."""
+        self.logger.info(msg, *args, **kwargs)
+
 
 class AIParserLogger(ParserLogger):
     """

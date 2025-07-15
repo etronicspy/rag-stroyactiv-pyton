@@ -20,6 +20,7 @@ from core.schemas.processing_models import (
 from core.database.repositories.processing_repository import ProcessingRepository
 from core.dependencies.database import get_db_session
 from core.logging import get_logger
+from core.config.base import get_settings
 
 # Импорт всех компонентов pipeline (этапы 1-7)
 from services.material_processing_pipeline import MaterialProcessingPipeline
@@ -479,23 +480,25 @@ class BatchProcessingService:
     
     async def get_processing_progress(self, request_id: str) -> ProcessingProgress:
         """
-        Получить прогресс обработки запроса.
-        
+        Получить прогресс обработки запроса через централизованный fallback manager.
         Args:
             request_id: Идентификатор запроса
-            
         Returns:
             Объект с прогрессом
+        Raises:
+            AllDatabasesUnavailableError: если все БД недоступны
         """
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        fallback_manager = get_fallback_manager()
         try:
-            async with get_db_session() as session:
-                repository = ProcessingRepository(session)
-                return await repository.get_processing_progress(request_id)
-                
+            result = await fallback_manager.sql_client.get_processing_progress(request_id)
+            return result
         except Exception as e:
             self.logger.error(f"Error getting processing progress: {str(e)}")
+            if isinstance(e, AllDatabasesUnavailableError):
+                raise
             raise
-    
+
     async def get_processing_results(
         self, 
         request_id: str,
@@ -503,43 +506,43 @@ class BatchProcessingService:
         offset: Optional[int] = None
     ) -> List[MaterialProcessingResult]:
         """
-        Получить результаты обработки запроса.
-        
+        Получить результаты обработки запроса через централизованный fallback manager.
         Args:
             request_id: Идентификатор запроса
             limit: Лимит записей
             offset: Смещение
-            
         Returns:
             Список результатов обработки
+        Raises:
+            AllDatabasesUnavailableError: если все БД недоступны
         """
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        fallback_manager = get_fallback_manager()
         try:
-            async with get_db_session() as session:
-                repository = ProcessingRepository(session)
-                return await repository.get_processing_results(
-                    request_id, 
-                    limit, 
-                    offset
-                )
-                
+            result = await fallback_manager.sql_client.get_processing_results(request_id, limit, offset)
+            return result
         except Exception as e:
             self.logger.error(f"Error getting processing results: {str(e)}")
+            if isinstance(e, AllDatabasesUnavailableError):
+                raise
             raise
     
     async def get_service_statistics(self) -> ProcessingStatistics:
         """
-        Получить статистику сервиса.
-        
+        Получить статистику сервиса через централизованный fallback manager.
         Returns:
             Объект со статистикой
+        Raises:
+            AllDatabasesUnavailableError: если все БД недоступны
         """
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        fallback_manager = get_fallback_manager()
         try:
-            async with get_db_session() as session:
-                repository = ProcessingRepository(session)
-                return await repository.get_processing_statistics()
-                
-        except Exception as e:
-            self.logger.error(f"Error getting service statistics: {str(e)}")
+            # Предполагается, что sql_client.get_processing_statistics асинхронный
+            result = await fallback_manager.get_processing_statistics()
+            return result
+        except AllDatabasesUnavailableError as e:
+            self.logger.error(f"All databases unavailable for service statistics: {e.errors}")
             raise
     
     async def retry_failed_materials(self) -> int:

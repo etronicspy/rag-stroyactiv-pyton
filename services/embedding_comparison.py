@@ -15,44 +15,19 @@ logger = get_logger(__name__)
 
 
 class EmbeddingComparisonService:
-    """Service for RAG-based normalization using vector similarity search.
-    
-    Сервис для RAG нормализации через поиск по векторному сходству.
-    """
-    
-    def __init__(self, vector_db: IVectorDatabase = None):
-        """Initialize the embedding comparison service.
-        
-        Args:
-            vector_db: Vector database instance
-        """
-        self.vector_db = vector_db
+    """Service for RAG-based normalization using vector similarity search (через fallback manager)."""
+    def __init__(self):
         self.settings = get_settings()
         self.logger = logger
-        
-        # Similarity thresholds
         self.color_similarity_threshold = 0.8
         self.unit_similarity_threshold = 0.8
         self.default_similarity_threshold = 0.7
-        
-        # Collection names
         self.colors_collection = "construction_colors"
         self.units_collection = "construction_units"
-        
-    async def normalize_color(self, 
-                             color_text: str,
-                             similarity_threshold: Optional[float] = None) -> Dict[str, Any]:
-        """Normalize color through RAG vector search.
-        
-        Нормализация цвета через RAG векторный поиск.
-        
-        Args:
-            color_text: Color text to normalize
-            similarity_threshold: Minimum similarity threshold
-            
-        Returns:
-            Normalization result with normalized color and metadata
-        """
+
+    async def normalize_color(self, color_text: str, similarity_threshold: Optional[float] = None) -> Dict[str, Any]:
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        fallback_manager = get_fallback_manager()
         if not color_text or not color_text.strip():
             return {
                 "original_text": color_text,
@@ -62,12 +37,9 @@ class EmbeddingComparisonService:
                 "success": False,
                 "method": "empty_input"
             }
-        
         threshold = similarity_threshold or self.color_similarity_threshold
         color_text_clean = color_text.strip().lower()
-        
         self.logger.debug(f"Normalizing color: '{color_text}' with threshold {threshold}")
-        
         # First try: exact match in ColorCollection
         exact_match = ColorCollection.find_color_by_alias(color_text_clean)
         if exact_match:
@@ -80,47 +52,47 @@ class EmbeddingComparisonService:
                 "success": True,
                 "method": "exact_match"
             }
-        
-        # Second try: vector search if vector DB available
-        if self.vector_db:
-            try:
-                vector_result = await self._vector_search_color(color_text, threshold)
-                if vector_result["success"]:
-                    return vector_result
-            except Exception as e:
-                self.logger.error(f"Vector search failed for color '{color_text}': {e}")
-        
-        # Third try: fuzzy matching with all color aliases
-        fuzzy_result = self._fuzzy_match_color(color_text_clean, threshold)
+        # Second try: centralized vector search
+        try:
+            vector_result = await fallback_manager.embedding_search(
+                text=color_text,
+                collection=self.colors_collection,
+                threshold=threshold,
+                mode="color"
+            )
+            if vector_result["success"]:
+                return vector_result
+        except AllDatabasesUnavailableError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Vector search failed for color '{color_text}': {e}")
+        # Third try: centralized fuzzy search
+        fuzzy_result = fallback_manager.fuzzy_search(
+            text=color_text_clean,
+            collection=self.colors_collection,
+            threshold=threshold,
+            mode="color"
+        )
         if fuzzy_result["success"]:
             return fuzzy_result
-        
         # No match found
-        suggestions = self._get_color_suggestions(color_text_clean)
-        
+        suggestions = fallback_manager.suggestion_search(
+            text=color_text_clean,
+            collection=self.colors_collection,
+            mode="color"
+        )
         return {
             "original_text": color_text,
             "normalized_color": None,
             "similarity_score": 0.0,
-            "suggestions": suggestions[:5],  # Top 5 suggestions
+            "suggestions": suggestions[:5],
             "success": False,
             "method": "no_match"
         }
-    
-    async def normalize_unit(self,
-                           unit_text: str, 
-                           similarity_threshold: Optional[float] = None) -> Dict[str, Any]:
-        """Normalize unit through RAG vector search.
-        
-        Нормализация единицы измерения через RAG векторный поиск.
-        
-        Args:
-            unit_text: Unit text to normalize
-            similarity_threshold: Minimum similarity threshold
-            
-        Returns:
-            Normalization result with normalized unit and metadata
-        """
+
+    async def normalize_unit(self, unit_text: str, similarity_threshold: Optional[float] = None) -> Dict[str, Any]:
+        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        fallback_manager = get_fallback_manager()
         if not unit_text or not unit_text.strip():
             return {
                 "original_text": unit_text,
@@ -130,13 +102,10 @@ class EmbeddingComparisonService:
                 "success": False,
                 "method": "empty_input"
             }
-        
         threshold = similarity_threshold or self.unit_similarity_threshold
         unit_text_clean = unit_text.strip().lower()
-        
         self.logger.debug(f"Normalizing unit: '{unit_text}' with threshold {threshold}")
-        
-        # First try: exact match with existing unit mapping
+        # First try: exact match
         exact_match = self._exact_match_unit(unit_text_clean)
         if exact_match:
             self.logger.debug(f"Found exact match for unit: {unit_text} -> {exact_match}")
@@ -148,125 +117,44 @@ class EmbeddingComparisonService:
                 "success": True,
                 "method": "exact_match"
             }
-        
-        # Second try: vector search if vector DB available
-        if self.vector_db:
-            try:
-                vector_result = await self._vector_search_unit(unit_text, threshold)
-                if vector_result["success"]:
-                    return vector_result
-            except Exception as e:
-                self.logger.error(f"Vector search failed for unit '{unit_text}': {e}")
-        
-        # Third try: fuzzy matching with all unit aliases
-        fuzzy_result = self._fuzzy_match_unit(unit_text_clean, threshold)
+        # Second try: centralized vector search
+        try:
+            vector_result = await fallback_manager.embedding_search(
+                text=unit_text,
+                collection=self.units_collection,
+                threshold=threshold,
+                mode="unit"
+            )
+            if vector_result["success"]:
+                return vector_result
+        except AllDatabasesUnavailableError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Vector search failed for unit '{unit_text}': {e}")
+        # Third try: centralized fuzzy search
+        fuzzy_result = fallback_manager.fuzzy_search(
+            text=unit_text_clean,
+            collection=self.units_collection,
+            threshold=threshold,
+            mode="unit"
+        )
         if fuzzy_result["success"]:
             return fuzzy_result
-        
         # No match found
-        suggestions = self._get_unit_suggestions(unit_text_clean)
-        
+        suggestions = fallback_manager.suggestion_search(
+            text=unit_text_clean,
+            collection=self.units_collection,
+            mode="unit"
+        )
         return {
             "original_text": unit_text,
             "normalized_unit": None,
             "similarity_score": 0.0,
-            "suggestions": suggestions[:5],  # Top 5 suggestions
+            "suggestions": suggestions[:5],
             "success": False,
             "method": "no_match"
         }
-    
-    async def _vector_search_color(self, color_text: str, threshold: float) -> Dict[str, Any]:
-        """Perform vector search for color normalization.
-        
-        Выполнить векторный поиск для нормализации цвета.
-        """
-        try:
-            # Generate embedding for search query
-            embedding = await self._generate_embedding(color_text)
-            if not embedding:
-                return {"success": False, "method": "embedding_failed"}
-            
-            # Search in colors collection
-            search_results = await self.vector_db.search(
-                collection_name=self.colors_collection,
-                query_vector=embedding,
-                limit=5,
-                score_threshold=threshold
-            )
-            
-            if search_results:
-                best_match = search_results[0]
-                color_name = best_match.get("payload", {}).get("name")
-                score = best_match.get("score", 0.0)
-                
-                # Get suggestions from all results
-                suggestions = []
-                for result in search_results:
-                    payload = result.get("payload", {})
-                    if payload.get("name"):
-                        suggestions.append(payload["name"])
-                
-                return {
-                    "original_text": color_text,
-                    "normalized_color": color_name,
-                    "similarity_score": score,
-                    "suggestions": suggestions,
-                    "success": True,
-                    "method": "vector_search"
-                }
-            
-            return {"success": False, "method": "no_vector_results"}
-            
-        except Exception as e:
-            self.logger.error(f"Vector search error for color: {e}")
-            return {"success": False, "method": "vector_error"}
-    
-    async def _vector_search_unit(self, unit_text: str, threshold: float) -> Dict[str, Any]:
-        """Perform vector search for unit normalization.
-        
-        Выполнить векторный поиск для нормализации единицы.
-        """
-        try:
-            # Generate embedding for search query
-            embedding = await self._generate_embedding(unit_text)
-            if not embedding:
-                return {"success": False, "method": "embedding_failed"}
-            
-            # Search in units collection
-            search_results = await self.vector_db.search(
-                collection_name=self.units_collection,
-                query_vector=embedding,
-                limit=5,
-                score_threshold=threshold
-            )
-            
-            if search_results:
-                best_match = search_results[0]
-                unit_name = best_match.get("payload", {}).get("name")
-                score = best_match.get("score", 0.0)
-                
-                # Get suggestions from all results
-                suggestions = []
-                for result in search_results:
-                    payload = result.get("payload", {})
-                    if payload.get("name"):
-                        suggestions.append(payload["name"])
-                
-                return {
-                    "original_text": unit_text,
-                    "normalized_unit": unit_name,
-                    "similarity_score": score,
-                    "suggestions": suggestions,
-                    "success": True,
-                    "method": "vector_search"
-                }
-            
-            return {"success": False, "method": "no_vector_results"}
-            
-        except Exception as e:
-            self.logger.error(f"Vector search error for unit: {e}")
-            return {"success": False, "method": "vector_error"}
-    
+
     def _fuzzy_match_color(self, color_text: str, threshold: float) -> Dict[str, Any]:
         """Perform fuzzy matching for color normalization.
         

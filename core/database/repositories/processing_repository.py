@@ -8,6 +8,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy import select, update, delete, func, and_, or_, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy import text
 
 from core.schemas.processing_models import (
     ProcessingStatus,
@@ -66,7 +67,6 @@ class ProcessingRepository:
                 records.append(record_data)
             
             # Bulk insert с использованием raw SQL для производительности
-            from sqlalchemy import text
             
             insert_query = text("""
                 INSERT INTO processing_results 
@@ -482,3 +482,27 @@ class ProcessingRepository:
             await self.session.rollback()
             self.logger.error(f"Error cleaning up old records: {str(e)}")
             raise 
+
+    async def save_processed_material(self, record_id: str, material_data: Dict[str, Any], status: ProcessingStatus, **kwargs) -> bool:
+        """
+        Upsert: если запись есть — обновить, если нет — создать новую.
+        Args:
+            record_id: ID записи
+            material_data: данные материала (dict)
+            status: новый статус
+            **kwargs: дополнительные поля
+        Returns:
+            True если успешно сохранено
+        """
+        # Проверяем наличие записи
+        query = text("SELECT id FROM processing_results WHERE id = :record_id")
+        result = await self.session.execute(query, {'record_id': record_id})
+        row = result.fetchone()
+        if row:
+            # Обновляем существующую запись
+            return await self.update_processing_status(record_id, status, **kwargs)
+        else:
+            # Создаём новую запись (используем create_processing_records)
+            await self.create_processing_records(material_data['request_id'], [material_data])
+            # После создания — обновляем статус и дополнительные поля
+            return await self.update_processing_status(record_id, status, **kwargs) 

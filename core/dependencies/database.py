@@ -130,7 +130,7 @@ async def get_db_session():
         
         # Создаем engine с кешированием
         _db_engine = create_async_engine(
-            settings.DATABASE_URL,
+            settings.POSTGRESQL_URL,
             echo=False,
             pool_size=5,
             max_overflow=10
