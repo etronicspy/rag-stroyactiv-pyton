@@ -6,7 +6,8 @@ from services.materials import CategoryService, UnitService, ColorService
 from core.database.interfaces import IVectorDatabase
 from core.dependencies.database import get_vector_db_dependency, get_ai_client_dependency
 from core.schemas.response_models import ERROR_RESPONSES
-from core.schemas.materials import UnitCreate
+from core.schemas.materials import UnitCreate, CategoryUpdate, UnitUpdate
+from core.schemas.colors import ColorUpdate
 
 router = APIRouter(
     prefix="",
@@ -234,6 +235,43 @@ async def delete_category(
     success = await service.delete_category(category_id)
     return {"success": success}
 
+@router.patch(
+    "/categories/{category_id}",
+    response_model=Category,
+    summary="✏️ Update Category – Update Material Category",
+    response_description="Updated material category",
+    status_code=200
+)
+async def update_category(
+    category_id: str,
+    category_update: CategoryUpdate,
+    service: CategoryService = Depends(get_category_service)
+):
+    """
+    ✏️ **Update Category** - Update existing material category
+    
+    Updates category data and always recalculates AI embedding.
+    
+    **Features:**
+    - Partial update (only provided fields)
+    - Always recalculates embedding
+    - Updates timestamps
+    - Returns updated category
+    
+    **Request Example:**
+    ```json
+    {
+        "name": "Обновленная категория",
+        "description": "Новое описание"
+    }
+    ```
+    """
+    updated = await service.update_category(category_id, category_update)
+    if not updated:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Category not found")
+    return updated
+
 @router.post(
     "/units/",
     response_model=Unit,
@@ -434,6 +472,43 @@ async def delete_unit(
     """
     success = await service.delete_unit(unit_id)
     return {"success": success}
+
+@router.patch(
+    "/units/{unit_id}",
+    response_model=Unit,
+    summary="✏️ Update Unit – Update Measurement Unit",
+    response_description="Updated measurement unit",
+    status_code=200
+)
+async def update_unit(
+    unit_id: str,
+    unit_update: UnitUpdate,
+    service: UnitService = Depends(get_unit_service)
+):
+    """
+    ✏️ **Update Unit** - Update existing measurement unit
+    
+    Updates unit data and always recalculates AI embedding.
+    
+    **Features:**
+    - Partial update (only provided fields)
+    - Always recalculates embedding
+    - Updates timestamps
+    - Returns updated unit
+    
+    **Request Example:**
+    ```json
+    {
+        "name": "кг",
+        "description": "Обновленное описание"
+    }
+    ```
+    """
+    updated = await service.update_unit(unit_id, unit_update)
+    if not updated:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Unit not found")
+    return updated
 
 @router.post(
     "/colors/",
@@ -643,5 +718,42 @@ async def delete_color(
     """
     success = await service.delete_color(color_id)
     return {"success": success}
+
+@router.patch(
+    "/colors/{color_id}",
+    response_model=ColorReference,
+    summary="✏️ Update Color – Update Reference Color",
+    response_description="Updated color",
+    status_code=200
+)
+async def update_color(
+    color_id: str,
+    color_update: ColorUpdate,
+    service: ColorService = Depends(get_color_service)
+):
+    """
+    ✏️ **Update Color** - Update existing reference color
+    
+    Updates color data and always recalculates AI embedding.
+    
+    **Features:**
+    - Partial update (only provided fields)
+    - Always recalculates embedding
+    - Updates timestamps
+    - Returns updated color
+    
+    **Request Example:**
+    ```json
+    {
+        "name": "Обновленный цвет",
+        "hex_code": "#00FF00"
+    }
+    ```
+    """
+    updated = await service.update_color(color_id, color_update)
+    if not updated:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Color not found")
+    return updated
 
  

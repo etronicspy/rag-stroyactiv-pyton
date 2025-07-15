@@ -720,3 +720,65 @@ class RawProductListResponse(BaseModel):
     pricelistid: Optional[int] = None
     raw_products: List[RawProduct]
     total_count: int 
+
+class CategoryUpdate(BaseModel):
+    """Schema for updating a material category.
+    
+    Схема для обновления категории материалов.
+    
+    Args:
+        name (Optional[str]): Category name
+        description (Optional[str]): Category description
+        aliases (Optional[List[str]]): Alternative names and synonyms
+    
+    Example:
+        {
+            "name": "Цемент",
+            "description": "Строительные цементы и вяжущие материалы",
+            "aliases": ["цемент", "cement", "вяжущие"]
+        }
+    """
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = None
+    aliases: Optional[List[str]] = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Цемент",
+                "description": "Строительные цементы и вяжущие материалы",
+                "aliases": ["цемент", "cement", "вяжущие"]
+            }
+        }
+    )
+
+class UnitUpdate(BaseModel):
+    """Schema for updating a measurement unit.
+    
+    Схема для обновления единицы измерения.
+    
+    Args:
+        name (Optional[str]): Unit abbreviation/short name
+        description (Optional[str]): Unit description
+        aliases (Optional[List[str]]): Alternative names and abbreviations
+    
+    Example:
+        {
+            "name": "кг",
+            "description": "Килограмм — единица массы",
+            "aliases": ["килограмм", "kg", "кг."]
+        }
+    """
+    name: Optional[str] = Field(None, min_length=1, max_length=50)
+    description: Optional[str] = None
+    aliases: Optional[List[str]] = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "кг",
+                "description": "Килограмм — единица массы",
+                "aliases": ["килограмм", "kg", "кг."]
+            }
+        }
+    ) 

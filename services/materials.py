@@ -1004,6 +1004,67 @@ class CategoryService(BaseRepository):
             # Return empty list instead of raising error
             return []
     
+    async def update_category(self, category_id: str, category_update) -> Optional["Category"]:
+        """Update existing category and embedding.
+        
+        Args:
+            category_id: Category UUID
+            category_update: CategoryUpdate object
+        Returns:
+            Updated Category or None if not found
+        """
+        try:
+            # Получить текущую категорию
+            existing = await self.vector_db.get_by_id(self.collection_name, category_id)
+            if not existing:
+                logger.info(f"Category not found for update: {category_id}")
+                return None
+            payload = existing.get("payload", {})
+            # Обновить поля
+            updated_data = {
+                "name": category_update.name if category_update.name is not None else payload.get("name"),
+                "description": category_update.description if category_update.description is not None else payload.get("description"),
+                "aliases": category_update.aliases if category_update.aliases is not None else payload.get("aliases", []),
+            }
+            # Пересчитать embedding
+            embedding_text = updated_data["name"]
+            if updated_data["description"]:
+                embedding_text += f" {updated_data['description']}"
+            if updated_data["aliases"]:
+                embedding_text += " " + " ".join(updated_data["aliases"])
+            embedding = await self.get_embedding(embedding_text)
+            # Обновить timestamps
+            from datetime import datetime
+            updated_at = datetime.utcnow().isoformat()
+            # Upsert вектор
+            await self.vector_db.upsert(
+                collection_name=self.collection_name,
+                vectors=[{
+                    "id": category_id,
+                    "vector": embedding,
+                    "payload": {
+                        **updated_data,
+                        "type": "category",
+                        "created_at": payload.get("created_at"),
+                        "updated_at": updated_at
+                    }
+                }]
+            )
+            logger.info(f"Category updated successfully: {category_id}")
+            from core.schemas.materials import Category
+            return Category(
+                id=category_id,
+                name=updated_data["name"],
+                description=updated_data["description"],
+                aliases=updated_data["aliases"],
+                embedding=embedding,
+                created_at=payload.get("created_at"),
+                updated_at=updated_at
+            )
+        except Exception as e:
+            logger.error(f"Failed to update category {category_id}: {e}")
+            return None
+
     async def delete_category(self, category_id: str) -> bool:
         """Delete a category from Qdrant by ID."""
         try:
@@ -1098,6 +1159,67 @@ class UnitService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to create unit {getattr(unit_data, 'name', None)}: {e}")
             raise e
+
+    async def update_unit(self, unit_id: str, unit_update) -> Optional["Unit"]:
+        """Update existing unit and embedding.
+        
+        Args:
+            unit_id: Unit UUID
+            unit_update: UnitUpdate object
+        Returns:
+            Updated Unit or None if not found
+        """
+        try:
+            # Получить текущую единицу
+            existing = await self.vector_db.get_by_id(self.collection_name, unit_id)
+            if not existing:
+                logger.info(f"Unit not found for update: {unit_id}")
+                return None
+            payload = existing.get("payload", {})
+            # Обновить поля
+            updated_data = {
+                "name": unit_update.name if unit_update.name is not None else payload.get("name"),
+                "description": unit_update.description if unit_update.description is not None else payload.get("description"),
+                "aliases": unit_update.aliases if unit_update.aliases is not None else payload.get("aliases", []),
+            }
+            # Пересчитать embedding
+            embedding_text = updated_data["name"]
+            if updated_data["description"]:
+                embedding_text += f" {updated_data['description']}"
+            if updated_data["aliases"]:
+                embedding_text += " " + " ".join(updated_data["aliases"])
+            embedding = await self.get_embedding(embedding_text)
+            # Обновить timestamps
+            from datetime import datetime
+            updated_at = datetime.utcnow().isoformat()
+            # Upsert вектор
+            await self.vector_db.upsert(
+                collection_name=self.collection_name,
+                vectors=[{
+                    "id": unit_id,
+                    "vector": embedding,
+                    "payload": {
+                        **updated_data,
+                        "type": "unit",
+                        "created_at": payload.get("created_at"),
+                        "updated_at": updated_at
+                    }
+                }]
+            )
+            logger.info(f"Unit updated successfully: {unit_id}")
+            from core.schemas.materials import Unit
+            return Unit(
+                id=unit_id,
+                name=updated_data["name"],
+                description=updated_data["description"],
+                aliases=updated_data["aliases"],
+                embedding=embedding,
+                created_at=payload.get("created_at"),
+                updated_at=updated_at
+            )
+        except Exception as e:
+            logger.error(f"Failed to update unit {unit_id}: {e}")
+            return None
 
     async def get_units(self) -> List[Unit]:
         """Get all units from Qdrant, including description, aliases, and embedding."""
@@ -1209,12 +1331,14 @@ class ColorService(BaseRepository):
             import uuid
             color_id = str(uuid.uuid4())
             
-            # Generate embedding for color name and aliases
-            color_text = f"{color_data.name} {' '.join(color_data.aliases)}"
+            # Формируем текст для embedding: name + aliases
+            embedding_text = color_data.name
+            if color_data.aliases:
+                embedding_text += " " + " ".join(color_data.aliases)
             
             # Use AI client to generate embedding (inherited from BaseRepository)
             try:
-                embedding = await self.get_embedding(color_text)
+                embedding = await self.get_embedding(embedding_text)
             except Exception as e:
                 logger.error(f"Failed to generate embedding for color '{color_data.name}': {e}")
                 # Use fallback hash-based vector
@@ -1306,6 +1430,67 @@ class ColorService(BaseRepository):
             logger.error(f"Failed to get colors: {e}")
             # Return empty list instead of raising error
             return []
+    
+    async def update_color(self, color_id: str, color_update) -> Optional["ColorReference"]:
+        """Update existing color and embedding.
+        
+        Args:
+            color_id: Color UUID
+            color_update: ColorUpdate object
+        Returns:
+            Updated ColorReference or None if not found
+        """
+        try:
+            # Получить текущий цвет
+            existing = await self.vector_db.get_by_id(self.collection_name, color_id)
+            if not existing:
+                logger.info(f"Color not found for update: {color_id}")
+                return None
+            payload = existing.get("payload", {})
+            # Обновить поля
+            updated_data = {
+                "name": color_update.name if color_update.name is not None else payload.get("name"),
+                "hex_code": color_update.hex_code if color_update.hex_code is not None else payload.get("hex_code"),
+                "rgb_values": color_update.rgb_values if color_update.rgb_values is not None else payload.get("rgb_values"),
+                "aliases": color_update.aliases if color_update.aliases is not None else payload.get("aliases", []),
+            }
+            # Пересчитать embedding
+            embedding_text = updated_data["name"]
+            if updated_data["aliases"]:
+                embedding_text += " " + " ".join(updated_data["aliases"])
+            embedding = await self.get_embedding(embedding_text)
+            # Обновить timestamps
+            from datetime import datetime
+            updated_at = datetime.utcnow().isoformat()
+            # Upsert вектор
+            await self.vector_db.upsert(
+                collection_name=self.collection_name,
+                vectors=[{
+                    "id": color_id,
+                    "vector": embedding,
+                    "payload": {
+                        **updated_data,
+                        "type": "color",
+                        "created_at": payload.get("created_at"),
+                        "updated_at": updated_at
+                    }
+                }]
+            )
+            logger.info(f"Color updated successfully: {color_id}")
+            from core.schemas.colors import ColorReference
+            return ColorReference(
+                id=color_id,
+                name=updated_data["name"],
+                hex_code=updated_data["hex_code"],
+                rgb_values=updated_data["rgb_values"],
+                aliases=updated_data["aliases"],
+                embedding=embedding,
+                created_at=payload.get("created_at"),
+                updated_at=updated_at
+            )
+        except Exception as e:
+            logger.error(f"Failed to update color {color_id}: {e}")
+            return None
     
     async def delete_color(self, color_id: str) -> bool:
         """Delete a color from Qdrant by ID."""
