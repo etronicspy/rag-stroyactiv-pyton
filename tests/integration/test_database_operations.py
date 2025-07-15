@@ -26,6 +26,10 @@ from core.repositories.cached_materials import CachedMaterialsRepository
 from core.schemas.materials import MaterialCreate, Material
 from core.monitoring.logger import get_logger
 import redis.exceptions
+from core.database.factories import DatabaseFallbackManager, AllDatabasesUnavailableError
+from tests.fixtures.mock_fixtures import MockFactories
+import pytest
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -1096,3 +1100,207 @@ class TestHybridMaterialsRepository:
         
         assert result == sample_material
         mock_sql_repo.create.assert_called_once() 
+
+
+class TestBatchProcessingFallbackManager:
+    """Integration tests for DatabaseFallbackManager batch processing fallback."""
+
+    @pytest.fixture
+    def mock_sql(self):
+        mock = AsyncMock()
+        mock.create_processing_records = AsyncMock(return_value=["id1", "id2"])
+        mock.update_processing_status = AsyncMock(return_value=True)
+        mock.get_processing_progress = AsyncMock(return_value={"progress": 0.5})
+        mock.get_processing_results = AsyncMock(return_value=[{"id": "id1"}])
+        mock.get_processing_statistics = AsyncMock(return_value={"count": 2})
+        mock.cleanup_old_records = AsyncMock(return_value=1)
+        return mock
+
+    @pytest.fixture
+    def mock_qdrant(self):
+        mock = AsyncMock()
+        mock.create_processing_records = AsyncMock(side_effect=NotImplementedError)
+        mock.update_processing_status = AsyncMock(side_effect=NotImplementedError)
+        mock.get_processing_progress = AsyncMock(side_effect=NotImplementedError)
+        mock.get_processing_results = AsyncMock(side_effect=NotImplementedError)
+        mock.get_processing_statistics = AsyncMock(side_effect=NotImplementedError)
+        mock.cleanup_old_records = AsyncMock(side_effect=NotImplementedError)
+        return mock
+
+    @pytest.mark.asyncio
+    async def test_only_sql_available(self, mock_sql):
+        manager = DatabaseFallbackManager(sql_client=mock_sql, vector_client=None)
+        ids = await manager.create_processing_records("req1", [{"name": "mat1"}])
+        assert ids == ["id1", "id2"]
+        assert await manager.update_processing_status("req1", "id1", "done")
+        assert await manager.get_processing_progress("req1") == {"progress": 0.5}
+        assert await manager.get_processing_results("req1") == [{"id": "id1"}]
+        assert await manager.get_processing_statistics() == {"count": 2}
+        assert await manager.cleanup_old_records(30) == 1
+
+    @pytest.mark.asyncio
+    async def test_only_qdrant_available(self, mock_qdrant):
+        manager = DatabaseFallbackManager(sql_client=None, vector_client=mock_qdrant)
+        with pytest.raises(NotImplementedError):
+            await manager.create_processing_records("req1", [{"name": "mat1"}])
+        with pytest.raises(NotImplementedError):
+            await manager.update_processing_status("req1", "id1", "done")
+        with pytest.raises(NotImplementedError):
+            await manager.get_processing_progress("req1")
+        with pytest.raises(NotImplementedError):
+            await manager.get_processing_results("req1")
+        with pytest.raises(NotImplementedError):
+            await manager.get_processing_statistics()
+        with pytest.raises(NotImplementedError):
+            await manager.cleanup_old_records(30)
+
+    @pytest.mark.asyncio
+    async def test_both_available_sql_priority(self, mock_sql, mock_qdrant):
+        manager = DatabaseFallbackManager(sql_client=mock_sql, vector_client=mock_qdrant)
+        ids = await manager.create_processing_records("req1", [{"name": "mat1"}])
+        assert ids == ["id1", "id2"]
+        # SQL должен использоваться первым
+        mock_sql.create_processing_records.assert_awaited_once()
+        mock_qdrant.create_processing_records.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_both_unavailable(self):
+        manager = DatabaseFallbackManager(sql_client=None, vector_client=None)
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.create_processing_records("req1", [{"name": "mat1"}])
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.update_processing_status("req1", "id1", "done")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.get_processing_progress("req1")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.get_processing_results("req1")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.get_processing_statistics()
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.cleanup_old_records(30) 
+
+
+class TestSearchAndCrudFallbackManager:
+    """Integration tests for DatabaseFallbackManager search and CRUD fallback."""
+
+    @pytest.fixture
+    def mock_sql(self):
+        mock = AsyncMock()
+        mock.search = AsyncMock(return_value=[{"id": "sql1"}])
+        mock.sql_search = AsyncMock(return_value=[{"id": "sql2"}])
+        mock.fuzzy_search = AsyncMock(return_value=[{"id": "sql3"}])
+        mock.hybrid_search = AsyncMock(return_value=[{"id": "sql4"}])
+        mock.upsert = AsyncMock(return_value=True)
+        mock.get_by_id = AsyncMock(return_value={"id": "sql1"})
+        return mock
+
+    @pytest.fixture
+    def mock_qdrant(self):
+        mock = AsyncMock()
+        mock.search = AsyncMock(return_value=[{"id": "vec1"}])
+        mock.vector_search = AsyncMock(return_value=[{"id": "vec2"}])
+        mock.hybrid_search = AsyncMock(return_value=[{"id": "vec3"}])
+        mock.upsert = AsyncMock(return_value=True)
+        mock.get_by_id = AsyncMock(return_value={"id": "vec1"})
+        return mock
+
+    @pytest.mark.asyncio
+    async def test_only_sql_available(self, mock_sql):
+        manager = DatabaseFallbackManager(sql_client=mock_sql, vector_client=None)
+        assert await manager.search("q") == [{"id": "sql1"}]
+        assert await manager.sql_search("q") == [{"id": "sql2"}]
+        assert await manager.fuzzy_search("q") == [{"id": "sql3"}]
+        assert await manager.hybrid_search("q") == [{"id": "sql4"}]
+        assert await manager.upsert({"id": "x"}) is True
+        assert await manager.get_by_id("x") == {"id": "sql1"}
+
+    @pytest.mark.asyncio
+    async def test_only_qdrant_available(self, mock_qdrant):
+        manager = DatabaseFallbackManager(sql_client=None, vector_client=mock_qdrant)
+        assert await manager.search("q") == [{"id": "vec1"}]
+        assert await manager.vector_search("q") == [{"id": "vec2"}]
+        assert await manager.hybrid_search("q") == [{"id": "vec3"}]
+        assert await manager.upsert({"id": "x"}) is True
+        assert await manager.get_by_id("x") == {"id": "vec1"}
+        # sql_search и fuzzy_search должны выбрасывать AllDatabasesUnavailableError
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.sql_search("q")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.fuzzy_search("q")
+
+    @pytest.mark.asyncio
+    async def test_both_available_vector_priority(self, mock_sql, mock_qdrant):
+        manager = DatabaseFallbackManager(sql_client=mock_sql, vector_client=mock_qdrant)
+        # search должен сначала пробовать sql, затем vector (по реализации)
+        assert await manager.search("q") == [{"id": "sql1"}]
+        # vector_search должен использовать Qdrant
+        assert await manager.vector_search("q") == [{"id": "vec2"}]
+        # hybrid_search должен вернуть оба результата (по реализации)
+        res = await manager.hybrid_search("q")
+        assert any(r["id"] in ["vec3", "sql4"] for r in res)
+        # CRUD
+        assert await manager.upsert({"id": "x"}) is True
+        assert await manager.get_by_id("x") == {"id": "sql1"}
+
+    @pytest.mark.asyncio
+    async def test_both_unavailable(self):
+        manager = DatabaseFallbackManager(sql_client=None, vector_client=None)
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.search("q")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.vector_search("q")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.sql_search("q")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.fuzzy_search("q")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.hybrid_search("q")
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.upsert({"id": "x"})
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.get_by_id("x") 
+
+
+class TestHealthCheckAndStatisticsFallbackManager:
+    """Integration tests for DatabaseFallbackManager health-check and statistics fallback."""
+
+    @pytest.fixture
+    def mock_sql(self):
+        mock = AsyncMock()
+        mock.health_check = AsyncMock(return_value={"status": "ok", "db": "sql"})
+        mock.get_processing_statistics = AsyncMock(return_value={"count": 42})
+        return mock
+
+    @pytest.fixture
+    def mock_qdrant(self):
+        mock = AsyncMock()
+        mock.health_check = AsyncMock(return_value={"status": "ok", "db": "qdrant"})
+        mock.get_processing_statistics = AsyncMock(side_effect=NotImplementedError)
+        return mock
+
+    @pytest.mark.asyncio
+    async def test_only_sql_available(self, mock_sql):
+        manager = DatabaseFallbackManager(sql_client=mock_sql, vector_client=None)
+        assert await manager.sql_client.health_check() == {"status": "ok", "db": "sql"}
+        assert await manager.get_processing_statistics() == {"count": 42}
+
+    @pytest.mark.asyncio
+    async def test_only_qdrant_available(self, mock_qdrant):
+        manager = DatabaseFallbackManager(sql_client=None, vector_client=mock_qdrant)
+        assert await manager.vector_client.health_check() == {"status": "ok", "db": "qdrant"}
+        with pytest.raises(NotImplementedError):
+            await manager.get_processing_statistics()
+
+    @pytest.mark.asyncio
+    async def test_both_available_sql_priority(self, mock_sql, mock_qdrant):
+        manager = DatabaseFallbackManager(sql_client=mock_sql, vector_client=mock_qdrant)
+        # health_check можно вызывать у обеих, но get_processing_statistics должен использовать SQL
+        assert await manager.sql_client.health_check() == {"status": "ok", "db": "sql"}
+        assert await manager.vector_client.health_check() == {"status": "ok", "db": "qdrant"}
+        assert await manager.get_processing_statistics() == {"count": 42}
+
+    @pytest.mark.asyncio
+    async def test_both_unavailable(self):
+        manager = DatabaseFallbackManager(sql_client=None, vector_client=None)
+        with pytest.raises(AllDatabasesUnavailableError):
+            await manager.get_processing_statistics() 
