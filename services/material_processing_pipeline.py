@@ -70,7 +70,7 @@ class MaterialProcessingPipeline:
         
         # Initialize services
         self.parser_service = EnhancedParserIntegrationService()
-        self.rag_service = EmbeddingComparisonService(vector_db=vector_db)
+        self.rag_service = EmbeddingComparisonService()
         self.sku_search_service = get_sku_search_service()  # NEW: SKU search service
         
         # Statistics tracking

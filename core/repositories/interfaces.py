@@ -204,3 +204,80 @@ class IUnitsRepository(ABC):
         Returns:
             True if deleted successfully
         """
+
+
+class IBatchProcessingRepository(ABC):
+    """Abstract interface for batch processing repository.
+    
+    Universal interface for batch processing, progress tracking, and statistics.
+    Should be implemented for both vector and relational DBs.
+    """
+
+    @abstractmethod
+    async def create_processing_records(self, request_id: str, materials: List[Dict[str, Any]]) -> List[str]:
+        """Create initial records for batch processing.
+        
+        Args:
+            request_id: Request identifier
+            materials: List of materials to process
+        
+        Returns:
+            List of created record IDs
+        """
+
+    @abstractmethod
+    async def update_processing_status(self, request_id: str, material_id: str, status: str, error: Optional[str] = None) -> bool:
+        """Update processing status for a material in a batch.
+        
+        Args:
+            request_id: Request identifier
+            material_id: Material identifier
+            status: New status
+            error: Optional error message
+        
+        Returns:
+            True if update successful
+        """
+
+    @abstractmethod
+    async def get_processing_progress(self, request_id: str) -> Any:
+        """Get processing progress for a batch request.
+        
+        Args:
+            request_id: Request identifier
+        
+        Returns:
+            Progress object (implementation-specific)
+        """
+
+    @abstractmethod
+    async def get_processing_results(self, request_id: str, limit: Optional[int] = None, offset: Optional[int] = None) -> List[Any]:
+        """Get processing results for a batch request.
+        
+        Args:
+            request_id: Request identifier
+            limit: Optional limit
+            offset: Optional offset
+        
+        Returns:
+            List of processing results
+        """
+
+    @abstractmethod
+    async def get_processing_statistics(self) -> Any:
+        """Get overall processing statistics.
+        
+        Returns:
+            Statistics object (implementation-specific)
+        """
+
+    @abstractmethod
+    async def cleanup_old_records(self, days_old: int = 30) -> int:
+        """Cleanup old processing records.
+        
+        Args:
+            days_old: Number of days to keep
+        
+        Returns:
+            Number of deleted records
+        """

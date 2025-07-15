@@ -280,6 +280,28 @@ tail -50 app.log
 - [ ] Middleware не блокирует запросы
 - [ ] Логи не содержат критических ошибок
 
+## Batch Processing Fallback Troubleshooting
+
+### Common Errors
+- `AllDatabasesUnavailableError`: Both Qdrant and PostgreSQL are unavailable for batch processing. Check DB connectivity and logs.
+- `NotImplementedError`: Qdrant batch processing is not fully implemented. Only SQL fallback is available.
+- `Connection refused`/`timeout`: Check DB service status and network configuration.
+
+### Diagnosing Failures
+1. Check logs for which DB was attempted first and the error message.
+2. If both DBs fail, ensure at least one is running and accessible.
+3. For Qdrant NotImplementedError, use PostgreSQL for batch operations.
+4. Use health check endpoints to verify DB status.
+
+### Testing Fallback
+- Stop PostgreSQL and ensure Qdrant is up: batch operations should raise NotImplementedError (until Qdrant support is implemented).
+- Stop Qdrant and ensure PostgreSQL is up: batch operations should succeed via SQL.
+- Stop both: API returns 503 with detailed error.
+
+### Log Interpretation
+- Look for `core.database.factories.DatabaseFallbackManager` log entries.
+- Each operation logs which DB was used and the error if fallback occurred.
+
 ---
 
 **Обновлено**: $(date +%Y-%m-%d) 

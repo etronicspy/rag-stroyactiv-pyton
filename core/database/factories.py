@@ -10,10 +10,6 @@ from core.logging import get_logger
 from core.config import settings, DatabaseType, AIProvider
 from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
 from core.database.exceptions import ConfigurationError, ConnectionError
-from core.database.adapters.mock_adapters import (
-    create_mock_relational_adapter,
-    create_mock_cache_adapter
-)
 
 
 logger = get_logger(__name__)
@@ -96,13 +92,13 @@ class DatabaseFactory:
         """
         # Check if PostgreSQL connection is disabled
         if getattr(settings, 'DISABLE_POSTGRESQL_CONNECTION', True):
-            logger.info("PostgreSQL connection disabled, using mock database")
-            return create_mock_relational_adapter()
+            logger.error("PostgreSQL connection disabled, but mock adapters are removed. No fallback available.")
+            raise ConnectionError("PostgreSQL connection disabled and no mock available.")
         
         # Check if we're in Qdrant-only mode
         if getattr(settings, 'QDRANT_ONLY_MODE', True):
-            logger.info("Qdrant-only mode enabled, using mock PostgreSQL database")
-            return create_mock_relational_adapter()
+            logger.error("Qdrant-only mode enabled, but mock adapters are removed. No fallback available.")
+            raise ConnectionError("Qdrant-only mode enabled and no mock available.")
         
         try:
             if config_override:
@@ -124,8 +120,8 @@ class DatabaseFactory:
             
             # Use fallback if enabled
             if getattr(settings, 'ENABLE_FALLBACK_DATABASES', True):
-                logger.warning("Using mock PostgreSQL database as fallback")
-                return create_mock_relational_adapter()
+                logger.error("Fallback to mock PostgreSQL requested, but mock adapters are removed. No fallback available.")
+                raise ConnectionError("Fallback to mock PostgreSQL requested and no mock available.")
                 
             if isinstance(e, NotImplementedError):
                 raise e  # Pass through NotImplementedError
@@ -156,13 +152,13 @@ class DatabaseFactory:
         """
         # Check if Redis connection is disabled
         if getattr(settings, 'DISABLE_REDIS_CONNECTION', True):
-            logger.info("Redis connection disabled, using mock cache")
-            return create_mock_cache_adapter()
+            logger.error("Redis connection disabled, but mock adapters are removed. No fallback available.")
+            raise ConnectionError("Redis connection disabled and no mock available.")
         
         # Check if we're in Qdrant-only mode
         if getattr(settings, 'QDRANT_ONLY_MODE', True):
-            logger.info("Qdrant-only mode enabled, using mock Redis cache")
-            return create_mock_cache_adapter()
+            logger.error("Qdrant-only mode enabled, but mock adapters are removed. No fallback available.")
+            raise ConnectionError("Qdrant-only mode enabled and no mock available.")
         
         try:
             config = config_override or {
@@ -180,8 +176,8 @@ class DatabaseFactory:
             
             # Use fallback if enabled
             if getattr(settings, 'ENABLE_FALLBACK_DATABASES', True):
-                logger.warning("Using mock Redis cache as fallback")
-                return create_mock_cache_adapter()
+                logger.error("Fallback to mock Redis cache requested, but mock adapters are removed. No fallback available.")
+                raise ConnectionError("Fallback to mock Redis cache requested and no mock available.")
                 
             if isinstance(e, NotImplementedError):
                 raise e  # Pass through NotImplementedError
@@ -577,6 +573,91 @@ class DatabaseFallbackManager:
             self.logger.error(f"All DBs down for hybrid_search: {errors}")
             raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
         return results
+
+    # === Batch Processing Fallback Methods ===
+    async def create_processing_records(self, request_id: str, materials: list) -> list:
+        """Create initial records for batch processing with fallback."""
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if client is not None:
+                try:
+                    return await client.create_processing_records(request_id, materials)
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB create_processing_records failed: {e}")
+        self.logger.error(f"All DBs down for create_processing_records: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def update_processing_status(self, request_id: str, material_id: str, status: str, error: str = None) -> bool:
+        """Update processing status for a material in a batch with fallback."""
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if client is not None:
+                try:
+                    return await client.update_processing_status(request_id, material_id, status, error)
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB update_processing_status failed: {e}")
+        self.logger.error(f"All DBs down for update_processing_status: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def get_processing_progress(self, request_id: str):
+        """Get processing progress for a batch request with fallback."""
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if client is not None:
+                try:
+                    return await client.get_processing_progress(request_id)
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB get_processing_progress failed: {e}")
+        self.logger.error(f"All DBs down for get_processing_progress: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def get_processing_results(self, request_id: str, limit: int = None, offset: int = None) -> list:
+        """Get processing results for a batch request with fallback."""
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if client is not None:
+                try:
+                    return await client.get_processing_results(request_id, limit, offset)
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB get_processing_results failed: {e}")
+        self.logger.error(f"All DBs down for get_processing_results: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def get_processing_statistics(self):
+        """Get overall processing statistics with fallback."""
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if client is not None:
+                try:
+                    return await client.get_processing_statistics()
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB get_processing_statistics failed: {e}")
+        self.logger.error(f"All DBs down for get_processing_statistics: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def cleanup_old_records(self, days_old: int = 30) -> int:
+        """Cleanup old processing records with fallback."""
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if client is not None:
+                try:
+                    return await client.cleanup_old_records(days_old)
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB cleanup_old_records failed: {e}")
+        self.logger.error(f"All DBs down for cleanup_old_records: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
 
     # ... add more as needed for your DB interface ...
 

@@ -17,6 +17,7 @@ from core.schemas.processing_models import (
     ProcessingStatistics
 )
 from core.logging import get_logger
+from core.repositories.interfaces import IBatchProcessingRepository
 
 logger = get_logger(__name__)
 
@@ -30,8 +31,10 @@ class ProcessingResult:
         pass
 
 
-class ProcessingRepository:
-    """Repository для работы с результатами batch обработки."""
+class ProcessingRepository(IBatchProcessingRepository):
+    """Repository для работы с результатами batch обработки.
+    Implements IBatchProcessingRepository for universal batch processing support.
+    """
     
     def __init__(self, session: AsyncSession):
         self.session = session

@@ -12,12 +12,13 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from core.database.interfaces import IVectorDatabase
 from core.database.exceptions import ConnectionError, QueryError, DatabaseError
+from core.repositories.interfaces import IBatchProcessingRepository
 
 
 logger = get_logger(__name__)
 
 
-class QdrantVectorDatabase(IVectorDatabase):
+class QdrantVectorDatabase(IVectorDatabase, IBatchProcessingRepository):
     """Qdrant vector database adapter.
     
     Адаптер для работы с Qdrant, реализующий все обязательные методы:
@@ -409,3 +410,41 @@ class QdrantVectorDatabase(IVectorDatabase):
                 "status": "error",
                 "error": str(e)
             } 
+
+    # === IBatchProcessingRepository methods (stubs, to be implemented) ===
+
+    async def create_processing_records(self, request_id: str, materials: list) -> list:
+        """Create initial records for batch processing (Qdrant stub).
+        TODO: Implement batch processing records in Qdrant payload/collection.
+        """
+        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+
+    async def update_processing_status(self, request_id: str, material_id: str, status: str, error: str = None) -> bool:
+        """Update processing status for a material in a batch (Qdrant stub).
+        TODO: Implement status update in Qdrant payload/collection.
+        """
+        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+
+    async def get_processing_progress(self, request_id: str):
+        """Get processing progress for a batch request (Qdrant stub).
+        TODO: Implement progress tracking in Qdrant payload/collection.
+        """
+        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+
+    async def get_processing_results(self, request_id: str, limit: int = None, offset: int = None) -> list:
+        """Get processing results for a batch request (Qdrant stub).
+        TODO: Implement result retrieval in Qdrant payload/collection.
+        """
+        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+
+    async def get_processing_statistics(self):
+        """Get overall processing statistics (Qdrant stub).
+        TODO: Implement statistics in Qdrant payload/collection.
+        """
+        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+
+    async def cleanup_old_records(self, days_old: int = 30) -> int:
+        """Cleanup old processing records (Qdrant stub).
+        TODO: Implement cleanup in Qdrant payload/collection.
+        """
+        raise NotImplementedError("Batch processing not yet implemented for Qdrant.") 

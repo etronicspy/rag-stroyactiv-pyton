@@ -233,11 +233,6 @@ class BaseRepository(ABC):
                 )
                 return response.data[0].embedding
             
-            # For mock AI client (testing only)
-            elif hasattr(self.ai_client, 'get_embedding'):
-                self.logger.info(f"🔧 Using mock AI client for testing: {text[:50]}...")
-                return await self.ai_client.get_embedding(text)
-            
             # No valid AI client interface
             else:
                 raise DatabaseError(
@@ -266,20 +261,4 @@ class BaseRepository(ABC):
         for text in texts:
             embedding = await self.get_embedding(text)
             embeddings.append(embedding)
-        return embeddings
-    
-    async def _generate_mock_embedding(self, text: str) -> list:
-        """Generate mock embedding for testing/fallback.
-        
-        Args:
-            text: Input text
-            
-        Returns:
-            Mock embedding vector
-        """
-        import hashlib
-        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
-        mock_embedding = []
-        for i in range(1536):  # OpenAI embedding size
-            mock_embedding.append(float(int(text_hash[i % len(text_hash)], 16)) / 15.0 - 0.5)
-        return mock_embedding 
+        return embeddings 

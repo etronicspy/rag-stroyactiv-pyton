@@ -62,7 +62,7 @@ def get_relational_db_dependency() -> IRelationalDatabase:
         ...
     
     Returns:
-        Relational database client instance (real or mock)
+        Relational database client instance
     """
     from core.database.factories import DatabaseFactory
     return DatabaseFactory.create_relational_database()
@@ -79,7 +79,7 @@ def get_cache_db_dependency() -> ICacheDatabase:
         ...
     
     Returns:
-        Cache database client instance (real or mock)
+        Cache database client instance
     """
     from core.database.factories import DatabaseFactory
     return DatabaseFactory.create_cache_database()

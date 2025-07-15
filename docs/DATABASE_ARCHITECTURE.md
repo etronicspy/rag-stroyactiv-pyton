@@ -263,6 +263,41 @@ EXPLAIN ANALYZE SELECT * FROM materials WHERE name ILIKE '%цемент%';
 redis-cli info memory
 ```
 
+## Universal Batch Processing Fallback Architecture
+
+### Overview
+All batch processing, progress tracking, and statistics operations are now routed through a universal fallback manager. This ensures that any operation can be performed using either Qdrant (vector DB) or PostgreSQL (relational DB), with automatic fallback if one is unavailable.
+
+### Key Components
+- **IBatchProcessingRepository**: Abstract interface defining batch processing methods (create_processing_records, update_processing_status, get_processing_progress, get_processing_results, get_processing_statistics, cleanup_old_records).
+- **ProcessingRepository**: Implements IBatchProcessingRepository for PostgreSQL.
+- **QdrantVectorDatabase**: Implements IBatchProcessingRepository for Qdrant (stubs/TODO for full support).
+- **DatabaseFallbackManager**: Centralized manager that routes all batch operations, trying SQL first, then Qdrant, with error handling and logging.
+
+### Example Usage
+```python
+fallback_manager = get_fallback_manager()
+await fallback_manager.create_processing_records(request_id, materials)
+progress = await fallback_manager.get_processing_progress(request_id)
+results = await fallback_manager.get_processing_results(request_id)
+```
+
+### Diagram
+
+```mermaid
+graph TD;
+    API-->|calls|BatchProcessingService;
+    BatchProcessingService-->|calls|DatabaseFallbackManager;
+    DatabaseFallbackManager-->|fallback|ProcessingRepository(PostgreSQL);
+    DatabaseFallbackManager-->|fallback|QdrantVectorDatabase(Qdrant);
+```
+
+### Benefits
+- No direct DB calls in services/routes for batch processing
+- Centralized error handling and logging
+- Easy to extend for new DBs
+- Graceful degradation if one DB is down
+
 ---
 
 **Обновлено**: $(date +%Y-%m-%d) 

@@ -300,7 +300,7 @@ class Settings(BaseSettings):
     )
     ENABLE_FALLBACK_DATABASES: bool = Field(
         default=True,
-        description="Enable fallback to mock databases"
+        description="Enable fallback to alternative databases"
     )
     DISABLE_REDIS_CONNECTION: bool = Field(
         default=True,
