@@ -20,15 +20,14 @@ from core.logging import get_logger
 # Parser interface imports
 from ..interfaces import (
     IMaterialParser,
-    MaterialParseData,
     AIParseRequest,
-    AIParseResult,
     ParseStatus,
     BatchParseRequest,
     BatchParseResult,
     InputType,
     OutputType
 )
+from ..interfaces.ai_parser_interface import MaterialParseData, AIParseResult
 
 # Service imports
 from .ai_parser_service import AIParserService, get_ai_parser_service
@@ -169,7 +168,7 @@ class MaterialParserService:
             # Create AI parse request
             request = AIParseRequest(
                 input_data=material_text,
-                request_id=f"material_parse_{id(material_text)}",
+                correlation_id=f"material_parse_{id(material_text)}",
                 options={"enable_embeddings": True}
             )
             
@@ -194,11 +193,14 @@ class MaterialParserService:
             
             # Return error result
             return AIParseResult(
+                success=False,
                 status=ParseStatus.ERROR,
                 data=MaterialParseData(
                     name=material_text,
                     original_unit="",
-                    original_price=0.0
+                    original_price=0.0,
+                    unit="",  # Set unit field for compatibility
+                    price=0.0  # Set price field for compatibility
                 ),
                 confidence=0.0,
                 processing_time=0.0,
@@ -275,7 +277,7 @@ class MaterialParserService:
             requests = [
                 AIParseRequest(
                     input_data=material,
-                    request_id=f"batch_item_{i}",
+                    correlation_id=f"batch_item_{i}",
                     options={"enable_embeddings": True}
                 )
                 for i, material in enumerate(materials)
@@ -311,8 +313,8 @@ class MaterialParserService:
                 total_processed=context.processed_materials,
                 successful_count=context.successful_parses,
                 failed_count=context.failed_parses,
-                success_rate=context.success_rate,
-                processing_time=asyncio.get_event_loop().time() - context.start_time
+                success_rate=context.success_rate * 100.0,
+                total_processing_time=asyncio.get_event_loop().time() - context.start_time
             )
             
             self.logger.info(f"Batch parsing completed: {context.successful_parses}/{context.total_materials} successful")
@@ -329,7 +331,9 @@ class MaterialParserService:
                     data=MaterialParseData(
                         name=material,
                         original_unit="",
-                        original_price=0.0
+                        original_price=0.0,
+                        unit="",  # Set unit field for compatibility
+                        price=0.0  # Set price field for compatibility
                     ),
                     confidence=0.0,
                     processing_time=0.0,
@@ -345,7 +349,7 @@ class MaterialParserService:
                 successful_count=0,
                 failed_count=len(materials),
                 success_rate=0.0,
-                processing_time=asyncio.get_event_loop().time() - context.start_time
+                total_processing_time=asyncio.get_event_loop().time() - context.start_time
             )
     
     async def parse_from_file(self, file_path: Union[str, Path]) -> BatchParseResult[MaterialParseData]:
@@ -445,7 +449,7 @@ class MaterialParserService:
                     "successful_count": results.successful_count,
                     "failed_count": results.failed_count,
                     "success_rate": results.success_rate,
-                    "processing_time": results.processing_time,
+                    "total_processing_time": results.total_processing_time,
                     "service_version": self.version
                 },
                 "results": serializable_results

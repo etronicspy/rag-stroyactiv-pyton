@@ -185,6 +185,20 @@ class MaterialParseData(BaseModel):
     coefficient: Optional[float] = Field(default=None, description="Conversion coefficient")
     category: Optional[str] = Field(default=None, description="Material category")
     specifications: Dict[str, Any] = Field(default_factory=dict, description="Additional specifications")
+    
+    # Additional fields for AI parsing compatibility
+    original_unit: Optional[str] = Field(default=None, description="Original unit from input")
+    original_price: Optional[float] = Field(default=None, description="Original price from input")
+    unit_parsed: Optional[str] = Field(default=None, description="Parsed unit from AI")
+    price_coefficient: Optional[float] = Field(default=None, description="Price coefficient for conversion")
+    price_parsed: Optional[float] = Field(default=None, description="Parsed price per unit")
+    parsing_method: Optional[str] = Field(default=None, description="Method used for parsing")
+    confidence: Optional[float] = Field(default=None, description="Confidence score")
+    
+    # Embedding fields
+    embeddings: Optional[List[float]] = Field(default=None, description="Material name embedding")
+    color_embedding: Optional[List[float]] = Field(default=None, description="Color embedding")
+    unit_embedding: Optional[List[float]] = Field(default=None, description="Unit embedding")
 
 
 class TextParseData(BaseModel):

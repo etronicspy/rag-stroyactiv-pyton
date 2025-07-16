@@ -301,3 +301,61 @@ graph TD;
 ---
 
 **Обновлено**: $(date +%Y-%m-%d) 
+
+## Batch Processing on Qdrant
+
+### Overview
+Batch processing in Qdrant is implemented using a dedicated collection `processing_records`. This enables full batch workflow (creation, status updates, progress tracking, statistics, cleanup) without relying on PostgreSQL. The fallback manager routes all batch operations to Qdrant in Qdrant-only mode.
+
+### Collection Structure: `processing_records`
+- **Vector size:** 1 (dummy, always [0.0])
+- **ID:** material_id (string)
+- **Payload fields:**
+  - `request_id: str` — batch request identifier
+  - `material_id: str` — material identifier
+  - `status: str` — processing status (e.g., "pending", "processing", "done", "error")
+  - `error: Optional[str]` — error message if any
+  - `created_at: str` — ISO8601 timestamp
+  - `updated_at: str` — ISO8601 timestamp
+
+### Supported Methods
+- `create_processing_records(request_id, materials)` — creates records for each material in the batch
+- `update_processing_status(request_id, material_id, status, error)` — updates status and error for a material
+- `get_processing_progress(request_id)` — returns progress summary (total, done, error, pending, percent_done)
+- `get_processing_results(request_id, limit, offset)` — returns all records for a batch
+- `get_processing_statistics()` — returns global stats (total_batches, total_records, status_counts)
+- `cleanup_old_records(days_old)` — deletes records older than N days
+
+### Fallback and Qdrant-Only Mode
+- If PostgreSQL is disabled, all batch operations are routed to Qdrant.
+- No NotImplementedError is raised for batch methods in Qdrant-only mode.
+- The fallback manager transparently uses Qdrant for all batch operations.
+
+### Example: Record Payload
+```json
+{
+  "request_id": "batch-123",
+  "material_id": "mat-001",
+  "status": "pending",
+  "error": null,
+  "created_at": "2024-06-18T12:00:00Z",
+  "updated_at": "2024-06-18T12:00:00Z"
+}
+```
+
+### Example: Progress Response
+```json
+{
+  "request_id": "batch-123",
+  "total": 3,
+  "done": 1,
+  "error": 1,
+  "pending": 1,
+  "percent_done": 33.3
+}
+```
+
+### Notes
+- The collection is created automatically if it does not exist.
+- All batch operations are fully async and safe for concurrent use.
+- No dependency on relational DB for batch status, progress, or statistics. 

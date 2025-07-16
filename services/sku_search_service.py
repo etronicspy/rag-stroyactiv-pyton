@@ -120,6 +120,127 @@ class SKUSearchService:
             self.logger.error(f"All databases unavailable for SKU search: {e.errors}")
             raise
     
+    async def find_sku_by_combined_embedding(
+        self,
+        material_embedding: List[float],
+        normalized_unit: str,
+        normalized_color: Optional[str]
+    ) -> SKUSearchResponse:
+        """
+        Search SKU through combined material embedding.
+        
+        Поиск SKU через комбинированный embedding.
+        
+        Args:
+            material_embedding: Combined material embedding (name + unit + color)
+            normalized_unit: Normalized unit for filtering
+            normalized_color: Normalized color for filtering (None for any color)
+            
+        Returns:
+            SKU search response with best match
+        """
+        start_time = time.time()
+        
+        try:
+            self.logger.debug(f"Searching SKU with combined embedding for unit: {normalized_unit}, color: {normalized_color}")
+            
+            if not self.vector_db:
+                raise ValueError("Vector database not available")
+            
+            # Search similar materials using combined embedding
+            search_results = await self.vector_db.search(
+                collection_name=self.config.reference_collection,
+                query_vector=material_embedding,
+                limit=self.config.max_candidates
+            )
+            
+            if not search_results:
+                self.logger.debug("No candidates found in vector search")
+                return SKUSearchResponse(
+                    found_sku=None,
+                    search_successful=True,
+                    candidates_evaluated=0,
+                    matching_candidates=0,
+                    search_method="combined_embedding_search",
+                    processing_time=time.time() - start_time
+                )
+            
+            # Convert search results to candidates
+            candidates = []
+            for result in search_results:
+                try:
+                    candidate = self._convert_vector_result_to_candidate(result)
+                    if candidate:
+                        candidates.append(candidate)
+                except Exception as e:
+                    self.logger.warning(f"Failed to convert search result to candidate: {e}")
+                    continue
+            
+            self.logger.debug(f"Found {len(candidates)} candidates from vector search")
+            
+            # Filter candidates by unit and color
+            matching_candidates = []
+            for candidate in candidates:
+                # Strict unit matching
+                unit_match = self._check_unit_match(candidate.unit, normalized_unit)
+                
+                # Flexible color matching (None color accepts any color)
+                color_match = True  # Since we don't have color field in current DB structure
+                if normalized_color:
+                    # In future, implement color matching logic here
+                    color_match = True
+                
+                # Overall match requires unit match and color compatibility
+                overall_match = unit_match and color_match
+                
+                if overall_match:
+                    matching_candidates.append(candidate)
+                    self.logger.debug(f"✅ Matching candidate: {candidate.name} (SKU: {candidate.sku})")
+                else:
+                    self.logger.debug(f"❌ Non-matching candidate: {candidate.name} (unit: {candidate.unit} vs {normalized_unit})")
+            
+            # Return best match (highest similarity score)
+            if matching_candidates:
+                # Sort by similarity score (highest first)
+                matching_candidates.sort(key=lambda x: x.similarity_score, reverse=True)
+                best_match = matching_candidates[0]
+                
+                self.logger.info(f"✅ Found SKU: {best_match.sku} for material with similarity: {best_match.similarity_score}")
+                
+                return SKUSearchResponse(
+                    found_sku=best_match.sku,
+                    search_successful=True,
+                    candidates_evaluated=len(candidates),
+                    matching_candidates=len(matching_candidates),
+                    best_match=best_match,
+                    search_method="combined_embedding_search",
+                    processing_time=time.time() - start_time,
+                    all_candidates=candidates
+                )
+            else:
+                self.logger.warning("No matching candidates found after filtering")
+                return SKUSearchResponse(
+                    found_sku=None,
+                    search_successful=True,
+                    candidates_evaluated=len(candidates),
+                    matching_candidates=0,
+                    search_method="combined_embedding_search",
+                    processing_time=time.time() - start_time,
+                    all_candidates=candidates
+                )
+                
+        except Exception as e:
+            self.logger.error(f"Error in combined embedding SKU search: {e}")
+            return SKUSearchResponse(
+                found_sku=None,
+                search_successful=False,
+                candidates_evaluated=0,
+                matching_candidates=0,
+                search_method="combined_embedding_search",
+                processing_time=time.time() - start_time,
+                error_message=str(e)
+            )
+    
     async def _phase1_vector_search(
         self, 
         query_embedding: List[float], 
@@ -406,6 +527,34 @@ class SKUSearchService:
         except Exception as e:
             self.logger.error(f"Failed to convert search result: {e}")
             self.logger.error(f"Search result data: {search_result}")
+            return None
+    
+    def _convert_vector_result_to_candidate(self, result: Dict[str, Any]) -> Optional[SKUSearchCandidate]:
+        """
+        Convert vector database result to SKU search candidate.
+        
+        Args:
+            result: Vector database search result
+            
+        Returns:
+            SKU search candidate or None if conversion fails
+        """
+        try:
+            payload = result.get("payload", {})
+            
+            return SKUSearchCandidate(
+                material_id=str(result.get("id", "")),
+                sku=payload.get("sku"),
+                name=payload.get("name", ""),
+                unit=payload.get("unit", ""),
+                description=payload.get("description"),
+                similarity_score=result.get("score", 0.0),
+                unit_match=True,  # Will be checked later
+                color_match=True,  # Will be checked later
+                overall_match=True  # Will be checked later
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to convert vector result to candidate: {e}")
             return None
     
     def _generate_cache_key(

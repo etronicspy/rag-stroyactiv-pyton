@@ -31,6 +31,9 @@ from tests.fixtures.mock_fixtures import MockFactories
 import pytest
 import asyncio
 
+from core.database.adapters.qdrant_adapter import QdrantVectorDatabase
+from datetime import datetime, timedelta
+
 logger = get_logger(__name__)
 
 # Create simple request/response classes for testing if they don't exist
@@ -1304,3 +1307,166 @@ class TestHealthCheckAndStatisticsFallbackManager:
         manager = DatabaseFallbackManager(sql_client=None, vector_client=None)
         with pytest.raises(AllDatabasesUnavailableError):
             await manager.get_processing_statistics() 
+
+
+import pytest
+import asyncio
+from core.database.adapters.qdrant_adapter import QdrantVectorDatabase
+from datetime import datetime, timedelta
+
+@pytest.mark.integration
+class TestQdrantBatchProcessing:
+    @pytest.fixture(scope="class")
+    def qdrant_config(self, database_connection_params):
+        return {
+            "url": database_connection_params["qdrant"]["url"],
+            "api_key": database_connection_params["qdrant"]["api_key"],
+            "collection_name": "processing_records",
+            "vector_size": 1
+        }
+
+    @pytest.fixture(scope="function")
+    async def qdrant_db(self, qdrant_config):
+        db = QdrantVectorDatabase(qdrant_config)
+        # Cleanup before test
+        try:
+            await db.client.delete_collection("processing_records")
+        except Exception:
+            pass
+        yield db
+        # Cleanup after test
+        try:
+            await db.client.delete_collection("processing_records")
+        except Exception:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_create_processing_records(self, qdrant_db):
+        request_id = "test-batch-1"
+        materials = [
+            {"material_id": "mat1"},
+            {"material_id": "mat2"},
+            {"material_id": "mat3"}
+        ]
+        created_ids = await qdrant_db.create_processing_records(request_id, materials)
+        assert set(created_ids) == {"mat1", "mat2", "mat3"}
+        # Проверяем, что записи действительно созданы
+        all_records = await qdrant_db.scroll_all("processing_records", with_payload=True, with_vectors=False)
+        assert len(all_records) == 3
+        for rec in all_records:
+            payload = rec["payload"]
+            assert payload["request_id"] == request_id
+            assert payload["status"] == "pending"
+            assert payload["material_id"] in {"mat1", "mat2", "mat3"} 
+
+    @pytest.mark.asyncio
+    async def test_update_processing_status(self, qdrant_db):
+        request_id = "test-batch-2"
+        materials = [
+            {"material_id": "matA"},
+            {"material_id": "matB"}
+        ]
+        await qdrant_db.create_processing_records(request_id, materials)
+        # Обновляем статус одной записи
+        result = await qdrant_db.update_processing_status(request_id, "matA", status="done", error=None)
+        assert result is True
+        all_records = await qdrant_db.scroll_all("processing_records", with_payload=True, with_vectors=False)
+        statuses = {rec["payload"]["material_id"]: rec["payload"]["status"] for rec in all_records}
+        assert statuses["matA"] == "done"
+        assert statuses["matB"] == "pending"
+
+    @pytest.mark.asyncio
+    async def test_get_processing_progress(self, qdrant_db):
+        request_id = "test-batch-3"
+        materials = [
+            {"material_id": "matX"},
+            {"material_id": "matY"},
+            {"material_id": "matZ"}
+        ]
+        await qdrant_db.create_processing_records(request_id, materials)
+        await qdrant_db.update_processing_status(request_id, "matX", status="done")
+        await qdrant_db.update_processing_status(request_id, "matY", status="error", error="fail")
+        progress = await qdrant_db.get_processing_progress(request_id)
+        assert progress["total"] == 3
+        assert progress["done"] == 1
+        assert progress["error"] == 1
+        assert progress["pending"] == 1
+        assert progress["percent_done"] > 0
+
+    @pytest.mark.asyncio
+    async def test_get_processing_results(self, qdrant_db):
+        request_id = "test-batch-4"
+        materials = [
+            {"material_id": "matR"},
+            {"material_id": "matS"},
+            {"material_id": "matT"}
+        ]
+        await qdrant_db.create_processing_records(request_id, materials)
+        results = await qdrant_db.get_processing_results(request_id)
+        assert len(results) == 3
+        ids = {r["material_id"] for r in results}
+        assert ids == {"matR", "matS", "matT"}
+        # Проверка limit/offset
+        results2 = await qdrant_db.get_processing_results(request_id, limit=2)
+        assert len(results2) == 2
+        results3 = await qdrant_db.get_processing_results(request_id, offset=1)
+        assert len(results3) == 2
+
+    @pytest.mark.asyncio
+    async def test_get_processing_statistics(self, qdrant_db):
+        request_id1 = "batch-stat-1"
+        request_id2 = "batch-stat-2"
+        await qdrant_db.create_processing_records(request_id1, [{"material_id": "m1"}])
+        await qdrant_db.create_processing_records(request_id2, [{"material_id": "m2"}, {"material_id": "m3"}])
+        stats = await qdrant_db.get_processing_statistics()
+        assert stats["total_batches"] >= 2
+        assert stats["total_records"] >= 3
+        assert "pending" in stats["status_counts"]
+
+    @pytest.mark.asyncio
+    async def test_cleanup_old_records(self, qdrant_db):
+        request_id = "batch-old-cleanup"
+        # Создаём запись с датой в прошлом
+        from datetime import datetime, timedelta
+        old_date = (datetime.utcnow() - timedelta(days=40)).isoformat()
+        materials = [
+            {"material_id": "old1", "created_at": old_date, "updated_at": old_date},
+            {"material_id": "old2"}
+        ]
+        await qdrant_db.create_processing_records(request_id, materials)
+        # Принудительно обновим created_at для old1
+        await qdrant_db.update_processing_status(request_id, "old1", status="pending")
+        # Удаляем старые записи (старше 30 дней)
+        deleted = await qdrant_db.cleanup_old_records(days_old=30)
+        # old1 должен быть удалён, old2 остаться
+        all_records = await qdrant_db.scroll_all("processing_records", with_payload=True, with_vectors=False)
+        ids = {rec["id"] for rec in all_records}
+        assert "old2" in ids 
+
+
+@pytest.mark.asyncio
+async def test_qdrant_only_fallback_manager(qdrant_db):
+    # Создаём менеджер только с Qdrant (sql_client=None)
+    manager = DatabaseFallbackManager(sql_client=None, vector_client=qdrant_db)
+    request_id = "fallback-batch-1"
+    materials = [
+        {"material_id": "matF1"},
+        {"material_id": "matF2"}
+    ]
+    # create_processing_records
+    ids = await manager.vector_client.create_processing_records(request_id, materials)
+    assert set(ids) == {"matF1", "matF2"}
+    # update_processing_status
+    assert await manager.vector_client.update_processing_status(request_id, "matF1", status="done")
+    # get_processing_progress
+    progress = await manager.vector_client.get_processing_progress(request_id)
+    assert progress["total"] == 2
+    # get_processing_results
+    results = await manager.vector_client.get_processing_results(request_id)
+    assert len(results) == 2
+    # get_processing_statistics
+    stats = await manager.vector_client.get_processing_statistics()
+    assert stats["total_batches"] >= 1
+    # cleanup_old_records
+    deleted = await manager.vector_client.cleanup_old_records(days_old=0)
+    assert isinstance(deleted, int) 

@@ -199,12 +199,13 @@ class TestDataClasses:
         )
         
         result = AIParseResult(
+            success=True,
             status=ParseStatus.SUCCESS,
             data=data,
             confidence=0.85,
             processing_time=2.0,
             request_id="ai_test_123",
-            model_used=AIModelType.GPT4O_MINI,
+            model_used=AIModelType.OPENAI_GPT,
             tokens_used=150
         )
         
@@ -213,7 +214,7 @@ class TestDataClasses:
         assert result.confidence == 0.85
         assert result.processing_time == 2.0
         assert result.request_id == "ai_test_123"
-        assert result.model_used == AIModelType.GPT4O_MINI
+        assert result.model_used == AIModelType.OPENAI_GPT
         assert result.tokens_used == 150
     
     def test_batch_parse_request_creation(self):

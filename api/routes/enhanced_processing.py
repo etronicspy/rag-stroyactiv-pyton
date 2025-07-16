@@ -172,18 +172,17 @@ async def process_materials_batch(
                 detail=f"Too many active jobs: {service_stats['active_jobs']} >= {batch_service.config.max_concurrent_batches}"
             )
         
-        # Запускаем background job
-        job_started = await batch_service.start_processing_job(
-            request.request_id,
-            request.materials
-        )
+        # Создаем background task для асинхронной обработки
+        async def process_batch_wrapper():
+            try:
+                logger.info(f"Background task started for request {request.request_id}")
+                await batch_service._process_materials_batch(request.request_id, request.materials)
+                logger.info(f"Background task completed for request {request.request_id}")
+            except Exception as e:
+                logger.error(f"Background task failed for request {request.request_id}: {str(e)}")
+                # Можно добавить уведомление об ошибке или retry логику
         
-        if not job_started:
-            error_response = BatchValidationError(
-                errors=["Failed to start processing job"],
-                rejected_materials=[]
-            )
-            return error_response
+        background_tasks.add_task(process_batch_wrapper)
         
         # Вычисляем предполагаемое время завершения
         estimated_completion = datetime.utcnow() + timedelta(
@@ -321,18 +320,18 @@ async def get_processing_status(
         progress = await batch_service.get_processing_progress(request_id)
         
         # Проверяем, найден ли запрос
-        if progress.total == 0:
+        if progress["total"] == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Request {request_id} not found"
             )
         
         # Определяем общий статус
-        if progress.pending > 0:
+        if progress["pending"] > 0:
             overall_status = ProcessingStatus.PROCESSING
-        elif progress.failed > 0 and progress.completed == 0:
+        elif progress["failed"] > 0 and progress["completed"] == 0:
             overall_status = ProcessingStatus.FAILED
-        elif progress.completed == progress.total:
+        elif progress["completed"] == progress["total"]:
             overall_status = ProcessingStatus.COMPLETED
         else:
             overall_status = ProcessingStatus.PROCESSING
@@ -343,9 +342,9 @@ async def get_processing_status(
         
         # Вычисляем предполагаемое время завершения
         estimated_completion = None
-        if overall_status == ProcessingStatus.PROCESSING and progress.pending > 0:
+        if overall_status == ProcessingStatus.PROCESSING and progress["pending"] > 0:
             estimated_completion = datetime.utcnow() + timedelta(
-                seconds=progress.pending * 2
+                seconds=progress["pending"] * 2
             )
         
         response = ProcessingStatusResponse(
@@ -357,7 +356,7 @@ async def get_processing_status(
             completed_at=None  # Можно добавить в БД
         )
         
-        logger.debug(f"Processing status for {request_id}: {overall_status.value}, {progress.completed}/{progress.total}")
+        logger.debug(f"Processing status for {request_id}: {overall_status.value}, {progress['completed']}/{progress['total']}")
         return response
         
     except HTTPException:
@@ -498,46 +497,50 @@ async def get_processing_results(
     try:
         logger.debug(f"Getting processing results for request {request_id}")
         
-        # Получаем результаты
-        results = await batch_service.get_processing_results(
-            request_id,
-            limit=limit,
-            offset=offset
-        )
+        # Получаем результаты обработки
+        raw_results = await batch_service.get_processing_results(request_id, limit=limit, offset=offset)
         
-        # Проверяем, найден ли запрос
-        if not results:
-            # Проверяем прогресс, чтобы убедиться, что запрос существует
-            progress = await batch_service.get_processing_progress(request_id)
-            if progress.total == 0:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Request {request_id} not found"
-                )
+        # Преобразуем raw_results в MaterialProcessingResult
+        results = []
+        for raw_result in raw_results:
+            # Извлекаем данные из payload
+            material_id = raw_result.get('material_id', 'unknown')
+            status = raw_result.get('status', 'pending')
+            
+            # Создаем MaterialProcessingResult с обязательными полями
+            material_result = MaterialProcessingResult(
+                material_id=material_id,
+                original_name=raw_result.get('original_name', 'Unknown Material'),
+                original_unit=raw_result.get('original_unit', 'шт'),
+                sku=raw_result.get('sku'),
+                similarity_score=raw_result.get('similarity_score'),
+                processing_status=ProcessingStatus(status),
+                error_message=raw_result.get('error'),
+                processed_at=datetime.fromisoformat(raw_result.get('processed_at')) if raw_result.get('processed_at') else None,
+                normalized_color=raw_result.get('normalized_color'),
+                normalized_unit=raw_result.get('normalized_unit'),
+                unit_coefficient=raw_result.get('unit_coefficient')
+            )
+            results.append(material_result)
         
-        # Получаем общую статистику
-        progress = await batch_service.get_processing_progress(request_id)
-        
-        # Создаем сводку по статусам
+        # Подсчитываем сводку
         summary = {
-            "pending": progress.pending,
-            "completed": progress.completed,
-            "failed": progress.failed,
-            "total": progress.total
+            'completed': sum(1 for r in results if r.processing_status == ProcessingStatus.COMPLETED),
+            'failed': sum(1 for r in results if r.processing_status == ProcessingStatus.FAILED),
+            'pending': sum(1 for r in results if r.processing_status == ProcessingStatus.PENDING),
+            'processing': sum(1 for r in results if r.processing_status == ProcessingStatus.PROCESSING)
         }
         
         response = ProcessingResultsResponse(
             request_id=request_id,
-            total_materials=progress.total,
+            total_materials=len(results),
             results=results,
             summary=summary
         )
         
-        logger.debug(f"Retrieved {len(results)} results for request {request_id}")
+        logger.debug(f"Returning {len(results)} results for request {request_id}")
         return response
         
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error getting processing results for {request_id}: {str(e)}")
         raise HTTPException(
@@ -695,7 +698,18 @@ async def get_processing_statistics(
         
         # Получаем статистику из БД
         stats = await batch_service.get_service_statistics()
-        
+        # Если stats — dict, приводим к модели
+        if isinstance(stats, dict):
+            # Приводим к Pydantic-модели, заполняя обязательные поля (fallback для Qdrant-only)
+            stats = ProcessingStatistics(
+                total_requests=stats.get('total_batches', 0),
+                active_requests=0,
+                completed_requests=stats.get('status_counts', {}).get('completed', 0),
+                failed_requests=stats.get('status_counts', {}).get('failed', 0),
+                total_materials_processed=stats.get('total_records', 0),
+                average_processing_time=0.0,
+                success_rate=(stats.get('status_counts', {}).get('completed', 0) / stats.get('total_records', 1)) if stats.get('total_records', 1) else 0.0
+            )
         logger.debug(f"Processing statistics: {stats.total_requests} requests, {stats.success_rate:.2%} success rate")
         return stats
         

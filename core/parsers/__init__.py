@@ -35,7 +35,6 @@ from .interfaces import (
     AIParseMode,
     AIParseRequest,
     AIParseResult,
-    MaterialParseData,
     TextParseData,
     
     # Metadata
@@ -45,6 +44,9 @@ from .interfaces import (
     list_available_interfaces,
     validate_interface_implementation
 )
+
+# Import MaterialParseData from the correct location
+from .interfaces.ai_parser_interface import MaterialParseData
 
 # Lazy imports for services (will be available after migration)
 def get_ai_parser_service():

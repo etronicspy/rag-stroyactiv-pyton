@@ -16,7 +16,6 @@ from typing import Dict, List, Optional, Tuple
 from functools import lru_cache
 
 import openai
-from openai import AsyncOpenAI
 
 from core.config.base import Settings
 from core.schemas.pipeline_models import (
@@ -44,7 +43,7 @@ class CombinedEmbeddingService:
         """Initialize Combined Embedding Service"""
         self.config = config or CombinedEmbeddingConfig()
         self.ai_settings = Settings()
-        self._client: Optional[AsyncOpenAI] = None
+        self._client: Optional[openai.AsyncOpenAI] = None
         
         # In-memory cache for embeddings
         self.embedding_cache: Dict[str, EmbeddingCacheEntry] = {}
@@ -52,10 +51,10 @@ class CombinedEmbeddingService:
         logger.info("✅ Combined Embedding Service initialized successfully")
 
     @property
-    def client(self) -> AsyncOpenAI:
+    def client(self) -> openai.AsyncOpenAI:
         """Get or create OpenAI async client"""
         if self._client is None:
-            self._client = AsyncOpenAI(
+            self._client = openai.AsyncOpenAI(
                 api_key=self.ai_settings.OPENAI_API_KEY,
                 timeout=self.ai_settings.OPENAI_TIMEOUT,
                 max_retries=self.ai_settings.OPENAI_MAX_RETRIES
@@ -232,6 +231,56 @@ class CombinedEmbeddingService:
                 success=False
             )
 
+    async def generate_material_embedding_for_sku(
+        self, 
+        name: str, 
+        parsed_unit: str, 
+        color: Optional[str]
+    ) -> List[float]:
+        """
+        Generate material embedding from name + parsed_unit + color for SKU search.
+        
+        Генерация embedding из name + parsed_unit + color для SKU поиска.
+        
+        Args:
+            name: Material name
+            parsed_unit: Parsed unit from AI
+            color: Extracted color (None for colorless materials)
+            
+        Returns:
+            Combined material embedding (1536 dimensions)
+        """
+        try:
+            # Combine material components for SKU search
+            color_part = color if color else "без_цвета"
+            material_text = f"{name} {parsed_unit} {color_part}"
+            
+            logger.debug(f"Generating SKU embedding for: '{material_text}'")
+            
+            # Generate embedding via OpenAI
+            response = await self.client.embeddings.create(
+                model=self.config.embedding_model,
+                input=material_text,
+                encoding_format="float"
+            )
+            
+            if not response.data:
+                raise ValueError("No embedding data received from OpenAI")
+            
+            embedding = response.data[0].embedding
+            
+            # Validate embedding dimensions
+            if len(embedding) != 1536:
+                logger.warning(f"Unexpected embedding dimensions: {len(embedding)}, expected 1536")
+            
+            logger.info(f"✅ Generated SKU embedding: {name} ({len(embedding)}dim)")
+            
+            return embedding
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to generate SKU embedding for {name}: {str(e)}")
+            raise
+
     async def generate_batch_embeddings(
         self, 
         materials: List[CombinedEmbeddingRequest],
@@ -347,6 +396,37 @@ class CombinedEmbeddingService:
         except Exception as e:
             logger.error(f"❌ OpenAI connection test failed: {str(e)}")
             return False
+
+    async def get_color_embedding(self, color_text: str) -> list:
+        """Generate embedding for color text (public API for scripts and services)."""
+        # Кэшируем по самому тексту цвета
+        cache_key = f"color::{color_text.strip().lower()}"
+        cached = self._get_cached_embedding(cache_key)
+        if cached is not None:
+            return cached
+        response = await self.client.embeddings.create(
+            model=self.config.embedding_model,
+            input=color_text,
+            encoding_format="float"
+        )
+        embedding = response.data[0].embedding
+        self._cache_embedding(cache_key, embedding)
+        return embedding
+
+    async def get_unit_embedding(self, unit_text: str) -> list:
+        """Generate embedding for unit text (public API for scripts and services)."""
+        cache_key = f"unit::{unit_text.strip().lower()}"
+        cached = self._get_cached_embedding(cache_key)
+        if cached is not None:
+            return cached
+        response = await self.client.embeddings.create(
+            model=self.config.embedding_model,
+            input=unit_text,
+            encoding_format="float"
+        )
+        embedding = response.data[0].embedding
+        self._cache_embedding(cache_key, embedding)
+        return embedding
 
 
 # Singleton instance

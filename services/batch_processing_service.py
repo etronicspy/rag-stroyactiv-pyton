@@ -17,6 +17,7 @@ from core.schemas.processing_models import (
     ProcessingStatistics,
     MaterialProcessingResult
 )
+from core.schemas.pipeline_models import MaterialProcessRequest, ProcessingResult
 from core.database.repositories.processing_repository import ProcessingRepository
 from core.logging import get_logger
 from core.config.base import get_settings
@@ -26,7 +27,6 @@ from services.material_processing_pipeline import MaterialProcessingPipeline
 from services.combined_embedding_service import CombinedEmbeddingService
 from services.sku_search_service import SKUSearchService
 from services.materials import MaterialsService
-from core.schemas.pipeline_models import MaterialProcessRequest, ProcessingResult
 from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
 
 logger = get_logger(__name__)
@@ -126,13 +126,18 @@ class BatchProcessingService:
         start_time = datetime.utcnow()
         
         try:
+            self.logger.info(f"Starting _process_materials_batch for request {request_id}")
+            
             # 1. Инициализация - создание записей в БД
+            self.logger.info(f"Step 1: Initializing processing records for request {request_id}")
             await self._initialize_processing_records(request_id, materials)
             
             # 2. Batch обработка по частям
+            self.logger.info(f"Step 2: Starting batch processing for request {request_id}")
             await self._process_in_batches(request_id)
             
             # 3. Завершение обработки
+            self.logger.info(f"Step 3: Finalizing processing for request {request_id}")
             await self._finalize_processing(request_id, start_time)
             
         except Exception as e:
@@ -159,7 +164,7 @@ class BatchProcessingService:
             # Конвертируем в формат для repository
             material_dicts = [
                 {
-                    'id': material.id,
+                    'material_id': material.id,  # исправлено!
                     'name': material.name,
                     'unit': material.unit
                 }
@@ -176,92 +181,89 @@ class BatchProcessingService:
         Обработать материалы по batch'ам через fallback manager.
         """
         try:
+            self.logger.info(f"Starting batch processing for request {request_id}")
             fallback_manager = get_fallback_manager()
             batch_size = self.config.batch_processing_size
-            while True:
-                # Получаем следующий batch pending материалов (оставить как есть или реализовать через fallback позже)
-                # Здесь можно реализовать через fallback_manager, если будет поддержка
-                # pending_materials = await fallback_manager.get_pending_materials(request_id, limit=batch_size)
-                # Пока оставляем как есть, если нет поддержки в fallback
-                break  # TODO: реализовать через fallback_manager
+            
+            # Получаем все записи для данного request_id
+            all_records = await fallback_manager.get_processing_results(request_id)
+            self.logger.info(f"Retrieved {len(all_records)} total records for request {request_id}")
+            
+            pending_materials = [
+                record for record in all_records 
+                if record.get('status') == 'pending'
+            ]
+            
+            self.logger.info(f"Found {len(pending_materials)} pending materials for request {request_id}")
+            
+            if not pending_materials:
+                self.logger.warning(f"No pending materials found for request {request_id}")
+                return
+            
+            # Обрабатываем материалы по batch'ам
+            for i in range(0, len(pending_materials), batch_size):
+                batch = pending_materials[i:i + batch_size]
+                self.logger.info(f"Processing batch {i//batch_size + 1} with {len(batch)} materials")
+                
+                # Обрабатываем каждый материал в batch
+                for material_record in batch:
+                    self.logger.info(f"Processing material {material_record.get('material_id')} from record")
+                    await self._process_single_material_from_record(request_id, material_record)
+                
         except Exception as e:
             self.logger.error(f"Error in batch processing: {str(e)}")
             raise
     
-    async def _process_single_batch(
-        self, 
-        request_id: str, 
-        materials: List[Dict[str, Any]]
-    ) -> None:
+    async def _process_single_material_from_record(self, request_id: str, material_record: dict) -> None:
         """
-        Обработать один batch материалов.
+        Обработать один материал из записи в БД.
         
         Args:
             request_id: Идентификатор запроса
-            materials: Список материалов для обработки
+            material_record: Запись материала из БД
         """
-        try:
-            # Создаем задачи для параллельной обработки
-            tasks = []
-            
-            for material in materials:
-                task = asyncio.create_task(
-                    self._process_single_material(request_id, material)
-                )
-                tasks.append(task)
-            
-            # Ждем завершения всех задач в batch
-            await asyncio.gather(*tasks, return_exceptions=True)
-            
-            self.logger.debug(f"Processed batch of {len(materials)} materials for request {request_id}")
-            
-        except Exception as e:
-            self.logger.error(f"Error processing single batch: {str(e)}")
-            raise
-    
-    async def _process_single_material(
-        self, 
-        request_id: str, 
-        material: Dict[str, Any]
-    ) -> None:
-        """
-        Обработать один материал через весь pipeline.
-        
-        Args:
-            request_id: Идентификатор запроса
-            material: Данные материала
-        """
-        record_id = material['id']
-        material_id = material['material_id']
-        
+        material_id = material_record.get('material_id')
+        self.logger.info(f"Starting processing for material {material_id}")
+        self.logger.debug(f"Material record for processing: {material_record}")
         try:
             # Обновляем статус на "processing"
+            self.logger.info(f"Updating status to PROCESSING for material {material_id}")
             await self._update_material_status(
-                record_id, 
+                material_id, 
                 ProcessingStatus.PROCESSING
             )
             
             # Создаем запрос для pipeline
             pipeline_request = MaterialProcessRequest(
                 id=material_id,
-                name=material['original_name'],
-                unit=material['original_unit']
+                name=material_record.get('original_name', 'Unknown Material'),
+                unit=material_record.get('original_unit', 'шт'),
+                price=0.0,  # Добавляем обязательное поле price
+                enable_color_extraction=True,
+                enable_unit_normalization=True,
+                enable_sku_search=True,
+                parsing_method="ai_gpt"  # Исправлено!
             )
+            self.logger.info(f"Created pipeline request for material {material_id}: {pipeline_request.name}")
+            self.logger.debug(f"Pipeline request: {pipeline_request.dict()}")
             
-            # Проходим через полный pipeline (этапы 1-7)
+            # Проходим через полный pipeline
+            self.logger.info(f"Starting pipeline processing for material {material_id}")
             processing_result = await self.pipeline.process_material(pipeline_request)
+            self.logger.info(f"Pipeline completed for material {material_id}, success: {processing_result.overall_success}")
             
             # Обрабатываем результат
             await self._handle_processing_result(
-                record_id, 
+                material_id, 
                 material_id, 
                 processing_result
             )
             
         except Exception as e:
+            self.logger.error(f"Error processing material {material_id}: {str(e)}")
             # Обрабатываем ошибку
             await self._handle_processing_error(
-                record_id, 
+                material_id, 
                 material_id, 
                 str(e)
             )
@@ -300,7 +302,7 @@ class BatchProcessingService:
                 
             else:
                 # Обработка неуспешна
-                error_msg = f"Pipeline processing failed: {result.stage}"
+                error_msg = f"Pipeline processing failed: overall_success=False"
                 await self._update_material_status(
                     record_id,
                     ProcessingStatus.FAILED,
@@ -362,6 +364,7 @@ class BatchProcessingService:
             error_message: Сообщение об ошибке
         """
         try:
+            self.logger.error(f"_handle_processing_error called for material {material_id} with error: {error_message}")
             # Обновляем статус на "failed"
             await self._update_material_status(
                 record_id,
@@ -384,8 +387,33 @@ class BatchProcessingService:
         Обновить статус материала в БД через fallback manager.
         """
         try:
+            self.logger.info(f"_update_material_status called for {record_id} to {status}")
             fallback_manager = get_fallback_manager()
-            await fallback_manager.update_processing_status(record_id, kwargs.get('material_id', None), status.value, kwargs.get('error_message', None))
+            # Подготавливаем дополнительные поля для передачи
+            additional_fields = {}
+            if 'sku' in kwargs:
+                additional_fields['sku'] = kwargs['sku']
+            if 'similarity_score' in kwargs:
+                additional_fields['similarity_score'] = kwargs['similarity_score']
+            if 'normalized_color' in kwargs:
+                additional_fields['normalized_color'] = kwargs['normalized_color']
+            if 'normalized_unit' in kwargs:
+                additional_fields['normalized_unit'] = kwargs['normalized_unit']
+            if 'unit_coefficient' in kwargs:
+                additional_fields['unit_coefficient'] = kwargs['unit_coefficient']
+            if 'processed_at' in kwargs:
+                additional_fields['processed_at'] = kwargs['processed_at']
+
+            # Гарантируем, что material_id всегда str и не None
+            assert record_id is not None and isinstance(record_id, str), f"material_id (record_id) must be str, got {record_id} ({type(record_id)})"
+            self.logger.debug(f"Calling update_processing_status with material_id={record_id} (type={type(record_id)}), status={status}, additional_fields={additional_fields}")
+            await fallback_manager.update_processing_status(
+                record_id,  # request_id
+                record_id,  # material_id
+                status.value,
+                kwargs.get('error_message', None),
+                **additional_fields
+            )
         except Exception as e:
             self.logger.error(f"Error updating material status: {str(e)}")
             raise
@@ -406,8 +434,8 @@ class BatchProcessingService:
             self.logger.info(
                 f"Completed batch processing for request {request_id}. "
                 f"Processing time: {processing_time:.2f}s, "
-                f"Results: {progress.completed}/{progress.total} completed, "
-                f"{progress.failed} failed"
+                f"Results: {progress['completed']}/{progress['total']} completed, "
+                f"{progress['failed']} failed"
             )
         except Exception as e:
             self.logger.error(f"Error finalizing processing: {str(e)}")
@@ -517,11 +545,15 @@ class BatchProcessingService:
             # Запускаем retry для каждой группы
             for request_id, materials in retry_groups.items():
                 if request_id not in self.active_jobs:
-                    # Увеличиваем retry counter
-                    for material in materials:
-                        await fallback_manager.increment_retry_count(material['id'])
-                    
                     self.logger.info(f"Retrying {len(materials)} materials for request {request_id}")
+                    
+                    # Обрабатываем каждый материал
+                    for material in materials:
+                        # Увеличиваем retry counter
+                        await fallback_manager.increment_retry_count(material['id'])
+                        
+                        # Фактически обрабатываем материал
+                        await self._process_single_material_from_record(request_id, material)
             
             return len(retry_materials)
                 

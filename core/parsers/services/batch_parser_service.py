@@ -22,15 +22,14 @@ from core.logging import get_logger
 # Parser interface imports
 from ..interfaces import (
     IBaseParser,
-    MaterialParseData,
     AIParseRequest,
-    AIParseResult,
     ParseStatus,
     BatchParseRequest,
     BatchParseResult,
     InputType,
     OutputType
 )
+from ..interfaces.ai_parser_interface import MaterialParseData, AIParseResult
 
 # Service imports
 from .material_parser_service import MaterialParserService, get_material_parser_service
@@ -296,11 +295,14 @@ class BatchParserService():
             # Return error batch result
             error_results = [
                 AIParseResult(
+                    success=False,
                     status=ParseStatus.ERROR,
                     data=MaterialParseData(
                         name=material,
                         original_unit="",
-                        original_price=0.0
+                        original_price=0.0,
+                        unit="",  # Set unit field for compatibility
+                        price=0.0  # Set price field for compatibility
                     ),
                     confidence=0.0,
                     processing_time=0.0,
@@ -408,11 +410,14 @@ class BatchParserService():
                 # Create error results for this batch
                 error_results = [
                     AIParseResult(
+                        success=False,
                         status=ParseStatus.ERROR,
                         data=MaterialParseData(
                             name=material,
                             original_unit="",
-                            original_price=0.0
+                            original_price=0.0,
+                            unit="",  # Set unit field for compatibility
+                            price=0.0  # Set price field for compatibility
                         ),
                         confidence=0.0,
                         processing_time=0.0,

@@ -31,7 +31,8 @@ from core.schemas.pipeline_models import (
 )
 from core.schemas.enhanced_parsing import (
     EnhancedParseRequest,
-    EnhancedParseResult
+    EnhancedParseResult,
+    ParsingMethod
 )
 from services.enhanced_parser_integration import EnhancedParserIntegrationService
 from services.embedding_comparison import EmbeddingComparisonService
@@ -189,7 +190,7 @@ class MaterialProcessingPipeline:
                 name=request.name,
                 unit=request.unit,
                 price=request.price,
-                parsing_method="ai"
+                parsing_method=ParsingMethod.AI_GPT
             )
             
             # Use parser integration service
@@ -198,15 +199,15 @@ class MaterialProcessingPipeline:
             # Convert result to AI parsing result
             ai_result = AIParsingResult(
                 success=parse_result.success,
-                color=parse_result.color,
-                unit_coefficient=parse_result.unit_coefficient,
-                parsed_unit=parse_result.unit_parsed,
-                material_embedding=parse_result.material_embedding,
-                color_embedding=parse_result.color_embedding,
-                unit_embedding=parse_result.unit_embedding,
-                processing_time=time.time() - stage_start,
-                confidence_score=parse_result.confidence_score,
-                error_message=parse_result.error_message
+                color=getattr(parse_result, 'color', None),
+                unit_coefficient=getattr(parse_result, 'price_coefficient', None),
+                parsed_unit=getattr(parse_result, 'unit_parsed', None),
+                material_embedding=getattr(parse_result, 'embeddings', None),
+                color_embedding=getattr(parse_result, 'color_embedding', None),
+                unit_embedding=getattr(parse_result, 'unit_embedding', None),
+                processing_time=getattr(parse_result, 'processing_time', time.time() - stage_start),
+                confidence_score=getattr(parse_result, 'confidence', None),
+                error_message=getattr(parse_result, 'error_message', None)
             )
             
             self.logger.info(
@@ -231,7 +232,7 @@ class MaterialProcessingPipeline:
         ai_result: AIParsingResult
     ) -> RAGNormalizationResult:
         """
-        Stage 2: RAG Normalization - Normalize color and unit through reference databases
+        Stage 2: RAG Normalization - Normalize color and unit using embedding comparison
         
         Args:
             request: Material processing request
@@ -245,27 +246,18 @@ class MaterialProcessingPipeline:
         try:
             self.logger.debug(f"RAG Normalization stage for: {request.name}")
             
-            # Normalize color if extracted
+            # Normalize color if extracted using embedding comparison
             color_normalization = None
             if ai_result.color and request.enable_color_extraction:
-                color_normalization = await self.rag_service.normalize_color(
-                    ai_result.color,
-                    request.color_similarity_threshold
-                )
+                color_normalization = await self._normalize_color(ai_result.color, ai_result.color_embedding)
             
-            # Normalize unit 
+            # Normalize unit using embedding comparison
             unit_normalization = None
             if ai_result.parsed_unit and request.enable_unit_normalization:
-                unit_normalization = await self.rag_service.normalize_unit(
-                    ai_result.parsed_unit,
-                    request.unit_similarity_threshold
-                )
+                unit_normalization = await self._normalize_unit(ai_result.parsed_unit, ai_result.unit_embedding)
             elif request.enable_unit_normalization:
                 # Fallback to original unit if AI didn't parse any unit
-                unit_normalization = await self.rag_service.normalize_unit(
-                    request.unit,
-                    request.unit_similarity_threshold
-                )
+                unit_normalization = await self._normalize_unit(request.unit, None) # Pass None for embedding
             
             # Create normalization result
             rag_result = RAGNormalizationResult(
@@ -273,12 +265,16 @@ class MaterialProcessingPipeline:
                 processing_time=time.time() - stage_start
             )
             
-            # Color normalization results
+            # Color normalization results with embedding data
             if color_normalization:
                 rag_result.normalized_color = color_normalization.get("normalized_color")
                 rag_result.color_similarity_score = color_normalization.get("similarity_score")
                 rag_result.color_normalization_method = color_normalization.get("method")
                 rag_result.color_suggestions = color_normalization.get("suggestions", [])
+                
+                # NEW: Embedding data for color
+                rag_result.color_embedding = color_normalization.get("color_embedding")
+                rag_result.color_embedding_similarity = color_normalization.get("color_embedding_similarity")
                 
                 if not color_normalization.get("success", False):
                     self.logger.warning(
@@ -286,12 +282,16 @@ class MaterialProcessingPipeline:
                         f"'{ai_result.color}' -> suggestions: {rag_result.color_suggestions}"
                     )
             
-            # Unit normalization results
+            # Unit normalization results with embedding data
             if unit_normalization:
                 rag_result.normalized_unit = unit_normalization.get("normalized_unit")
                 rag_result.unit_similarity_score = unit_normalization.get("similarity_score")
                 rag_result.unit_normalization_method = unit_normalization.get("method")
                 rag_result.unit_suggestions = unit_normalization.get("suggestions", [])
+                
+                # NEW: Embedding data for unit
+                rag_result.unit_embedding = unit_normalization.get("unit_embedding")
+                rag_result.unit_embedding_similarity = unit_normalization.get("unit_embedding_similarity")
                 
                 if not unit_normalization.get("success", False):
                     self.logger.warning(
@@ -302,26 +302,19 @@ class MaterialProcessingPipeline:
             # Validate normalized data through reference databases
             validation_results = self._validate_normalized_data(rag_result, request.name)
             
-            # Add validation results to processing metadata
-            if validation_results["validation_messages"]:
-                if not rag_result.error_message:
-                    rag_result.error_message = "; ".join(validation_results["validation_messages"])
-                else:
-                    rag_result.error_message += "; " + "; ".join(validation_results["validation_messages"])
-            
-            self.logger.info(
-                f"RAG Normalization completed for {request.name}: "
-                f"color: {ai_result.color} -> {rag_result.normalized_color} "
-                f"(valid: {validation_results['color_valid']}), "
-                f"unit: {ai_result.parsed_unit or request.unit} -> {rag_result.normalized_unit} "
-                f"(valid: {validation_results['unit_valid']}), "
-                f"time={rag_result.processing_time:.2f}s"
-            )
+            # Update success status based on validation
+            if not validation_results["overall_success"]:
+                rag_result.success = False
+                rag_result.error_message = validation_results["error_message"]
+                self.logger.warning(
+                    f"RAG normalization validation failed for {request.name}: "
+                    f"{validation_results['error_message']}"
+                )
             
             return rag_result
             
         except Exception as e:
-            self.logger.error(f"RAG Normalization stage failed for {request.name}: {e}")
+            self.logger.error(f"Error in RAG normalization stage for {request.name}: {e}")
             return RAGNormalizationResult(
                 success=False,
                 processing_time=time.time() - stage_start,
@@ -348,7 +341,8 @@ class MaterialProcessingPipeline:
             "unit_valid": False,
             "color_validation_method": None,
             "unit_validation_method": None,
-            "validation_messages": []
+            "validation_messages": [],
+            "overall_success": True # Assume success until proven otherwise
         }
         
         # Validate normalized color through ColorCollection
@@ -366,10 +360,14 @@ class MaterialProcessingPipeline:
                     validation_results["validation_messages"].append(
                         f"Warning: Color '{rag_result.normalized_color}' not found in reference database"
                     )
+                    validation_results["overall_success"] = False
+                    validation_results["error_message"] = f"Color normalization failed: '{rag_result.normalized_color}' not found in reference database."
             except Exception as e:
                 validation_results["validation_messages"].append(
                     f"Error validating color '{rag_result.normalized_color}': {str(e)}"
                 )
+                validation_results["overall_success"] = False
+                validation_results["error_message"] = f"Error validating color '{rag_result.normalized_color}': {str(e)}"
         
         # Validate normalized unit through UnitsCollection
         if rag_result.normalized_unit:
@@ -386,10 +384,14 @@ class MaterialProcessingPipeline:
                     validation_results["validation_messages"].append(
                         f"Warning: Unit '{rag_result.normalized_unit}' not found in reference database"
                     )
+                    validation_results["overall_success"] = False
+                    validation_results["error_message"] = f"Unit normalization failed: '{rag_result.normalized_unit}' not found in reference database."
             except Exception as e:
                 validation_results["validation_messages"].append(
                     f"Error validating unit '{rag_result.normalized_unit}': {str(e)}"
                 )
+                validation_results["overall_success"] = False
+                validation_results["error_message"] = f"Error validating unit '{rag_result.normalized_unit}': {str(e)}"
         
         # Log validation results
         if validation_results["color_valid"] and validation_results["unit_valid"]:
@@ -410,7 +412,7 @@ class MaterialProcessingPipeline:
         rag_result: RAGNormalizationResult
     ) -> SKUSearchResult:
         """
-        Stage 3: SKU Search - Search for SKU in materials reference database
+        Stage 3: SKU Search - Find SKU using combined material embedding
         
         Args:
             request: Material processing request
@@ -425,37 +427,59 @@ class MaterialProcessingPipeline:
         try:
             self.logger.debug(f"SKU Search stage for: {request.name}")
             
-            # Use real SKU search service (STAGE 6 Implementation)
-            sku_search_response = await self.sku_search_service.find_sku_by_material_data(
-                material_name=request.name,
-                normalized_unit=rag_result.normalized_unit or "",
-                normalized_color=rag_result.normalized_color,
-                material_embedding=ai_result.material_embedding  # Use AI parsing embedding
+            # Generate combined material embedding for SKU search
+            from services.combined_embedding_service import get_combined_embedding_service
+            
+            embedding_service = get_combined_embedding_service()
+            
+            # Use normalized unit and color from RAG normalization
+            normalized_unit = rag_result.normalized_unit or ai_result.parsed_unit or request.unit
+            normalized_color = rag_result.normalized_color or ai_result.color
+            
+            # Generate combined embedding from name + parsed_unit + color
+            material_embedding = await embedding_service.generate_material_embedding_for_sku(
+                name=request.name,
+                parsed_unit=normalized_unit,
+                color=normalized_color
             )
             
-            # Convert SKUSearchResponse to SKUSearchResult for pipeline
+            # Search SKU using combined embedding
+            sku_response = await self.sku_search_service.find_sku_by_combined_embedding(
+                material_embedding=material_embedding,
+                normalized_unit=normalized_unit,
+                normalized_color=normalized_color
+            )
+            
+            # Convert response to SKU search result
             sku_result = SKUSearchResult(
-                success=sku_search_response.search_successful,
-                sku=sku_search_response.found_sku,
-                similarity_score=sku_search_response.best_match.similarity_score if sku_search_response.best_match else 0.0,
-                search_method=sku_search_response.search_method,
-                candidates_found=sku_search_response.candidates_evaluated,
-                processing_time=sku_search_response.processing_time,
-                error_message=sku_search_response.error_message
+                success=sku_response.search_successful,
+                sku=sku_response.found_sku,
+                similarity_score=sku_response.best_match.similarity_score if sku_response.best_match else None,
+                combined_embedding=material_embedding,
+                embedding_similarity=sku_response.best_match.similarity_score if sku_response.best_match else None,
+                embedding_text=f"{request.name} {normalized_unit} {normalized_color or 'без_цвета'}",
+                search_method=sku_response.search_method,
+                candidates_found=sku_response.candidates_evaluated,
+                processing_time=time.time() - stage_start,
+                error_message=sku_response.error_message
             )
             
-            self.logger.info(
-                f"SKU Search completed for {request.name}: "
-                f"success={sku_result.success}, sku={sku_result.sku}, "
-                f"similarity={sku_result.similarity_score:.3f}, "
-                f"candidates={sku_result.candidates_found}, "
-                f"time={sku_result.processing_time:.2f}s"
-            )
+            if sku_result.success:
+                self.logger.info(
+                    f"✅ SKU found for {request.name}: {sku_result.sku} "
+                    f"(similarity: {sku_result.similarity_score:.3f}, "
+                    f"candidates: {sku_result.candidates_found})"
+                )
+            else:
+                self.logger.warning(
+                    f"❌ SKU not found for {request.name}: "
+                    f"candidates evaluated: {sku_result.candidates_found}"
+                )
             
             return sku_result
             
         except Exception as e:
-            self.logger.error(f"SKU Search stage failed for {request.name}: {e}")
+            self.logger.error(f"Error in SKU search stage for {request.name}: {e}")
             return SKUSearchResult(
                 success=False,
                 processing_time=time.time() - stage_start,
@@ -468,43 +492,79 @@ class MaterialProcessingPipeline:
         result: ProcessingResult
     ) -> DatabaseSaveResult:
         """
-        Stage 4: Database Save - Save processed material to database (через fallback manager)
+        Stage 4: Database Save - Save processed material to reference database
+        
+        Args:
+            request: Material processing request
+            result: Complete processing result
+            
+        Returns:
+            Database save result
         """
-        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
         stage_start = time.time()
-        fallback_manager = get_fallback_manager()
+        
         try:
-            # Формируем данные для сохранения
-            material_data = {
-                'request_id': request.request_id,
-                'id': result.request_id,  # record_id
-                'name': request.name,
-                'unit': request.unit,
-                # ... другие необходимые поля ...
-            }
-            # Сохраняем через fallback manager
-            success = await fallback_manager.save_processed_material(
-                record_id=result.request_id,
-                material_data=material_data,
-                status=result.processing_status,
-                sku=result.sku,
-                similarity_score=getattr(result, 'similarity_score', None),
-                error_message=getattr(result, 'error_message', None),
-                normalized_color=getattr(result, 'normalized_color', None),
-                normalized_unit=getattr(result, 'normalized_unit', None),
-                unit_coefficient=getattr(result, 'unit_coefficient', None)
+            self.logger.debug(f"Database Save stage for: {request.name}")
+            
+            # Import materials reference collection
+            from core.database.collections.materials_reference import MaterialsReferenceCollection
+            
+            materials_ref = MaterialsReferenceCollection()
+            
+            # Get SKU from search result
+            sku = result.sku
+            if not sku:
+                self.logger.warning(f"No SKU found for {request.name}, skipping database save")
+                return DatabaseSaveResult(
+                    success=False,
+                    processing_time=time.time() - stage_start,
+                    error_message="No SKU found for database save"
+                )
+            
+            # Get normalized data from RAG normalization
+            normalized_unit = result.rag_normalization.normalized_unit
+            normalized_color = result.rag_normalization.normalized_color
+            
+            # Get combined embedding from SKU search
+            material_embedding = result.sku_search.combined_embedding
+            if not material_embedding:
+                self.logger.warning(f"No combined embedding found for {request.name}")
+                return DatabaseSaveResult(
+                    success=False,
+                    processing_time=time.time() - stage_start,
+                    error_message="No combined embedding found for database save"
+                )
+            
+            # Save material to reference database
+            save_success = await materials_ref.save_material_reference(
+                sku=sku,
+                name=request.name,
+                unit=normalized_unit or request.unit,
+                color=normalized_color,
+                embedding=material_embedding
             )
-            return DatabaseSaveResult(
-                success=success,
-                saved_id=result.request_id if success else None,
-                processing_time=time.time() - stage_start,
-                error_message=None if success else "Failed to save processing result"
-            )
-        except AllDatabasesUnavailableError as e:
-            self.logger.error(f"All databases unavailable for database save: {e.errors}")
-            raise
+            
+            if save_success:
+                self.logger.info(
+                    f"✅ Saved material to reference database: {sku} - {request.name}"
+                )
+                
+                return DatabaseSaveResult(
+                    success=True,
+                    saved_id=sku,
+                    processing_time=time.time() - stage_start
+                )
+            else:
+                self.logger.error(f"❌ Failed to save material to reference database: {sku}")
+                
+                return DatabaseSaveResult(
+                    success=False,
+                    processing_time=time.time() - stage_start,
+                    error_message="Failed to save material to reference database"
+                )
+                
         except Exception as e:
-            self.logger.error(f"Database Save stage failed for {request.name}: {e}")
+            self.logger.error(f"Error in database save stage for {request.name}: {e}")
             return DatabaseSaveResult(
                 success=False,
                 processing_time=time.time() - stage_start,
@@ -777,3 +837,23 @@ class MaterialProcessingPipeline:
             health_status["error"] = str(e)
         
         return health_status 
+
+    async def _normalize_color(self, color_text: str, embedding: list) -> list:
+        """Normalize color using embedding comparison service (через fallback-менеджер)."""
+        comparison_service = EmbeddingComparisonService()
+        return await comparison_service.normalize_color_by_embedding(color_text, embedding)
+
+    async def _suggest_color(self, color_text: str) -> list:
+        """Suggest color using embedding comparison service (через fallback-менеджер)."""
+        comparison_service = EmbeddingComparisonService()
+        return await comparison_service.suggest_color(color_text)
+
+    async def _normalize_unit(self, unit_text: str, embedding: list) -> list:
+        """Normalize unit using embedding comparison service (через fallback-менеджер)."""
+        comparison_service = EmbeddingComparisonService()
+        return await comparison_service.normalize_unit_by_embedding(unit_text, embedding)
+
+    async def _suggest_unit(self, unit_text: str) -> list:
+        """Suggest unit using embedding comparison service (через fallback-менеджер)."""
+        comparison_service = EmbeddingComparisonService()
+        return await comparison_service.suggest_unit(unit_text) 

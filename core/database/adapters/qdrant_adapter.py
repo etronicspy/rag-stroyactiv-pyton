@@ -13,6 +13,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from core.database.interfaces import IVectorDatabase
 from core.database.exceptions import ConnectionError, QueryError, DatabaseError
 from core.repositories.interfaces import IBatchProcessingRepository
+from datetime import datetime
 
 
 logger = get_logger(__name__)
@@ -414,37 +415,294 @@ class QdrantVectorDatabase(IVectorDatabase, IBatchProcessingRepository):
     # === IBatchProcessingRepository methods (stubs, to be implemented) ===
 
     async def create_processing_records(self, request_id: str, materials: list) -> list:
-        """Create initial records for batch processing (Qdrant stub).
-        TODO: Implement batch processing records in Qdrant payload/collection.
-        """
-        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+        """Create initial records for batch processing in Qdrant.
 
-    async def update_processing_status(self, request_id: str, material_id: str, status: str, error: str = None) -> bool:
-        """Update processing status for a material in a batch (Qdrant stub).
-        TODO: Implement status update in Qdrant payload/collection.
+        Args:
+            request_id: Request identifier
+            materials: List of materials to process (dicts with at least material_id)
+
+        Returns:
+            List of created material_ids
         """
-        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+        import uuid
+        from datetime import datetime
+
+        collection_name = "processing_records"
+        vector_size = 1  # Minimal vector size for Qdrant
+        now_iso = datetime.utcnow().isoformat()
+        # 1. Ensure collection exists
+        if not await self.collection_exists(collection_name):
+            await self.create_collection(collection_name, vector_size)
+
+        points = []
+        material_ids = []
+        for material in materials:
+            material_id = material.get("material_id") or str(uuid.uuid4())
+            # Генерируем UUID для точки в Qdrant
+            point_id = str(uuid.uuid4())
+            payload = {
+                "request_id": request_id,
+                "material_id": material_id,
+                "status": "pending",
+                "error": None,
+                "created_at": now_iso,
+                "updated_at": now_iso,
+                "original_name": material.get("name", "Unknown Material"),
+                "original_unit": material.get("unit", "шт"),
+                "processed_at": None,
+                "sku": None,
+                "similarity_score": None,
+                "normalized_color": None,
+                "normalized_unit": None,
+                "unit_coefficient": None
+            }
+            point = PointStruct(
+                id=point_id,  # Используем UUID для точки
+                vector=[0.0],
+                payload=payload
+            )
+            points.append(point)
+            material_ids.append(material_id)
+
+        # 2. Upsert all points in batch
+        await asyncio.to_thread(
+            self.client.upsert,
+            collection_name=collection_name,
+            points=points
+        )
+        logger.info(f"Created {len(points)} processing records in Qdrant for request {request_id}")
+        return material_ids
+
+    async def update_processing_status(self, request_id: str, material_id: str, status: str, error: str = None, **kwargs) -> bool:
+        collection_name = "processing_records"
+        if not material_id or not isinstance(material_id, str):
+            logger.error(f"Invalid material_id for update_processing_status: {material_id} ({type(material_id)})")
+            raise ValueError("material_id must be a non-empty string")
+        
+        # 1. Получить все записи и найти нужную по material_id в payload
+        all_records = await self.scroll_all(collection_name, with_payload=True, with_vectors=False)
+        target_record = None
+        for record in all_records:
+            if record["payload"].get("material_id") == material_id:
+                target_record = record
+                break
+        
+        if not target_record:
+            logger.error(f"Material {material_id} not found in processing records")
+            return False
+        
+        payload = target_record["payload"]
+        
+        # 2. Verify request_id matches
+        if payload.get("request_id") != request_id:
+            return False
+        
+        # 3. Update payload with new status and additional fields
+        now_iso = datetime.utcnow().isoformat()
+        updated_payload = {
+            **payload,
+            "status": status,
+            "error": error,
+            "updated_at": now_iso
+        }
+        
+        # Add additional fields if provided
+        if kwargs.get('sku') is not None:
+            updated_payload['sku'] = kwargs['sku']
+        if kwargs.get('similarity_score') is not None:
+            updated_payload['similarity_score'] = kwargs['similarity_score']
+        if kwargs.get('normalized_color') is not None:
+            updated_payload['normalized_color'] = kwargs['normalized_color']
+        if kwargs.get('normalized_unit') is not None:
+            updated_payload['normalized_unit'] = kwargs['normalized_unit']
+        if kwargs.get('unit_coefficient') is not None:
+            updated_payload['unit_coefficient'] = kwargs['unit_coefficient']
+        if kwargs.get('processed_at') is not None:
+            updated_payload['processed_at'] = kwargs['processed_at']
+        elif status in ['completed', 'failed']:
+            # Set processed_at for completed/failed status
+            updated_payload['processed_at'] = now_iso
+        
+        # 4. Upsert updated record
+        point = PointStruct(
+            id=target_record["id"],  # Используем оригинальный ID точки
+            vector=[0.0],  # Dummy vector
+            payload=updated_payload
+        )
+        
+        await asyncio.to_thread(
+            self.client.upsert,
+            collection_name,
+            [point]
+        )
+        
+        return True
 
     async def get_processing_progress(self, request_id: str):
-        """Get processing progress for a batch request (Qdrant stub).
-        TODO: Implement progress tracking in Qdrant payload/collection.
+        """Get processing progress for a batch request (Qdrant).
+
+        Args:
+            request_id: Request identifier
+
+        Returns:
+            Dict with progress info: total, completed, failed, pending (int)
         """
-        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+        collection_name = "processing_records"
+        # 1. Получить все записи с данным request_id
+        all_records = await self.scroll_all(collection_name, with_payload=True, with_vectors=False)
+        batch_records = [rec for rec in all_records if rec["payload"].get("request_id") == request_id]
+        total = len(batch_records)
+        status_counts = {"completed": 0, "failed": 0, "pending": 0}
+        for rec in batch_records:
+            status = rec["payload"].get("status", "pending")
+            if status in ("done", "completed"):  # поддержка разных вариантов
+                status_counts["completed"] += 1
+            elif status in ("error", "failed"):
+                status_counts["failed"] += 1
+            else:
+                status_counts["pending"] += 1
+        return {
+            "total": total,
+            "completed": status_counts["completed"],
+            "failed": status_counts["failed"],
+            "pending": status_counts["pending"]
+        }
 
     async def get_processing_results(self, request_id: str, limit: int = None, offset: int = None) -> list:
-        """Get processing results for a batch request (Qdrant stub).
-        TODO: Implement result retrieval in Qdrant payload/collection.
+        """Get processing results for a batch request (Qdrant).
+
+        Args:
+            request_id: Request identifier
+            limit: Optional limit
+            offset: Optional offset
+
+        Returns:
+            List of processing record payloads
         """
-        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+        collection_name = "processing_records"
+        all_records = await self.scroll_all(collection_name, with_payload=True, with_vectors=False)
+        batch_records = [rec["payload"] for rec in all_records if rec["payload"].get("request_id") == request_id]
+        if offset is not None:
+            batch_records = batch_records[offset:]
+        if limit is not None:
+            batch_records = batch_records[:limit]
+        return batch_records
 
     async def get_processing_statistics(self):
-        """Get overall processing statistics (Qdrant stub).
-        TODO: Implement statistics in Qdrant payload/collection.
+        """Get overall processing statistics (Qdrant).
+
+        Returns:
+            Dict with statistics: total_batches, total_records, status_counts
         """
-        raise NotImplementedError("Batch processing not yet implemented for Qdrant.")
+        collection_name = "processing_records"
+        all_records = await self.scroll_all(collection_name, with_payload=True, with_vectors=False)
+        total_records = len(all_records)
+        request_ids = set()
+        status_counts = {}
+        for rec in all_records:
+            payload = rec["payload"]
+            request_id = payload.get("request_id")
+            if request_id:
+                request_ids.add(request_id)
+            status = payload.get("status", "pending")
+            if status not in status_counts:
+                status_counts[status] = 0
+            status_counts[status] += 1
+        return {
+            "total_batches": len(request_ids),
+            "total_records": total_records,
+            "status_counts": status_counts
+        }
 
     async def cleanup_old_records(self, days_old: int = 30) -> int:
-        """Cleanup old processing records (Qdrant stub).
-        TODO: Implement cleanup in Qdrant payload/collection.
+        """Cleanup old processing records (Qdrant).
+
+        Args:
+            days_old: Number of days to keep
+
+        Returns:
+            Number of deleted records
         """
-        raise NotImplementedError("Batch processing not yet implemented for Qdrant.") 
+        from datetime import datetime, timedelta
+        collection_name = "processing_records"
+        all_records = await self.scroll_all(collection_name, with_payload=True, with_vectors=False)
+        now = datetime.utcnow()
+        cutoff = now - timedelta(days=days_old)
+        to_delete = []
+        for rec in all_records:
+            payload = rec["payload"]
+            created_at = payload.get("created_at")
+            try:
+                created_dt = datetime.fromisoformat(created_at)
+                if created_dt < cutoff:
+                    to_delete.append(rec["id"])
+            except Exception:
+                continue
+        if to_delete:
+            await asyncio.to_thread(
+                self.client.delete,
+                collection_name=collection_name,
+                points_selector=to_delete
+            )
+        logger.info(f"Deleted {len(to_delete)} old processing records from Qdrant (older than {days_old} days)")
+        return len(to_delete) 
+
+    async def get_failed_materials_for_retry(self, max_retries=3, retry_delay_minutes=0):
+        from datetime import datetime, timedelta
+        collection_name = "processing_records"
+        all_records = await self.scroll_all(collection_name, with_payload=True, with_vectors=False)
+        now = datetime.utcnow()
+        retry_materials = []
+        for rec in all_records:
+            payload = rec["payload"]
+            material_id = rec["id"]  # ID записи из Qdrant
+            status = payload.get("status")
+            retries = payload.get("retries", 0)
+            last_error_time = payload.get("updated_at")
+            if status in ("failed", "pending") and retries < max_retries:
+                if last_error_time:
+                    last_error_dt = datetime.fromisoformat(last_error_time)
+                    if now - last_error_dt > timedelta(minutes=retry_delay_minutes):
+                        # Создаем словарь с id и всеми полями из payload
+                        material_data = {
+                            "id": material_id,
+                            **payload
+                        }
+                        retry_materials.append(material_data)
+                else:
+                    # Создаем словарь с id и всеми полями из payload
+                    material_data = {
+                        "id": material_id,
+                        **payload
+                    }
+                    retry_materials.append(material_data)
+        return retry_materials
+
+    async def increment_retry_count(self, material_id: str):
+        collection_name = "processing_records"
+        # Получить все записи и найти нужную по material_id в payload
+        all_records = await self.scroll_all(collection_name, with_payload=True, with_vectors=False)
+        target_record = None
+        for record in all_records:
+            if record["payload"].get("material_id") == material_id:
+                target_record = record
+                break
+        
+        if not target_record:
+            return False
+        
+        payload = target_record["payload"]
+        retries = payload.get("retries", 0) + 1
+        payload["retries"] = retries
+        from qdrant_client.models import PointStruct
+        point = PointStruct(
+            id=target_record["id"],  # Используем оригинальный ID точки
+            vector=[0.0],
+            payload=payload
+        )
+        await asyncio.to_thread(
+            self.client.upsert,
+            collection_name=collection_name,
+            points=[point]
+        )
+        return True 

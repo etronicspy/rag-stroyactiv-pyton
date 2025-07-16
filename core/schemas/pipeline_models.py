@@ -101,38 +101,71 @@ class AIParsingResult(BaseModel):
 
 
 class RAGNormalizationResult(BaseModel):
-    """Result of RAG normalization stage."""
-    
+    """Result of RAG normalization stage.
+
+    Attributes:
+        success: Whether normalization was successful.
+        normalized_color: Normalized color name (human-readable).
+        normalized_color_id: ID of the normalized color from reference database.
+        normalized_color_name: Canonical color name from reference database (EN).
+        color_similarity_score: Color similarity score.
+        color_normalization_method: Color normalization method.
+        normalized_unit: Normalized unit name (human-readable).
+        normalized_unit_id: ID of the normalized unit from reference database.
+        normalized_unit_name: Canonical unit name from reference database (EN).
+        unit_similarity_score: Unit similarity score.
+        unit_normalization_method: Unit normalization method.
+        color_embedding: Color embedding for normalization.
+        unit_embedding: Unit embedding for normalization.
+        color_embedding_similarity: Color embedding similarity score.
+        unit_embedding_similarity: Unit embedding similarity score.
+        color_suggestions: Color alternatives.
+        unit_suggestions: Unit alternatives.
+        processing_time: Processing time in seconds.
+        error_message: Error message if failed.
+    """
     success: bool = Field(..., description="Whether normalization was successful")
-    
     # Color normalization
-    normalized_color: Optional[str] = Field(None, description="Normalized color")
+    normalized_color: Optional[str] = Field(None, description="Normalized color (human-readable)")
+    normalized_color_id: Optional[str] = Field(None, description="ID of the normalized color from reference database")
+    normalized_color_name: Optional[str] = Field(None, description="Canonical color name from reference database (EN)")
     color_similarity_score: Optional[float] = Field(None, description="Color similarity score")
     color_normalization_method: Optional[str] = Field(None, description="Color normalization method")
-    
     # Unit normalization
-    normalized_unit: Optional[str] = Field(None, description="Normalized unit")
+    normalized_unit: Optional[str] = Field(None, description="Normalized unit (human-readable)")
+    normalized_unit_id: Optional[str] = Field(None, description="ID of the normalized unit from reference database")
+    normalized_unit_name: Optional[str] = Field(None, description="Canonical unit name from reference database (EN)")
     unit_similarity_score: Optional[float] = Field(None, description="Unit similarity score")
     unit_normalization_method: Optional[str] = Field(None, description="Unit normalization method")
-    
+    # Embedding-based normalization fields
+    color_embedding: Optional[List[float]] = Field(None, description="Color embedding for normalization")
+    unit_embedding: Optional[List[float]] = Field(None, description="Unit embedding for normalization")
+    color_embedding_similarity: Optional[float] = Field(None, description="Color embedding similarity score")
+    unit_embedding_similarity: Optional[float] = Field(None, description="Unit embedding similarity score")
     # Suggestions
     color_suggestions: List[str] = Field(default_factory=list, description="Color alternatives")
     unit_suggestions: List[str] = Field(default_factory=list, description="Unit alternatives")
-    
     # Processing metadata
     processing_time: float = Field(..., description="Processing time in seconds")
     error_message: Optional[str] = Field(None, description="Error message if failed")
-    
     class Config:
         schema_extra = {
             "example": {
                 "success": True,
                 "normalized_color": "белый",
+                "normalized_color_id": "color_01",
+                "normalized_color_name": "white",
                 "color_similarity_score": 1.0,
-                "color_normalization_method": "exact_match",
+                "color_normalization_method": "embedding_comparison",
                 "normalized_unit": "м³",
+                "normalized_unit_id": "unit_01",
+                "normalized_unit_name": "cubic meter",
                 "unit_similarity_score": 0.95,
-                "unit_normalization_method": "vector_search",
+                "unit_normalization_method": "embedding_comparison",
+                "color_embedding": [0.1, 0.2, 0.3, ...],
+                "unit_embedding": [0.4, 0.5, 0.6, ...],
+                "color_embedding_similarity": 0.92,
+                "unit_embedding_similarity": 0.89,
                 "color_suggestions": ["белый", "светлый"],
                 "unit_suggestions": ["м³", "кубометр"],
                 "processing_time": 0.8,
@@ -148,6 +181,11 @@ class SKUSearchResult(BaseModel):
     sku: Optional[str] = Field(None, description="Found SKU")
     similarity_score: Optional[float] = Field(None, description="SKU similarity score")
     
+    # NEW: Combined embedding fields
+    combined_embedding: Optional[List[float]] = Field(None, description="Combined material embedding (name + unit + color)")
+    embedding_similarity: Optional[float] = Field(None, description="Combined embedding similarity score")
+    embedding_text: Optional[str] = Field(None, description="Text used for combined embedding generation")
+    
     # Search metadata
     search_method: Optional[str] = Field(None, description="Search method used")
     candidates_found: int = Field(0, description="Number of candidates found")
@@ -160,7 +198,10 @@ class SKUSearchResult(BaseModel):
                 "success": True,
                 "sku": "SKU_12345",
                 "similarity_score": 0.92,
-                "search_method": "vector_search",
+                "combined_embedding": [0.1, 0.2, 0.3, ...],
+                "embedding_similarity": 0.89,
+                "embedding_text": "Кирпич керамический белый м³ белый",
+                "search_method": "combined_embedding_search",
                 "candidates_found": 3,
                 "processing_time": 1.2,
                 "error_message": None
@@ -190,32 +231,52 @@ class DatabaseSaveResult(BaseModel):
 
 
 class ProcessingResult(BaseModel):
-    """Complete processing result from pipeline."""
-    
+    """Complete processing result from pipeline.
+
+    Attributes:
+        request_id: Original request ID.
+        material_name: Original material name.
+        original_unit: Original unit.
+        sku: Found or assigned SKU.
+        normalized_color_id: ID of the normalized color from reference database.
+        normalized_color_name: Canonical color name from reference database (EN).
+        normalized_unit_id: ID of the normalized unit from reference database.
+        normalized_unit_name: Canonical unit name from reference database (EN).
+        ai_parsing: AI parsing results.
+        rag_normalization: RAG normalization results.
+        sku_search: SKU search results.
+        database_save: Database save results.
+        overall_success: Overall processing success.
+        current_stage: Current processing stage.
+        processing_status: Processing status.
+        total_processing_time: Total processing time.
+        started_at: Processing start time.
+        completed_at: Processing completion time.
+    """
     # Input data
     request_id: str = Field(..., description="Original request ID")
     material_name: str = Field(..., description="Original material name")
     original_unit: str = Field(..., description="Original unit")
-    
     # Output data (as per diagram)
     sku: Optional[str] = Field(None, description="Found or assigned SKU")
-    
+    # Normalized color/unit info (flattened for convenience)
+    normalized_color_id: Optional[str] = Field(None, description="ID of the normalized color from reference database")
+    normalized_color_name: Optional[str] = Field(None, description="Canonical color name from reference database (EN)")
+    normalized_unit_id: Optional[str] = Field(None, description="ID of the normalized unit from reference database")
+    normalized_unit_name: Optional[str] = Field(None, description="Canonical unit name from reference database (EN)")
     # Processing stages results
     ai_parsing: AIParsingResult = Field(..., description="AI parsing results")
     rag_normalization: RAGNormalizationResult = Field(..., description="RAG normalization results")
     sku_search: SKUSearchResult = Field(..., description="SKU search results")
     database_save: DatabaseSaveResult = Field(..., description="Database save results")
-    
     # Overall processing metadata
     overall_success: bool = Field(..., description="Overall processing success")
     current_stage: ProcessingStage = Field(..., description="Current processing stage")
     processing_status: ProcessingStatus = Field(..., description="Processing status")
     total_processing_time: float = Field(..., description="Total processing time")
-    
     # Timestamps
     started_at: datetime = Field(..., description="Processing start time")
     completed_at: Optional[datetime] = Field(None, description="Processing completion time")
-    
     class Config:
         schema_extra = {
             "example": {
@@ -223,6 +284,10 @@ class ProcessingResult(BaseModel):
                 "material_name": "Кирпич керамический белый",
                 "original_unit": "м3",
                 "sku": "SKU_12345",
+                "normalized_color_id": "color_01",
+                "normalized_color_name": "white",
+                "normalized_unit_id": "unit_01",
+                "normalized_unit_name": "cubic meter",
                 "ai_parsing": {
                     "success": True,
                     "color": "белый",
@@ -233,7 +298,11 @@ class ProcessingResult(BaseModel):
                 "rag_normalization": {
                     "success": True,
                     "normalized_color": "белый",
+                    "normalized_color_id": "color_01",
+                    "normalized_color_name": "white",
                     "normalized_unit": "м³",
+                    "normalized_unit_id": "unit_01",
+                    "normalized_unit_name": "cubic meter",
                     "processing_time": 0.8
                 },
                 "sku_search": {

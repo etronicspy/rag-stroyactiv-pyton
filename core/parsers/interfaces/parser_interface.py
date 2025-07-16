@@ -22,6 +22,10 @@ class ParseStatus(Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    ERROR = "error"
+    TIMEOUT = "timeout"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
@@ -73,6 +77,11 @@ class ParseResult(BaseModel, Generic[OutputType]):
     timestamp: datetime = Field(
         default_factory=datetime.now,
         description="Timestamp of parsing operation"
+    )
+    
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Request ID for tracking"
     )
 
 

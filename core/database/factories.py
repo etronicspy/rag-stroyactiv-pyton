@@ -589,13 +589,13 @@ class DatabaseFallbackManager:
         self.logger.error(f"All DBs down for create_processing_records: {errors}")
         raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
 
-    async def update_processing_status(self, request_id: str, material_id: str, status: str, error: str = None) -> bool:
+    async def update_processing_status(self, request_id: str, material_id: str, status: str, error: str = None, **kwargs) -> bool:
         """Update processing status for a material in a batch with fallback."""
         errors = {}
         for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
             if client is not None:
                 try:
-                    return await client.update_processing_status(request_id, material_id, status, error)
+                    return await client.update_processing_status(request_id, material_id, status, error, **kwargs)
                 except Exception as e:
                     self.status[db] = False
                     errors[db] = str(e)
@@ -657,6 +657,99 @@ class DatabaseFallbackManager:
                     errors[db] = str(e)
                     self.logger.error(f"{db} DB cleanup_old_records failed: {e}")
         self.logger.error(f"All DBs down for cleanup_old_records: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def get_failed_materials_for_retry(self, max_retries=3, retry_delay_minutes=10):
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if client is not None:
+                try:
+                    return await client.get_failed_materials_for_retry(max_retries, retry_delay_minutes)
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB get_failed_materials_for_retry failed: {e}")
+        self.logger.error(f"All DBs down for get_failed_materials_for_retry: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def increment_retry_count(self, material_id: str):
+        errors = {}
+        for db, client in [('sql', self.sql_client), ('vector', self.vector_client)]:
+            if client is not None:
+                try:
+                    return await client.increment_retry_count(material_id)
+                except Exception as e:
+                    self.status[db] = False
+                    errors[db] = str(e)
+                    self.logger.error(f"{db} DB increment_retry_count failed: {e}")
+        self.logger.error(f"All DBs down for increment_retry_count: {errors}")
+        raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def embedding_search(self, collection: str, embedding: list, top_k: int = 3, threshold: float = 0.7, **kwargs):
+        """
+        Search for similar items in a collection using embedding (vector search) with fallback to suggestion_search.
+
+        Args:
+            collection (str): Target collection name (e.g., 'colors', 'units', 'materials').
+            embedding (list): Query embedding vector.
+            top_k (int): Number of results to return.
+            threshold (float): Similarity threshold.
+            **kwargs: Additional arguments for vector client.
+
+        Returns:
+            list: List of found items (dicts or models).
+
+        Raises:
+            AllDatabasesUnavailableError: If all DBs are unavailable.
+        """
+        errors = {}
+        # Try vector search first
+        if self.vector_client is not None:
+            try:
+                results = await self.vector_client.search(
+                    collection_name=collection,
+                    query_vector=embedding,
+                    limit=top_k,
+                    filter_conditions=kwargs.get("filter_conditions")
+                )
+                if results:
+                    # Фильтруем по threshold, если есть score
+                    filtered = [r for r in results if r.get("score", 1.0) >= threshold]
+                    if filtered:
+                        return filtered
+            except Exception as e:
+                self.status['vector'] = False
+                self.logger.error(f"Vector DB embedding_search failed: {e}")
+                errors['vector'] = str(e)
+        # Fallback: suggestion_search
+        return await self.suggestion_search(collection, kwargs.get("query", ""), top_k=top_k)
+
+    async def suggestion_search(self, collection: str, query: str, top_k: int = 3, **kwargs):
+        """
+        Suggestion/fuzzy search in a collection (fallback for embedding_search).
+
+        Args:
+            collection (str): Target collection name (e.g., 'colors', 'units', 'materials').
+            query (str): Query string.
+            top_k (int): Number of results to return.
+            **kwargs: Additional arguments for sql client.
+
+        Returns:
+            list: List of found items (dicts or models).
+
+        Raises:
+            AllDatabasesUnavailableError: If all DBs are unavailable.
+        """
+        errors = {}
+        if self.sql_client is not None:
+            try:
+                # Предполагается, что sql_client реализует метод fuzzy_search_by_collection
+                return await self.sql_client.fuzzy_search_by_collection(collection, query, limit=top_k)
+            except Exception as e:
+                self.status['sql'] = False
+                self.logger.error(f"SQL DB suggestion_search failed: {e}")
+                errors['sql'] = str(e)
+        self.logger.error(f"All DBs down for suggestion_search: {errors}")
         raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
 
     # ... add more as needed for your DB interface ...
