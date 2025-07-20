@@ -255,9 +255,11 @@ per-file-ignores = [
 # ========================================
 [tool.ruff]
 line-length = 88
+exclude = [".venv", "alembic/versions"]
+
+[tool.ruff.lint]
 select = ["E", "F", "B", "C4", "I", "UP", "W"]  # pycodestyle, pyflakes, bugbear, comprehensions, isort, pyupgrade, whitespace
 ignore = ["E501", "E722"]  # Ignore line length and bare except for now
-exclude = [".venv", "alembic/versions"]
 
 # Enable automatic formatting on ruff check --fix
 [tool.ruff.format]
