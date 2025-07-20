@@ -1,6 +1,7 @@
 print("DEBUG: core/parsers/interfaces.py loaded")
 
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, Optional, Protocol
+
 
 class IMaterialParser(Protocol):
     def parse(self, data: Any) -> 'MaterialParseData':

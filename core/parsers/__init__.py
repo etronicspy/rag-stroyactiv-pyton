@@ -9,50 +9,47 @@ print("DEBUG: core/parsers/__init__.py loaded")
 
 # Import interfaces
 from .interfaces import (
-    # Base types
-    InputType,
-    OutputType,
-    ConfigType,
-    ParseStatus,
-    ParseResult,
-    ParseRequest,
-    BatchParseRequest,
-    BatchParseResult,
-    
-    # Base interfaces
-    IBaseParser,
-    IParserHealthCheck,
-    IParserConfig,
-    IParserMetrics,
-    
-    # AI interfaces
-    IAIParser,
-    IMaterialParser,
-    ITextParser,
-    
+    INTERFACE_HIERARCHY,
     # AI types
     AIModelType,
     AIParseMode,
     AIParseRequest,
     AIParseResult,
+    BatchParseRequest,
+    BatchParseResult,
+    ConfigType,
+    # AI interfaces
+    IAIParser,
+    # Base interfaces
+    IBaseParser,
+    IMaterialParser,
+    # Base types
+    InputType,
+    IParserConfig,
+    IParserHealthCheck,
+    IParserMetrics,
+    ITextParser,
+    OutputType,
+    ParseRequest,
+    ParseResult,
+    ParseStatus,
     TextParseData,
-    
-    # Metadata
-    __version__ as interfaces_version,
-    INTERFACE_HIERARCHY,
     get_interface_info,
     list_available_interfaces,
-    validate_interface_implementation
+    validate_interface_implementation,
 )
+from .interfaces import __version__ as interfaces_version
 
 # Import MaterialParseData from the correct location
 from .interfaces.ai_parser_interface import MaterialParseData
+
 
 # Lazy imports for services (will be available after migration)
 def get_ai_parser_service():
     """Get AI parser service instance (lazy import)."""
     try:
-        from .services.ai_parser_service import AIParserService, get_ai_parser_service as _get_service
+        from .services.ai_parser_service import AIParserService
+        from .services.ai_parser_service import get_ai_parser_service as _get_service
         return _get_service()
     except ImportError:
         raise ImportError("AI parser service not yet available. Run parser migration first.")
@@ -60,7 +57,10 @@ def get_ai_parser_service():
 def get_material_parser_service():
     print("DEBUG: get_material_parser_service called")
     try:
-        from .services.material_parser_service import MaterialParserService, get_material_parser_service as _get_service
+        from .services.material_parser_service import MaterialParserService
+        from .services.material_parser_service import (
+            get_material_parser_service as _get_service,
+        )
         print("DEBUG: import material_parser_service OK")
         return _get_service()
     except ImportError as e:
@@ -73,7 +73,10 @@ def get_material_parser_service():
 def get_batch_parser_service():
     """Get batch parser service instance (lazy import)."""
     try:
-        from .services.batch_parser_service import BatchParserService, get_batch_parser_service as _get_service
+        from .services.batch_parser_service import BatchParserService
+        from .services.batch_parser_service import (
+            get_batch_parser_service as _get_service,
+        )
         return _get_service()
     except ImportError:
         raise ImportError("Batch parser service not yet available. Run parser migration first.")
@@ -82,7 +85,10 @@ def get_batch_parser_service():
 def get_parser_config_manager():
     """Get parser configuration manager (lazy import)."""
     try:
-        from .config.parser_config_manager import ParserConfigManager, get_config_manager
+        from .config.parser_config_manager import (
+            ParserConfigManager,
+            get_config_manager,
+        )
         return get_config_manager()
     except ImportError:
         raise ImportError("Parser config manager not yet available. Run parser migration first.")
@@ -90,7 +96,10 @@ def get_parser_config_manager():
 def get_system_prompts_manager():
     """Get system prompts manager (lazy import)."""
     try:
-        from .config.system_prompts_manager import SystemPromptsManager, get_prompts_manager
+        from .config.system_prompts_manager import (
+            SystemPromptsManager,
+            get_prompts_manager,
+        )
         return get_prompts_manager()
     except ImportError:
         raise ImportError("System prompts manager not yet available. Run parser migration first.")
@@ -236,18 +245,7 @@ __all__ = [
     '__description__'
 ]
 
-# Compatibility note for legacy imports
-# The legacy parser_module has been removed, so this warning is no longer needed.
-# def _legacy_import_warning():
-#     """Issue warning for legacy imports from parser_module."""
-#     import warnings
-#     warnings.warn(
-#         "Direct imports from 'parser_module' are deprecated. "
-#         "Use 'core.parsers' instead. "
-#         "Legacy imports will be removed in version 3.0.0.",
-#         DeprecationWarning,
-#         stacklevel=3
-#     )
+
 
 # Parser module ready status
 print(f"🔧 Core Parsers Module v{__version__} loaded")

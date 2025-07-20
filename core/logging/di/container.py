@@ -5,33 +5,28 @@ This module provides a dependency injection container for the logging system.
 """
 
 from functools import lru_cache
-from typing import Dict, Any, Type, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
+from core.logging.core import (
+    ConsoleHandler,
+    ContextProvider,
+    CorrelationProvider,
+    Logger,
+    LoggingContext,
+    TextFormatter,
+)
+from core.logging.factories import FormatterFactory, HandlerFactory, LoggerFactory
 from core.logging.interfaces import (
-    ILogger,
-    IFormatter,
-    IHandler,
-    ILoggingContext,
     IContextProvider,
     ICorrelationProvider,
-    ILoggerFactory,
+    IFormatter,
     IFormatterFactory,
-    IHandlerFactory
+    IHandler,
+    IHandlerFactory,
+    ILogger,
+    ILoggerFactory,
+    ILoggingContext,
 )
-from core.logging.core import (
-    Logger,
-    TextFormatter,
-    ConsoleHandler,
-    LoggingContext,
-    ContextProvider,
-    CorrelationProvider
-)
-from core.logging.factories import (
-    LoggerFactory,
-    FormatterFactory,
-    HandlerFactory
-)
-
 
 T = TypeVar('T')
 

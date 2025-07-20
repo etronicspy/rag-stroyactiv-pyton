@@ -4,21 +4,19 @@ Comprehensive Price Lists Management API.
 API for managing supplier price lists with support for various data formats.
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, Query, BackgroundTasks
-from typing import Optional
-import tempfile
 import os
-from uuid import UUID
-from core.logging import get_logger
-from core.config import get_settings
-from core.schemas.materials import PriceUploadResponse, PriceProcessingStatus
-from services.price_processor import PriceProcessor
-import traceback
+import tempfile
 import time
+import traceback
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+from core.config import get_settings
+from core.database.factories import get_vector_database  # Import the correct function
+from core.logging import get_logger
 from core.schemas.response_models import ERROR_RESPONSES
-from core.database.factories import get_vector_database # Import the correct function
-from fastapi.responses import JSONResponse
+from services.price_processor import PriceProcessor
 
 router = APIRouter(
     prefix="",

@@ -4,30 +4,27 @@ Batch Processing Service для асинхронной обработки мат
 """
 
 import asyncio
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple, Union
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from core.database.factories import AllDatabasesUnavailableError, get_fallback_manager
+from core.logging import get_logger
+from core.schemas.pipeline_models import MaterialProcessRequest, ProcessingResult
 from core.schemas.processing_models import (
-    ProcessingStatus,
     MaterialInput,
+    MaterialProcessingResult,
     ProcessingJobConfig,
     ProcessingProgress,
     ProcessingStatistics,
-    MaterialProcessingResult
+    ProcessingStatus,
 )
-from core.schemas.pipeline_models import MaterialProcessRequest, ProcessingResult
-from core.database.repositories.processing_repository import ProcessingRepository
-from core.logging import get_logger
-from core.config.base import get_settings
+from services.combined_embedding_service import CombinedEmbeddingService
 
 # Импорт всех компонентов pipeline (этапы 1-7)
 from services.material_processing_pipeline import MaterialProcessingPipeline
-from services.combined_embedding_service import CombinedEmbeddingService
-from services.sku_search_service import SKUSearchService
 from services.materials import MaterialsService
-from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+from services.sku_search_service import SKUSearchService
 
 logger = get_logger(__name__)
 
@@ -302,7 +299,7 @@ class BatchProcessingService:
                 
             else:
                 # Обработка неуспешна
-                error_msg = f"Pipeline processing failed: overall_success=False"
+                error_msg = "Pipeline processing failed: overall_success=False"
                 await self._update_material_status(
                     record_id,
                     ProcessingStatus.FAILED,

@@ -1,9 +1,11 @@
 """
 Фикстуры для работы с базами данных в тестах
 """
-import pytest
 from typing import Dict, List
 from unittest.mock import AsyncMock, Mock
+
+import pytest
+
 from .data_fixtures import TestDataProvider
 
 

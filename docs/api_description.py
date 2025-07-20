@@ -6,7 +6,7 @@ This module contains comprehensive English descriptions, summaries, and examples
 for all API endpoints in the Swagger UI documentation.
 """
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 def get_api_description() -> str:

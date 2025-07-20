@@ -5,12 +5,12 @@ Embedding Comparison Service for RAG normalization.
 """
 
 import asyncio
-from typing import Optional, List, Dict, Any, Tuple
-from core.logging import get_logger
-from core.database.interfaces import IVectorDatabase
-from core.database.collections.colors import ColorCollection
+from typing import Any, Dict, List, Optional
+
 from core.config.base import get_settings
+from core.database.collections.colors import ColorCollection
 from core.database.factories import get_fallback_manager
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -22,9 +22,11 @@ class EmbeddingComparisonService:
         self.logger = logger
         self.color_similarity_threshold = 0.8
         self.unit_similarity_threshold = 0.8
+        self.category_similarity_threshold = 0.8
         self.default_similarity_threshold = 0.7
         self.colors_collection = "construction_colors"
         self.units_collection = "construction_units"
+        self.categories_collection = "construction_categories"
 
     async def normalize_color(self, color_text: str, similarity_threshold: Optional[float] = None) -> Dict[str, Any]:
         fallback_manager = get_fallback_manager()
@@ -378,6 +380,7 @@ class EmbeddingComparisonService:
             return None
         try:
             import openai
+
             from core.config.base import get_settings
             settings = get_settings()
             client = openai.AsyncOpenAI(
@@ -626,6 +629,77 @@ class EmbeddingComparisonService:
                 "method": "embedding_error"
             }
     
+    async def normalize_category(self, category_text: str, similarity_threshold: Optional[float] = None) -> Dict[str, Any]:
+        fallback_manager = get_fallback_manager()
+        if not category_text or not category_text.strip():
+            return {
+                "original_text": category_text,
+                "normalized_category": None,
+                "similarity_score": 0.0,
+                "suggestions": [],
+                "success": False,
+                "method": "empty_input"
+            }
+        threshold = similarity_threshold or self.category_similarity_threshold
+        category_text_clean = category_text.strip().lower()
+        self.logger.debug(f"Normalizing category: '{category_text}' with threshold {threshold}")
+        # Vector search
+        try:
+            vector_result = await fallback_manager.embedding_search(
+                text=category_text,
+                collection=self.categories_collection,
+                threshold=threshold,
+                mode="category"
+            )
+            if vector_result.get("success"):
+                return vector_result
+        except Exception as e:
+            self.logger.error(f"Vector search failed for category '{category_text}': {e}")
+        # Fuzzy search
+        fuzzy_result = fallback_manager.fuzzy_search(
+            text=category_text_clean,
+            collection=self.categories_collection,
+            threshold=threshold,
+            mode="category"
+        )
+        if fuzzy_result.get("success"):
+            return fuzzy_result
+        # Suggestions
+        suggestions = fallback_manager.suggestion_search(
+            text=category_text_clean,
+            collection=self.categories_collection,
+            mode="category"
+        )
+        return {
+            "original_text": category_text,
+            "normalized_category": None,
+            "similarity_score": 0.0,
+            "suggestions": suggestions[:5],
+            "success": False,
+            "method": "no_match"
+        }
+
+    async def normalize_category_by_embedding(self, category_text: str, embedding: list, top_k: int = 3, threshold: float = 0.7) -> list:
+        fallback_manager = get_fallback_manager()
+        if not embedding:
+            return []
+        results = await fallback_manager.embedding_search(
+            collection=self.categories_collection,
+            embedding=embedding,
+            top_k=top_k,
+            threshold=threshold,
+            query=category_text
+        )
+        return results
+
+    async def suggest_category(self, category_text: str, top_k: int = 3) -> list:
+        fallback_manager = get_fallback_manager()
+        return await fallback_manager.suggestion_search(
+            collection=self.categories_collection,
+            query=category_text,
+            top_k=top_k
+        )
+    
     async def batch_normalize_colors(self, color_texts: List[str]) -> List[Dict[str, Any]]:
         """Normalize multiple colors in batch.
         
@@ -682,7 +756,7 @@ class EmbeddingComparisonService:
         if not embedding:
             return []
         results = await fallback_manager.embedding_search(
-            collection="colors",
+            collection=self.colors_collection,
             embedding=embedding,
             top_k=top_k,
             threshold=threshold,
@@ -694,7 +768,7 @@ class EmbeddingComparisonService:
         """Suggest color using fuzzy search via fallback manager."""
         fallback_manager = get_fallback_manager()
         return await fallback_manager.suggestion_search(
-            collection="colors",
+            collection=self.colors_collection,
             query=color_text,
             top_k=top_k
         )
@@ -705,7 +779,7 @@ class EmbeddingComparisonService:
         if not embedding:
             return []
         results = await fallback_manager.embedding_search(
-            collection="units",
+            collection=self.units_collection,
             embedding=embedding,
             top_k=top_k,
             threshold=threshold,
@@ -717,7 +791,7 @@ class EmbeddingComparisonService:
         """Suggest unit using fuzzy search via fallback manager."""
         fallback_manager = get_fallback_manager()
         return await fallback_manager.suggestion_search(
-            collection="units",
+            collection=self.units_collection,
             query=unit_text,
             top_k=top_k
         ) 

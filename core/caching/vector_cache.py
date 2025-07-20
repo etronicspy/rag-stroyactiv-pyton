@@ -7,13 +7,13 @@ Stage 1.3: Vector Search Optimization
 
 import asyncio
 import hashlib
-import time
-from core.logging import get_logger
-from typing import List, Optional, Dict, Any, Tuple
-from dataclasses import dataclass, field
 import json
+import time
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.database.adapters.redis_adapter import RedisDatabase
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -545,7 +545,7 @@ class VectorCache:
             if existing:
                 await self.redis_db.delete(cache_key)
                 self.stats.invalidations += 1
-                logger.debug(f"✅ Smart invalidation: removed duplicate")
+                logger.debug("✅ Smart invalidation: removed duplicate")
                 
         except Exception as e:
             logger.error(f"Smart invalidation failed: {e}") 

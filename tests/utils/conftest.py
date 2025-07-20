@@ -2,11 +2,12 @@
 Конфигурация pytest для тестов утилит
 """
 
-import pytest
 import asyncio
 import os
 import sys
 from pathlib import Path
+
+import pytest
 
 # Добавляем корневую папку проекта в PYTHONPATH
 project_root = Path(__file__).parent.parent.parent

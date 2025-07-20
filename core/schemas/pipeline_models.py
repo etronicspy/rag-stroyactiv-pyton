@@ -4,11 +4,12 @@ Pipeline Models for Material Processing
 Модели пайплайна для обработки материалов согласно диаграмме интеграции.
 """
 
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class ProcessingStage(str, Enum):

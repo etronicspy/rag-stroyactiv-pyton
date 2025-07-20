@@ -7,13 +7,51 @@ This module provides configuration factories for all supported databases:
 - Cache databases: Redis
 """
 
-from typing import Dict, Any
-from .constants import (
-    DefaultTimeouts, 
-    DatabaseNames, 
-    ConnectionPools, 
-    CacheSettings
-)
+import os
+from typing import Any, Dict
+
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+def get_env_str(key: str, default: str) -> str:
+    """Get string value from environment variable."""
+    return os.getenv(key, default)
+
+
+class DefaultTimeouts:
+    """Default timeout values for various operations."""
+    DATABASE = get_env_int("DEFAULT_TIMEOUT_DATABASE", 30)
+    AI_CLIENT = get_env_int("DEFAULT_TIMEOUT_AI_CLIENT", 30)
+    CONNECTION_POOL = get_env_int("DEFAULT_TIMEOUT_CONNECTION_POOL", 30)
+    REDIS = get_env_int("DEFAULT_TIMEOUT_REDIS", 10)
+    SSH_TUNNEL = get_env_int("DEFAULT_TIMEOUT_SSH_TUNNEL", 30)
+
+
+class DatabaseNames:
+    """Database and collection names."""
+    QDRANT_COLLECTION = get_env_str("DATABASE_NAME_QDRANT_COLLECTION", "materials")
+    WEAVIATE_CLASS = get_env_str("DATABASE_NAME_WEAVIATE_CLASS", "Material")
+    PINECONE_INDEX = get_env_str("DATABASE_NAME_PINECONE_INDEX", "materials")
+    POSTGRESQL_DB = get_env_str("DATABASE_NAME_POSTGRESQL_DB", "stbr_rag1")
+    REDIS_KEY_PREFIX = get_env_str("DATABASE_NAME_REDIS_KEY_PREFIX", "rag:")
+
+
+class ConnectionPools:
+    """Connection pool configuration."""
+    POSTGRESQL_POOL_SIZE = get_env_int("CONNECTION_POOL_POSTGRESQL_POOL_SIZE", 10)
+    POSTGRESQL_MAX_OVERFLOW = get_env_int("CONNECTION_POOL_POSTGRESQL_MAX_OVERFLOW", 20)
+    REDIS_MAX_CONNECTIONS = get_env_int("CONNECTION_POOL_REDIS_MAX_CONNECTIONS", 50)
+    BATCH_SIZE = get_env_int("CONNECTION_POOL_BATCH_SIZE", 100)
+    MAX_CONCURRENT_UPLOADS = get_env_int("CONNECTION_POOL_MAX_CONCURRENT_UPLOADS", 5)
+
+
+class CacheSettings:
+    """Cache configuration settings."""
+    REDIS_DEFAULT_TTL = get_env_int("CACHE_REDIS_DEFAULT_TTL", 3600)  # 1 hour
+
 
 class BaseDatabaseConfig:
     """Base configuration class with common database settings."""
@@ -199,7 +237,7 @@ class CacheDatabaseConfig(BaseDatabaseConfig):
             "retry_on_timeout": retry_on_timeout,
             "socket_timeout": base["timeout"],
             "socket_connect_timeout": base["timeout"],
-            "health_check_interval": CacheSettings.HEALTH_CHECK_INTERVAL,
+            "health_check_interval": CacheSettings.REDIS_DEFAULT_TTL,
             "default_ttl": CacheSettings.REDIS_DEFAULT_TTL,
             "key_prefix": DatabaseNames.REDIS_KEY_PREFIX
         }

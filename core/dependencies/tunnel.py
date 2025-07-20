@@ -4,10 +4,11 @@ SSH Tunnel Dependencies for FastAPI.
 This module provides dependency injection for SSH tunnel service in FastAPI endpoints.
 """
 
-from typing import Optional, Annotated
+from typing import Annotated, Optional
+
 from fastapi import Depends, HTTPException, status
 
-from services.ssh_tunnel_service import get_tunnel_service, SSHTunnelService
+from services.ssh_tunnel_service import SSHTunnelService, get_tunnel_service
 
 
 async def get_tunnel_dependency() -> Optional[SSHTunnelService]:

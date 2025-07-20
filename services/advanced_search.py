@@ -17,18 +17,24 @@ import time
 from base64 import b64encode
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
 from difflib import SequenceMatcher
-from core.logging import get_logger
+from typing import Any, Dict, List, Optional, Tuple
 
-from core.schemas.materials import (
-    AdvancedSearchQuery, MaterialFilterOptions, SortOption, PaginationOptions,
-    SearchResponse, MaterialSearchResult, SearchSuggestion, SearchHighlight,
-    SearchAnalytics
-)
-from core.repositories.cached_materials import CachedMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
-from core.database.exceptions import DatabaseError, ValidationError
+from core.database.exceptions import ValidationError
+from core.logging import get_logger
+from core.repositories.cached_materials import CachedMaterialsRepository
+from core.schemas.materials import (
+    AdvancedSearchQuery,
+    MaterialFilterOptions,
+    MaterialSearchResult,
+    PaginationOptions,
+    SearchAnalytics,
+    SearchHighlight,
+    SearchResponse,
+    SearchSuggestion,
+    SortOption,
+)
 
 logger = get_logger(__name__)
 
@@ -71,7 +77,10 @@ class AdvancedSearchService:
         
     async def advanced_search(self, query: AdvancedSearchQuery) -> SearchResponse:
         """Perform advanced search with comprehensive filtering and sorting (через fallback manager)."""
-        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        from core.database.factories import (
+            AllDatabasesUnavailableError,
+            get_fallback_manager,
+        )
         start_time = time.time()
         await self._validate_search_query(query)
         if self.analytics_enabled and query.query:

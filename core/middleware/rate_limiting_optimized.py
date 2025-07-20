@@ -1,19 +1,32 @@
 """
-Optimized rate limiting middleware using Redis Lua scripts for atomic operations.
-Provides distributed rate limiting with minimal race conditions.
+Optimized Rate Limiting Middleware
+
+This module provides high-performance rate limiting functionality for FastAPI applications,
+including request counting, time-based limits, and configurable thresholds.
 """
 
+import logging
+import os
 import time
-from core.logging import get_logger
-from typing import Optional, Dict, Any, Callable, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
+import redis.asyncio as aioredis
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-import redis.asyncio as aioredis
 
-from core.config import settings
+logger = logging.getLogger(__name__)
 
-logger = get_logger(__name__)
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+class RateLimits:
+    """Rate limiting configuration."""
+    REQUESTS_PER_MINUTE = get_env_int("RATE_LIMIT_REQUESTS_PER_MINUTE", 60)
+    REQUESTS_PER_HOUR = get_env_int("RATE_LIMIT_REQUESTS_PER_HOUR", 1000)
+    BURST_LIMIT = get_env_int("RATE_LIMIT_BURST_LIMIT", 10)
 
 
 class OptimizedRateLimitMiddleware(BaseHTTPMiddleware):
@@ -136,10 +149,10 @@ class OptimizedRateLimitMiddleware(BaseHTTPMiddleware):
         enable_performance_logging: bool = False,
     ):
         super().__init__(app)
-        self.redis_url = redis_url or settings.REDIS_URL
-        self.default_rpm = default_requests_per_minute
-        self.default_rph = default_requests_per_hour
-        self.default_burst = default_burst_size
+        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        self.default_rpm = default_requests_per_minute or RateLimits.REQUESTS_PER_MINUTE
+        self.default_rph = default_requests_per_hour or RateLimits.REQUESTS_PER_HOUR
+        self.default_burst = default_burst_size or RateLimits.BURST_LIMIT
         self.burst_window = burst_window_seconds
         self.enable_burst = enable_burst_protection
         self.include_headers = rate_limit_headers
@@ -172,7 +185,7 @@ class OptimizedRateLimitMiddleware(BaseHTTPMiddleware):
         if self._redis is None:
             try:
                 # Check if we should use mock Redis
-                if getattr(settings, 'DISABLE_REDIS_CONNECTION', False) or getattr(settings, 'QDRANT_ONLY_MODE', False):
+                if os.getenv("DISABLE_REDIS_CONNECTION", "False").lower() == "true" or os.getenv("QDRANT_ONLY_MODE", "False").lower() == "true":
                     # Use mock Redis adapter
                     from core.database.factories import DatabaseFactory
                     cache_db = DatabaseFactory.create_cache_database()
@@ -206,7 +219,7 @@ class OptimizedRateLimitMiddleware(BaseHTTPMiddleware):
                 
                 # Try fallback to mock if enabled
                 try:
-                    if getattr(settings, 'ENABLE_FALLBACK_DATABASES', True):
+                    if os.getenv("ENABLE_FALLBACK_DATABASES", "True").lower() == "true":
                         from core.database.factories import DatabaseFactory
                         cache_db = DatabaseFactory.create_cache_database()
                         if hasattr(cache_db, 'mock_redis'):

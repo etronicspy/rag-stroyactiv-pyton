@@ -4,18 +4,16 @@
 """
 
 import asyncio
-from core.logging import get_logger
-from typing import Dict, Any, Optional
 import sys
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 from alembic import command
 from alembic.config import Config
-
 from core.config import settings
 from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
 from core.database.seed_data import seed_database
-
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 

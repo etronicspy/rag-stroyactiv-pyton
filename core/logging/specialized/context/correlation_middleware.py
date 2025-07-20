@@ -10,8 +10,8 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from core.logging.interfaces import ICorrelationProvider
 from core.logging.core.context import CorrelationProvider
+from core.logging.interfaces import ICorrelationProvider
 
 
 class CorrelationMiddleware(BaseHTTPMiddleware):

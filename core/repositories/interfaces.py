@@ -4,8 +4,15 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
-from core.schemas.materials import Material, MaterialCreate, MaterialUpdate, Category, Unit
+from typing import Any, Dict, List, Optional
+
+from core.schemas.materials import (
+    Category,
+    Material,
+    MaterialCreate,
+    MaterialUpdate,
+    Unit,
+)
 
 
 class IMaterialsRepository(ABC):

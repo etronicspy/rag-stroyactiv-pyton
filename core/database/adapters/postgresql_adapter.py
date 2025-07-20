@@ -3,26 +3,40 @@
 Адаптер для работы с PostgreSQL БД.
 """
 
-from typing import List, Dict, Any, Optional
-from core.logging import get_logger
-from datetime import datetime
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+    or_,
+    text,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, REAL, UUID
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import String, DateTime, Text, Integer, Numeric, Boolean, Float, Index, func, or_
-from sqlalchemy.dialects.postgresql import UUID, ARRAY, REAL
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import select
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text
 
+from core.database.exceptions import (
+    ConnectionError,
+    DatabaseError,
+    QueryError,
+    TransactionError,
+)
 from core.database.interfaces import IRelationalDatabase
-from core.database.exceptions import ConnectionError, QueryError, DatabaseError, TransactionError
-from core.config import Settings
+from core.logging import get_logger
 from services.ssh_tunnel_service import get_tunnel_service
-
 
 logger = get_logger(__name__)
 
@@ -127,8 +141,22 @@ class RawProductModel(Base):
 class PostgreSQLAdapter(IRelationalDatabase):
     """PostgreSQL adapter with SSH tunnel integration."""
     
-    def __init__(self, settings: Settings):
-        self.settings = settings
+    def __init__(self, config: Dict[str, Any]):
+        """
+        Initialize PostgreSQL adapter with configuration.
+        
+        Args:
+            config: Configuration dictionary with PostgreSQL settings
+        """
+        from core.config import get_settings
+        
+        # If config is a Settings object, use it directly
+        if hasattr(config, 'POSTGRES_USER'):
+            self.settings = config
+        else:
+            # If config is a dict, create Settings object
+            self.settings = get_settings()
+        
         self.engine = None
         self.session_factory = None
         self._connection_string = None
@@ -144,16 +172,16 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 # Use tunnel local port for connection
                 tunnel_config = self._tunnel_service.config
                 connection_string = (
-                    f"postgresql+asyncpg://{self.settings.POSTGRESQL_USER}:"
-                    f"{self.settings.POSTGRESQL_PASSWORD}@localhost:"
+                    f"postgresql+asyncpg://{self.settings.POSTGRES_USER}:"
+                    f"{self.settings.POSTGRES_PASSWORD}@localhost:"
                     f"{tunnel_config.local_port}/{self.settings.POSTGRESQL_DATABASE}"
                 )
             else:
                 logger.info("No active SSH tunnel found, using direct PostgreSQL connection")
                 # Use direct connection
                 connection_string = (
-                    f"postgresql+asyncpg://{self.settings.POSTGRESQL_USER}:"
-                    f"{self.settings.POSTGRESQL_PASSWORD}@{self.settings.POSTGRESQL_HOST}:"
+                    f"postgresql+asyncpg://{self.settings.POSTGRES_USER}:"
+                    f"{self.settings.POSTGRES_PASSWORD}@{self.settings.POSTGRESQL_HOST}:"
                     f"{self.settings.POSTGRESQL_PORT}/{self.settings.POSTGRESQL_DATABASE}"
                 )
             
@@ -200,11 +228,15 @@ class PostgreSQLAdapter(IRelationalDatabase):
     async def health_check(self) -> Dict[str, Any]:
         """Perform comprehensive health check."""
         if not self.engine:
-            return {
-                "status": "error",
-                "message": "No database connection",
-                "tunnel_status": "unknown"
-            }
+            # Try to connect automatically if engine is not created
+            try:
+                await self.connect()
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "message": f"Failed to connect: {str(e)}",
+                    "tunnel_status": "unknown"
+                }
         
         try:
             # Check database connection

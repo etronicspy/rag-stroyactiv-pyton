@@ -7,7 +7,7 @@ This module defines interfaces for metrics collection and performance tracking:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, ContextManager
+from typing import Any, ContextManager, Dict, Optional
 
 
 class IMetricsCollector(ABC):

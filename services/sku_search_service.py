@@ -8,21 +8,19 @@ SKU Search Service for RAG Construction Materials API
 Согласно диаграмме интеграции ЭТАП 6.
 """
 
-import asyncio
 import hashlib
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Any
 from functools import lru_cache
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.config.base import Settings
 from core.database.interfaces import IVectorDatabase
 from core.schemas.pipeline_models import (
-    SKUSearchRequest,
-    SKUSearchResponse,
     SKUSearchCandidate,
-    SKUSearchConfig
+    SKUSearchConfig,
+    SKUSearchResponse,
 )
 from services.combined_embedding_service import get_combined_embedding_service
 
@@ -90,7 +88,10 @@ class SKUSearchService:
         """
         Main method: Find SKU using two-phase search (now via centralized fallback manager)
         """
-        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        from core.database.factories import (
+            AllDatabasesUnavailableError,
+            get_fallback_manager,
+        )
         start_time = time.time()
         threshold = similarity_threshold or self.config.similarity_threshold
         max_cands = max_candidates or self.config.max_candidates
@@ -127,14 +128,12 @@ class SKUSearchService:
         normalized_color: Optional[str]
     ) -> SKUSearchResponse:
         """
-        Search SKU through combined material embedding.
-        
-        Поиск SKU через комбинированный embedding.
+        Find SKU using combined embedding search with fallback manager.
         
         Args:
-            material_embedding: Combined material embedding (name + unit + color)
-            normalized_unit: Normalized unit for filtering
-            normalized_color: Normalized color for filtering (None for any color)
+            material_embedding: Material embedding vector
+            normalized_unit: Normalized unit of measurement
+            normalized_color: Normalized color (optional)
             
         Returns:
             SKU search response with best match
@@ -144,11 +143,14 @@ class SKUSearchService:
         try:
             self.logger.debug(f"Searching SKU with combined embedding for unit: {normalized_unit}, color: {normalized_color}")
             
-            if not self.vector_db:
-                raise ValueError("Vector database not available")
+            # Search similar materials using fallback manager
+            from core.database.factories import (
+                AllDatabasesUnavailableError,
+                get_fallback_manager,
+            )
             
-            # Search similar materials using combined embedding
-            search_results = await self.vector_db.search(
+            fallback_manager = get_fallback_manager()
+            search_results = await fallback_manager.search(
                 collection_name=self.config.reference_collection,
                 query_vector=material_embedding,
                 limit=self.config.max_candidates
@@ -229,6 +231,17 @@ class SKUSearchService:
                     all_candidates=candidates
                 )
                 
+        except AllDatabasesUnavailableError as e:
+            self.logger.error(f"All databases unavailable for SKU search: {e}")
+            return SKUSearchResponse(
+                found_sku=None,
+                search_successful=False,
+                candidates_evaluated=0,
+                matching_candidates=0,
+                search_method="combined_embedding_search",
+                processing_time=time.time() - start_time,
+                error_message=f"All databases unavailable: {str(e)}"
+            )
         except Exception as e:
             self.logger.error(f"Error in combined embedding SKU search: {e}")
             return SKUSearchResponse(
@@ -247,10 +260,16 @@ class SKUSearchService:
         similarity_threshold: float,
         max_candidates: int
     ) -> List[SKUSearchCandidate]:
-        """Phase 1: Vector search for similar materials in reference collection"""
+        """Phase 1: Vector search for similar materials using fallback manager"""
         try:
-            # Perform vector search
-            search_results = await self.vector_db.search(
+            # Perform vector search using fallback manager
+            from core.database.factories import (
+                AllDatabasesUnavailableError,
+                get_fallback_manager,
+            )
+            
+            fallback_manager = get_fallback_manager()
+            search_results = await fallback_manager.search(
                 collection_name=self.config.reference_collection,
                 query_vector=query_embedding,
                 limit=max_candidates * 2,  # Get more results for threshold filtering
@@ -288,6 +307,9 @@ class SKUSearchService:
             logger.debug(f"Phase 1: Found {len(candidates)} candidates with similarity >= {similarity_threshold}")
             return candidates
             
+        except AllDatabasesUnavailableError as e:
+            logger.error(f"All databases unavailable for Phase 1 vector search: {e}")
+            return []
         except Exception as e:
             logger.error(f"Phase 1 vector search failed: {e}")
             return []
@@ -608,14 +630,20 @@ class SKUSearchService:
         )
     
     async def test_connection(self) -> bool:
-        """Test vector database and embedding service connection
+        """Test vector database and embedding service connection using fallback manager
         
         Returns:
             True if both connections work
         """
         try:
-            # Test vector database connection
-            health_status = await self.vector_db.health_check()
+            # Test vector database connection using fallback manager
+            from core.database.factories import (
+                AllDatabasesUnavailableError,
+                get_fallback_manager,
+            )
+            
+            fallback_manager = get_fallback_manager()
+            health_status = await fallback_manager.health_check()
             vector_db_ok = health_status.get("status") == "healthy"
             
             # Test embedding service connection  
@@ -628,6 +656,9 @@ class SKUSearchService:
                 logger.error(f"❌ Connection test failed - Vector DB: {vector_db_ok}, Embeddings: {embedding_ok}")
                 return False
                 
+        except AllDatabasesUnavailableError as e:
+            logger.error(f"All databases unavailable for connection test: {e}")
+            return False
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
             return False

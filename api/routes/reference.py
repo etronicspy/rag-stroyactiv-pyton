@@ -1,13 +1,23 @@
 from typing import List
+
 from fastapi import APIRouter, Depends
-from core.schemas.materials import Category, Unit, CategoryCreate
-from core.schemas.colors import ColorReference, ColorCreate
-from services.materials import CategoryService, UnitService, ColorService
+
 from core.database.interfaces import IVectorDatabase
-from core.dependencies.database import get_vector_db_dependency, get_ai_client_dependency
+from core.dependencies.database import (
+    get_ai_client_dependency,
+    get_vector_db_dependency,
+)
+from core.schemas.colors import ColorCreate, ColorReference, ColorUpdate
+from core.schemas.materials import (
+    Category,
+    CategoryCreate,
+    CategoryUpdate,
+    Unit,
+    UnitCreate,
+    UnitUpdate,
+)
 from core.schemas.response_models import ERROR_RESPONSES
-from core.schemas.materials import UnitCreate, CategoryUpdate, UnitUpdate
-from core.schemas.colors import ColorUpdate
+from services.materials import CategoryService, ColorService, UnitService
 
 router = APIRouter(
     prefix="",

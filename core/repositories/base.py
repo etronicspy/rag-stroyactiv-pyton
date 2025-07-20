@@ -4,12 +4,16 @@
 """
 
 from abc import ABC
-from typing import Dict, Any, Optional
 from datetime import datetime
-from core.logging import get_logger
+from typing import Any, Dict, Optional
 
-from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
 from core.database.exceptions import DatabaseError
+from core.database.interfaces import (
+    ICacheDatabase,
+    IRelationalDatabase,
+    IVectorDatabase,
+)
+from core.logging import get_logger
 
 
 class BaseRepository(ABC):
@@ -134,26 +138,36 @@ class BaseRepository(ABC):
         return datetime.utcnow()
     
     async def _check_database_health(self) -> Dict[str, Any]:
-        """Check health of all connected databases.
+        """Check health of all connected databases using fallback manager.
         
         Returns:
             Health status for each database
         """
         health_status = {}
         
-        # Check vector database
-        if self.vector_db:
-            try:
-                vector_health = await self.vector_db.health_check()
-                health_status["vector_db"] = {
-                    "status": "healthy",
-                    "details": vector_health
-                }
-            except Exception as e:
-                health_status["vector_db"] = {
-                    "status": "unhealthy",
-                    "error": str(e)
-                }
+        # Check vector database using fallback manager
+        try:
+            from core.database.factories import (
+                AllDatabasesUnavailableError,
+                get_fallback_manager,
+            )
+            
+            fallback_manager = get_fallback_manager()
+            vector_health = await fallback_manager.health_check()
+            health_status["vector_db"] = {
+                "status": "healthy",
+                "details": vector_health
+            }
+        except AllDatabasesUnavailableError as e:
+            health_status["vector_db"] = {
+                "status": "unavailable",
+                "error": f"All databases unavailable: {str(e)}"
+            }
+        except Exception as e:
+            health_status["vector_db"] = {
+                "status": "unhealthy",
+                "error": str(e)
+            }
         
         # Check relational database
         if self.relational_db:

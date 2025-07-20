@@ -7,12 +7,8 @@ This module provides an implementation of the IFormatterFactory interface.
 from functools import lru_cache
 from typing import Dict
 
-from core.logging.interfaces import IFormatterFactory, IFormatter
-from core.logging.core import (
-    TextFormatter,
-    JsonFormatter,
-    ColoredFormatter
-)
+from core.logging.core import ColoredFormatter, JsonFormatter, TextFormatter
+from core.logging.interfaces import IFormatter, IFormatterFactory
 
 
 class FormatterFactory(IFormatterFactory):

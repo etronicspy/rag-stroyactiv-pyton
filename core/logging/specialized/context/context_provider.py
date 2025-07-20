@@ -4,12 +4,12 @@ Context provider implementation.
 This module provides a provider for context management.
 """
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Dict, Generator
+from typing import Any, Dict
 
 from core.logging.interfaces import IContextProvider
-
 
 # Context variable for context
 _context_var: ContextVar[Dict[str, Any]] = ContextVar("context", default={})

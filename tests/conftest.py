@@ -2,18 +2,22 @@
 Единая конфигурация для всех тестов RAG Construction Materials API
 Поддерживает автоматическое переключение между mock и real DB
 """
-import pytest
 import os
+
+import pytest
+
 # Ensure Watchfiles hot-reload is disabled in all processes spawned during the
 # pytest session. Uvicorn/Watchfiles honours the ``WATCHFILES_DISABLE`` env var.
 os.environ.setdefault("WATCHFILES_DISABLE", "true")
-import time
 import logging
-from core.logging import get_logger
+import time
 from datetime import datetime
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
 from fastapi.testclient import TestClient
 from qdrant_client import QdrantClient
+
+from core.logging import get_logger
 
 # Настраиваем логирование для тестов
 logging.basicConfig(level=logging.INFO)
@@ -124,7 +128,8 @@ def client_mock():
         # Создаем минимальное приложение без middleware для unit тестов
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
-        from api.routes import reference, health, materials, prices, search
+
+        from api.routes import health, materials, prices, reference, search
         
         app = FastAPI(title="Test API")
         
@@ -486,7 +491,8 @@ def _patch_openai(monkeypatch, test_mode):
         yield
         return
 
-    import types, sys
+    import sys
+    import types
 
     fake_module = types.ModuleType("openai")
 
@@ -540,8 +546,9 @@ def _patch_vector_db_factory(monkeypatch):
     This prevents expensive (or recursive) initialisation when core services
     call `get_vector_database()` during functional workflows.
     """
-    from core.database.factories import DatabaseFactory
     from unittest.mock import MagicMock
+
+    from core.database.factories import DatabaseFactory
 
     class _StubVectorDB(MagicMock):
         async def collection_exists(self, *args, **kwargs):

@@ -5,22 +5,27 @@ This module tests the SSH tunnel service functionality including configuration,
 connection management, and service lifecycle.
 """
 
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
-import tempfile
 import os
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
-from services.ssh_tunnel_service import SSHTunnelService, initialize_tunnel_service, shutdown_tunnel_service
+import pytest
+
+from services.ssh_tunnel_service import (
+    SSHTunnelService,
+    initialize_tunnel_service,
+    shutdown_tunnel_service,
+)
+from services.tunnel.exceptions import (
+    SSHTunnelAuthenticationError,
+    SSHTunnelConfigError,
+    SSHTunnelConnectionError,
+    SSHTunnelKeyError,
+)
+from services.tunnel.ssh_tunnel import SSHTunnel
 from services.tunnel.tunnel_config import TunnelConfig
 from services.tunnel.tunnel_manager import TunnelManager
-from services.tunnel.ssh_tunnel import SSHTunnel
-from services.tunnel.exceptions import (
-    SSHTunnelConnectionError,
-    SSHTunnelConfigError,
-    SSHTunnelAuthenticationError,
-    SSHTunnelKeyError
-)
 
 
 class TestTunnelConfig:

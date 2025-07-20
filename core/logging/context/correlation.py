@@ -5,12 +5,12 @@ Provides thread-safe, async-safe correlation ID propagation.
 Extracted and refactored from core/monitoring/context.py.
 """
 
-import uuid
-import sys
 import asyncio
+import sys
+import uuid
 from contextvars import ContextVar
-from typing import Optional, Callable, Any, Dict
 from functools import wraps
+from typing import Any, Callable, Dict, Optional
 
 from ..base.interfaces import ContextManagerInterface
 

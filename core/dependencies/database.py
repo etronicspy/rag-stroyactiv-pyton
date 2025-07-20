@@ -3,14 +3,19 @@
 Функции внедрения зависимостей БД для FastAPI с кешированием.
 """
 
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Any, Optional
-from contextlib import asynccontextmanager
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 
-from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
-from core.repositories.interfaces import IMaterialsRepository
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+
+from core.database.interfaces import (
+    ICacheDatabase,
+    IRelationalDatabase,
+    IVectorDatabase,
+)
 from core.repositories.hybrid_materials import HybridMaterialsRepository
+from core.repositories.interfaces import IMaterialsRepository
 
 # Глобальный кеш для engine чтобы избежать повторного создания
 _db_engine: Optional[AsyncEngine] = None
@@ -123,8 +128,9 @@ async def get_db_session():
     
     # Инициализируем engine и session_factory только один раз
     if _db_engine is None or _session_factory is None:
-        from core.config.base import get_settings
         from sqlalchemy.ext.asyncio import create_async_engine
+
+        from core.config.base import get_settings
         
         settings = get_settings()
         
@@ -160,6 +166,6 @@ def clear_dependency_cache() -> None:
     get_materials_repository.cache_clear()
     
     # Also clear factory caches
-    from core.database.factories import DatabaseFactory, AIClientFactory
+    from core.database.factories import AIClientFactory, DatabaseFactory
     DatabaseFactory.clear_cache()
     AIClientFactory.clear_cache() 

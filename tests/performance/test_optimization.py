@@ -7,13 +7,14 @@ Performance tests for optimization components
 - test_dynamic_pool_manager.py
 - test_redis_serialization_optimization.py
 """
-import pytest
 import asyncio
-import time
-from unittest.mock import Mock, AsyncMock, patch
-from typing import List, Dict
 import random
+import time
 from datetime import datetime
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
 
 # Mock all middleware classes since they don't exist
 class ConditionalMiddleware:
@@ -253,7 +254,7 @@ class DynamicPoolManager:
                 return True
         return False
     
-    def get_pool_metrics(self, pool_name: str = None) -> Dict:
+    def get_pool_metrics(self, pool_name: str = None) -> dict:
         """Get pool metrics."""
         if pool_name:
             return {pool_name: self.metrics.get(pool_name, {})} if pool_name in self.metrics else {}
@@ -289,7 +290,7 @@ class TestCompressionPerformance:
         
         # Test compression decision for many responses
         for _ in range(1000):
-            should_compress = compression_middleware._should_compress(
+            compression_middleware._should_compress(
                 mock_request, mock_response, 10000
             )
         
@@ -377,7 +378,7 @@ class TestBatchProcessorPerformance:
     @pytest.fixture
     def sample_processor(self):
         """Sample async processor function."""
-        async def process_batch(items: List[int]) -> List[int]:
+        async def process_batch(items: list[int]) -> list[int]:
             # Simulate processing time
             await asyncio.sleep(0.001 * len(items))  # 1ms per item
             return [item * 2 for item in items]
@@ -507,11 +508,11 @@ class TestIntegrationPerformance:
             include_paths=[r"/api/.*"]
         )
         
-        compression = CompressionMiddleware(app=Mock())
+        CompressionMiddleware(app=Mock())
         
         mock_redis = AsyncMock()
         with patch('redis.asyncio.from_url', return_value=mock_redis):
-            rate_limiter = RateLimitMiddleware(app=Mock())
+            RateLimitMiddleware(app=Mock())
         
         # Simulate realistic workload
         start_time = time.time()
@@ -534,8 +535,9 @@ class TestIntegrationPerformance:
     @pytest.mark.performance
     def test_optimization_memory_efficiency(self):
         """Test memory efficiency of optimization components."""
-        import psutil
         import os
+
+        import psutil
         
         try:
             process = psutil.Process(os.getpid())
@@ -755,15 +757,15 @@ class TestRedisSerializationPerformance:
         # Serialize 1000 times
         for _ in range(1000):
             serialized = msgpack.packb(large_material_data)
-            deserialized = msgpack.unpackb(serialized, raw=False)
+            msgpack.unpackb(serialized, raw=False)
         
         msgpack_time = time.time() - start_time
         assert msgpack_time < 0.5, f"Msgpack serialization took too long: {msgpack_time}s"
     
     def test_compression_performance(self, large_material_data):
         """Test compression performance for large data."""
-        import json
         import gzip
+        import json
         import zlib
         
         json_data = json.dumps(large_material_data).encode('utf-8')
@@ -835,6 +837,7 @@ class TestRedisSerializationPerformance:
     def test_embedding_vector_serialization_performance(self):
         """Test performance of embedding vector serialization."""
         import json
+
         import numpy as np
         
         # Generate large embedding vectors

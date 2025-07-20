@@ -14,14 +14,14 @@ Migrated and optimized from core/monitoring/performance_optimizer.py.
 
 import asyncio
 import json
-import time
 import threading
+import time
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import lru_cache, wraps
-from typing import Dict, List, Optional, Any, Callable, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 from weakref import WeakValueDictionary
 
 

@@ -5,43 +5,30 @@ High-level service for parsing construction materials with AI-powered analysis,
 batch processing, and comprehensive result management.
 """
 
-import json
 import asyncio
-from typing import Dict, List, Optional, Any, Union
-from pathlib import Path
-from functools import lru_cache
-from dataclasses import dataclass
+import json
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 # Core infrastructure imports
 from core.config.parsers import ParserConfig, get_parser_config
 from core.logging import get_logger
+from core.parsers.config.units_config_manager import get_units_manager
 
 # Parser interface imports
 from ..interfaces import (
-    IMaterialParser,
     AIParseRequest,
-    ParseStatus,
-    BatchParseRequest,
     BatchParseResult,
-    InputType,
-    OutputType
+    ParseStatus,
 )
-from ..interfaces.ai_parser_interface import MaterialParseData, AIParseResult
+from ..interfaces.ai_parser_interface import AIParseResult, MaterialParseData
 
 # Service imports
-from .ai_parser_service import AIParserService, get_ai_parser_service
-from core.parsers.config.units_config_manager import get_units_manager
+from .ai_parser_service import get_ai_parser_service
 
-# Legacy compatibility imports
-# The legacy parser_module has been removed, so these imports are no longer needed.
-# try:
-#     from parser_module.units_config import normalize_unit, get_common_units_for_ai
-#     LEGACY_IMPORTS_AVAILABLE = True
-# except ImportError:
-#     LEGACY_IMPORTS_AVAILABLE = False
-
-print("DEBUG: material_parser_service.py loaded")
 
 @dataclass
 class MaterialParseContext:
@@ -367,7 +354,7 @@ class MaterialParserService:
         
         try:
             # Load materials from file
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 data = json.load(f)
             
             # Extract material texts

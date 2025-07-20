@@ -5,20 +5,19 @@ Specialized interface for AI-powered parsing operations with support for
 embeddings, confidence scoring, and advanced AI features.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional, Union, Generic, TypeVar
-from pydantic import BaseModel, Field
+from abc import abstractmethod
 from enum import Enum
+from typing import Any, Dict, List, Optional, TypeVar
+
+from pydantic import BaseModel, Field
 
 from .parser_interface import (
+    ConfigType,
     IBaseParser,
-    ParseRequest,
-    ParseResult,
-    BatchParseRequest,
-    BatchParseResult,
     InputType,
     OutputType,
-    ConfigType
+    ParseRequest,
+    ParseResult,
 )
 
 # AI-specific types

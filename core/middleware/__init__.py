@@ -8,11 +8,14 @@ This package contains middleware components for:
 - Error handling and monitoring
 """
 
-from core.logging.specialized.http.request_logging_middleware import RequestLoggingMiddleware as LoggingMiddleware
+from core.logging.specialized.http.request_logging_middleware import (
+    RequestLoggingMiddleware as LoggingMiddleware,
+)
+
+from .compression import CompressionMiddleware
+from .conditional import ConditionalMiddleware, MiddlewareOptimizer
 from .rate_limiting import RateLimitMiddleware
 from .security import SecurityMiddleware
-from .conditional import ConditionalMiddleware, MiddlewareOptimizer
-from .compression import CompressionMiddleware
 
 __all__ = [
     "LoggingMiddleware",

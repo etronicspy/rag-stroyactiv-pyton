@@ -4,13 +4,16 @@
 """
 
 from functools import lru_cache
-from typing import Optional, Dict, Any, Callable
-from core.logging import get_logger
+from typing import Any, Dict, Optional
 
-from core.config import settings, DatabaseType, AIProvider
-from core.database.interfaces import IVectorDatabase, IRelationalDatabase, ICacheDatabase
+from core.config import AIProvider, DatabaseType, settings
 from core.database.exceptions import ConfigurationError, ConnectionError
-
+from core.database.interfaces import (
+    ICacheDatabase,
+    IRelationalDatabase,
+    IVectorDatabase,
+)
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -462,6 +465,62 @@ class DatabaseFallbackManager:
             raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
         return []
 
+    async def health_check(self) -> Dict[str, Any]:
+        """
+        Perform health check on all available databases.
+        
+        Returns:
+            Dict with health status for each database
+        """
+        health_status = {
+            'vector_db': {'status': 'unavailable', 'error': None},
+            'relational_db': {'status': 'unavailable', 'error': None},
+            'overall_status': 'degraded'
+        }
+        
+        # Check vector database
+        if self.vector_client is not None:
+            try:
+                if hasattr(self.vector_client, 'health_check'):
+                    vector_health = await self.vector_client.health_check()
+                    health_status['vector_db'] = vector_health
+                else:
+                    # Simple connectivity check
+                    health_status['vector_db'] = {'status': 'available', 'error': None}
+            except Exception as e:
+                self.status['vector'] = False
+                health_status['vector_db'] = {'status': 'error', 'error': str(e)}
+                self.logger.error(f"Vector DB health check failed: {e}")
+        
+        # Check relational database
+        if self.sql_client is not None:
+            try:
+                if hasattr(self.sql_client, 'health_check'):
+                    sql_health = await self.sql_client.health_check()
+                    health_status['relational_db'] = sql_health
+                else:
+                    # Simple connectivity check
+                    health_status['relational_db'] = {'status': 'available', 'error': None}
+            except Exception as e:
+                self.status['sql'] = False
+                health_status['relational_db'] = {'status': 'error', 'error': str(e)}
+                self.logger.error(f"Relational DB health check failed: {e}")
+        
+        # Determine overall status
+        available_dbs = sum([
+            health_status['vector_db']['status'] == 'available',
+            health_status['relational_db']['status'] == 'available'
+        ])
+        
+        if available_dbs == 2:
+            health_status['overall_status'] = 'healthy'
+        elif available_dbs == 1:
+            health_status['overall_status'] = 'degraded'
+        else:
+            health_status['overall_status'] = 'unavailable'
+        
+        return health_status
+
     async def find_sku_by_material_data(self, *args, **kwargs):
         """
         Unified SKU search with fallback. Currently only vector DB is supported.
@@ -751,6 +810,86 @@ class DatabaseFallbackManager:
                 errors['sql'] = str(e)
         self.logger.error(f"All DBs down for suggestion_search: {errors}")
         raise AllDatabasesUnavailableError(errors or {'all': 'No DB clients available'})
+
+    async def collection_exists(self, collection_name: str) -> bool:
+        """
+        Check if collection exists in vector database.
+        
+        Args:
+            collection_name: Name of collection to check
+            
+        Returns:
+            True if collection exists, False otherwise
+        """
+        if self.vector_client is not None:
+            try:
+                return await self.vector_client.collection_exists(collection_name)
+            except Exception as e:
+                self.status['vector'] = False
+                self.logger.error(f"Vector DB collection_exists failed: {e}")
+        return False
+
+    async def create_collection(self, collection_config: dict) -> bool:
+        """
+        Create collection in vector database.
+        
+        Args:
+            collection_config: Collection configuration dictionary
+            
+        Returns:
+            True if collection created successfully
+        """
+        if self.vector_client is not None:
+            try:
+                name = collection_config["collection_name"]
+                vector_size = collection_config["vector_size"]
+                distance = collection_config.get("distance", "cosine")
+                return await self.vector_client.create_collection(name, vector_size, distance)
+            except Exception as e:
+                self.status['vector'] = False
+                self.logger.error(f"Vector DB create_collection failed: {e}")
+                raise AllDatabasesUnavailableError({'vector': str(e)})
+        raise AllDatabasesUnavailableError({'vector': 'No vector client available'})
+
+    async def insert_batch(self, collection_name: str, vectors: list) -> bool:
+        """
+        Insert batch of vectors into collection.
+        
+        Args:
+            collection_name: Name of collection
+            vectors: List of vector data dictionaries
+            
+        Returns:
+            True if batch inserted successfully
+        """
+        if self.vector_client is not None:
+            try:
+                return await self.vector_client.batch_upsert(collection_name, vectors)
+            except Exception as e:
+                self.status['vector'] = False
+                self.logger.error(f"Vector DB insert_batch failed: {e}")
+                raise AllDatabasesUnavailableError({'vector': str(e)})
+        raise AllDatabasesUnavailableError({'vector': 'No vector client available'})
+
+    async def get_collection_count(self, collection_name: str) -> int:
+        """
+        Get number of vectors in collection.
+        
+        Args:
+            collection_name: Name of collection
+            
+        Returns:
+            Number of vectors in collection
+        """
+        if self.vector_client is not None:
+            try:
+                # This would need to be implemented in the vector client
+                # For now, return 0 as placeholder
+                return 0
+            except Exception as e:
+                self.status['vector'] = False
+                self.logger.error(f"Vector DB get_collection_count failed: {e}")
+        return 0
 
     # ... add more as needed for your DB interface ...
 

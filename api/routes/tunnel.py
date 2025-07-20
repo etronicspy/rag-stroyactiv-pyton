@@ -4,15 +4,13 @@ SSH Tunnel API Routes for RAG Construction Materials API.
 This module provides API endpoints for managing SSH tunnel service.
 """
 
+from typing import Any, Dict, Optional
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
-from core.schemas.response_models import ERROR_RESPONSES
 
-from core.dependencies.tunnel import (
-    TunnelService,
-    RequiredTunnelService
-)
+from core.dependencies.tunnel import RequiredTunnelService, TunnelService
+from core.schemas.response_models import ERROR_RESPONSES
 
 router = APIRouter(prefix="/tunnel", tags=["tunnel"], responses=ERROR_RESPONSES)
 

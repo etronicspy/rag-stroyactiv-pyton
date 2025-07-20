@@ -3,8 +3,10 @@ Tests for SecurityMiddleware recovery functionality.
 Testing POST body validation that was previously disabled.
 """
 
-from fastapi.testclient import TestClient
 from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
 from main import app
 
 client = TestClient(app)

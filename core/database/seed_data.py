@@ -5,9 +5,11 @@
 """
 
 from typing import Dict
-from core.logging import get_logger
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 

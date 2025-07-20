@@ -5,17 +5,16 @@ Integration tests for complete RAG pipeline.
 id, name, unit → AI_parser → RAG нормализация → Поиск SKU → Сохранение в БД → id, sku
 """
 
+
 import pytest
-import asyncio
-from typing import Dict, Any
+
+from core.logging import get_logger
 from core.schemas.pipeline_models import (
     MaterialProcessRequest,
-    ProcessingResult,
+    ProcessingStage,
     ProcessingStatus,
-    ProcessingStage
 )
 from services.material_processing_pipeline import MaterialProcessingPipeline
-from core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -129,7 +128,7 @@ class TestRAGPipeline:
         assert result.rag_normalization.unit_embedding_similarity is not None
         assert result.rag_normalization.unit_normalization_method == "embedding_comparison"
         
-        logger.info(f"✅ Embedding comparison test passed")
+        logger.info("✅ Embedding comparison test passed")
     
     @pytest.mark.asyncio
     async def test_sku_assignment(self, pipeline):
@@ -162,7 +161,7 @@ class TestRAGPipeline:
         if result.sku:
             logger.info(f"✅ SKU assignment test passed: SKU={result.sku}")
         else:
-            logger.info(f"⚠️ SKU assignment test: No SKU found (this may be normal for test data)")
+            logger.info("⚠️ SKU assignment test: No SKU found (this may be normal for test data)")
     
     @pytest.mark.asyncio
     async def test_database_save(self, pipeline):
@@ -282,7 +281,7 @@ class TestRAGPipeline:
         assert stats.total_requests >= 0
         assert stats.statistics_updated_at is not None
         
-        logger.info(f"✅ Pipeline configuration test passed")
+        logger.info("✅ Pipeline configuration test passed")
     
     @pytest.mark.asyncio
     async def test_pipeline_health_check(self, pipeline):

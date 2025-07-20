@@ -262,5 +262,4 @@ exclude = [".venv", "alembic/versions"]
 # Enable automatic formatting on ruff check --fix
 [tool.ruff.format]
 quote-style = "preserve"
-indent-style = "space"
-line-length = 88 
+indent-style = "space" 

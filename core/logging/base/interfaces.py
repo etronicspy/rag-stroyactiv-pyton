@@ -4,9 +4,9 @@ Abstract interfaces for the logging system.
 Defines contracts that all logging components must follow.
 """
 
-from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, Union
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional, Union
 
 
 class LoggerInterface(ABC):

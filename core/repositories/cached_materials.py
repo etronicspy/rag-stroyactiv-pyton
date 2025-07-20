@@ -3,18 +3,18 @@
 Кеширующий репозиторий материалов с интеллектуальным кешированием и cache-aside pattern.
 """
 
-import json
-import hashlib
-from core.logging import get_logger
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 import asyncio
+import hashlib
+import json
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from core.repositories.hybrid_materials import HybridMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import DatabaseError
-from core.schemas.materials import MaterialCreate, Material, SearchResponse
-from typing import Dict, Any
+from core.logging import get_logger
+from core.repositories.hybrid_materials import HybridMaterialsRepository
+from core.schemas.materials import Material, MaterialCreate, SearchResponse
+
 
 # Simple replacement for MaterialSearchRequest
 class MaterialSearchRequest:

@@ -1,19 +1,32 @@
 """
-Rate limiting middleware using Redis backend.
-Implements sliding window rate limiting with different tiers.
+Rate Limiting Middleware
+
+This module provides rate limiting functionality for FastAPI applications,
+including request counting, time-based limits, and configurable thresholds.
 """
 
+import logging
+import os
 import time
-from typing import Optional, Dict, Any, Callable, Tuple
-from core.logging import get_logger
+from typing import Any, Callable, Dict, Optional, Tuple
 
+import redis.asyncio as aioredis
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-import redis.asyncio as aioredis
 
-from core.config import settings
+logger = logging.getLogger(__name__)
 
-logger = get_logger(__name__)
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+class RateLimits:
+    """Rate limiting configuration."""
+    REQUESTS_PER_MINUTE = get_env_int("RATE_LIMIT_REQUESTS_PER_MINUTE", 60)
+    REQUESTS_PER_HOUR = get_env_int("RATE_LIMIT_REQUESTS_PER_HOUR", 1000)
+    BURST_LIMIT = get_env_int("RATE_LIMIT_BURST_LIMIT", 10)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -38,10 +51,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         rate_limit_headers: bool = True,
     ):
         super().__init__(app)
-        self.redis_url = redis_url or settings.REDIS_URL
-        self.default_rpm = default_requests_per_minute
-        self.default_rph = default_requests_per_hour
-        self.default_burst = default_burst_size
+        self.redis_url = redis_url or os.getenv("REDIS_URL")
+        self.default_rpm = default_requests_per_minute or RateLimits.REQUESTS_PER_MINUTE
+        self.default_rph = default_requests_per_hour or RateLimits.REQUESTS_PER_HOUR
+        self.default_burst = default_burst_size or RateLimits.BURST_LIMIT
         self.enable_burst = enable_burst_protection
         self.include_headers = rate_limit_headers
         

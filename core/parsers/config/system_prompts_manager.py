@@ -6,32 +6,50 @@ caching, and context-aware prompt generation.
 """
 
 import json
+import logging
+import os
 import time
-from typing import Dict, List, Optional, Any, Union
-from pathlib import Path
-from functools import lru_cache
 from dataclasses import dataclass, field
 from enum import Enum
-import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
-# Core infrastructure imports
-from core.config.parsers import ParserConfig, get_parser_config
-from core.config.constants import ParserConstants
-from core.logging.specialized.parsers import get_material_parser_logger
+logger = logging.getLogger(__name__)
 
-# Legacy compatibility imports
-# The legacy parser_module has been removed, so these imports are no longer needed.
-# try:
-#     from parser_module.system_prompts import (
-#         get_material_parsing_system_prompt,
-#         get_material_parsing_user_prompt,
-#         get_embeddings_system_prompt,
-#         MATERIAL_TYPE_PROMPTS,
-#         UNIT_PARSING_PATTERNS
-#     )
-#     LEGACY_PROMPTS_AVAILABLE = True
-# except ImportError:
-#     LEGACY_PROMPTS_AVAILABLE = False
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+def get_env_str(key: str, default: str) -> str:
+    """Get string value from environment variable."""
+    return os.getenv(key, default)
+
+
+def get_env_float(key: str, default: float) -> float:
+    """Get float value from environment variable."""
+    return float(os.getenv(key, str(default)))
+
+
+class ParserConstants:
+    """Constants for parser operations."""
+    DEFAULT_OPENAI_MODEL = get_env_str("PARSER_CONSTANT_DEFAULT_OPENAI_MODEL", "gpt-4o-mini")
+    DEFAULT_EMBEDDING_MODEL = get_env_str("PARSER_CONSTANT_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+    DEFAULT_EMBEDDING_DIMENSIONS = get_env_int("PARSER_CONSTANT_DEFAULT_EMBEDDING_DIMENSIONS", 1536)
+    DEFAULT_BATCH_SIZE = get_env_int("PARSER_CONSTANT_DEFAULT_BATCH_SIZE", 10)
+    MAX_BATCH_SIZE = get_env_int("PARSER_CONSTANT_MAX_BATCH_SIZE", 50)
+    MIN_BATCH_SIZE = get_env_int("PARSER_CONSTANT_MIN_BATCH_SIZE", 1)
+    DEFAULT_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_DEFAULT_CONFIDENCE_THRESHOLD", 0.85)
+    MIN_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_MIN_CONFIDENCE_THRESHOLD", 0.1)
+    MAX_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_MAX_CONFIDENCE_THRESHOLD", 1.0)
+    DEFAULT_PARSER_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_PARSER_TIMEOUT", 30)
+    DEFAULT_AI_REQUEST_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_AI_REQUEST_TIMEOUT", 45)
+    DEFAULT_BATCH_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_BATCH_TIMEOUT", 300)
+    DEFAULT_RETRY_ATTEMPTS = get_env_int("PARSER_CONSTANT_DEFAULT_RETRY_ATTEMPTS", 3)
+    MAX_RETRY_ATTEMPTS = get_env_int("PARSER_CONSTANT_MAX_RETRY_ATTEMPTS", 10)
+    DEFAULT_CACHE_TTL = get_env_int("PARSER_CONSTANT_DEFAULT_CACHE_TTL", 3600)  # 1 hour
+    DEFAULT_EMBEDDING_CACHE_TTL = get_env_int("PARSER_CONSTANT_DEFAULT_EMBEDDING_CACHE_TTL", 86400)  # 24 hours
 
 
 class PromptType(Enum):
@@ -678,7 +696,7 @@ Output only the descriptive embedding string, nothing else.
                 return False
             
             # Load templates file
-            with open(input_path, 'r', encoding='utf-8') as f:
+            with open(input_path, encoding='utf-8') as f:
                 import_data = json.load(f)
             
             # Validate import data

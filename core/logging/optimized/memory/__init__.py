@@ -4,7 +4,11 @@ Memory optimization module.
 This module provides components for optimizing memory usage in logging.
 """
 
-from core.logging.optimized.memory.logger_pool import LoggerPool, get_logger, get_default_pool
+from core.logging.optimized.memory.logger_pool import (
+    LoggerPool,
+    get_default_pool,
+    get_logger,
+)
 from core.logging.optimized.memory.message_cache import (
     MessageCache,
     StructuredLogCache,

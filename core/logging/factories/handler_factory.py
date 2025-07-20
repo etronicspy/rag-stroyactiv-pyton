@@ -8,14 +8,14 @@ import sys
 from functools import lru_cache
 from typing import Dict, Optional, TextIO
 
-from core.logging.interfaces import IHandlerFactory, IHandler, IFormatter
 from core.logging.core import (
     ConsoleHandler,
     FileHandler,
+    NullHandler,
     RotatingFileHandler,
-    NullHandler
 )
 from core.logging.factories.formatter_factory import get_text_formatter
+from core.logging.interfaces import IFormatter, IHandler, IHandlerFactory
 
 
 class HandlerFactory(IHandlerFactory):

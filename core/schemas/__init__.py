@@ -4,92 +4,91 @@ Pydantic схемы для RAG Construction Materials API.
 """
 
 # Material schemas
-from .materials import (
-    MaterialBase,
-    MaterialCreate,
-    MaterialUpdate,
-    Material,
-    MaterialSearchQuery,
-    MaterialFilterOptions,
-    SortOption,
-    PaginationOptions,
-    AdvancedSearchQuery,
-    SearchSuggestion,
-    SearchHighlight,
-    MaterialSearchResult,
-    SearchResponse,
-    SearchAnalytics,
-    Category,
-    Unit,
-    MaterialBatchCreate,
-    MaterialBatchResponse,
-    MaterialImportItem,
-    MaterialImportRequest,
-    RawProductCreate,
-    RawProduct,
-    RawProductListResponse
-)
-
 # Color schemas - NEW
 from .colors import (
-    ColorReference,
     ColorCreate,
-    ColorUpdate,
+    ColorListResponse,
     ColorNormalizationRequest,
     ColorNormalizationResponse,
+    ColorReference,
     ColorSearchQuery,
     ColorSearchResult,
-    ColorListResponse
+    ColorUpdate,
 )
 
 # Enhanced parsing schemas - NEW (Updated for RAG Integration)
 from .enhanced_parsing import (
-    EnhancedParseRequest,
-    EnhancedParseResult,
     BatchParseRequest,
     BatchParseResponse,
-    ParserIntegrationConfig,
     ColorExtractionResult,
-    EmbeddingGenerationResult
+    EmbeddingGenerationResult,
+    EnhancedParseRequest,
+    EnhancedParseResult,
+    ParserIntegrationConfig,
+)
+from .materials import (
+    AdvancedSearchQuery,
+    Category,
+    Material,
+    MaterialBase,
+    MaterialBatchCreate,
+    MaterialBatchResponse,
+    MaterialCreate,
+    MaterialFilterOptions,
+    MaterialImportItem,
+    MaterialImportRequest,
+    MaterialSearchQuery,
+    MaterialSearchResult,
+    MaterialUpdate,
+    PaginationOptions,
+    RawProduct,
+    RawProductCreate,
+    RawProductListResponse,
+    SearchAnalytics,
+    SearchHighlight,
+    SearchResponse,
+    SearchSuggestion,
+    SortOption,
+    Unit,
 )
 
 # Pipeline processing schemas - NEW (Stage 4)
 from .pipeline_models import (
-    ProcessingStage,
-    ProcessingStatus,
-    MaterialProcessRequest,
     AIParsingResult,
-    RAGNormalizationResult,
-    SKUSearchResult,
-    DatabaseSaveResult,
-    ProcessingResult,
+    BatchEmbeddingRequest,
+    BatchEmbeddingResponse,
     BatchProcessingRequest,
     BatchProcessingResponse,
-    PipelineConfiguration,
-    PipelineStatistics,
+    CombinedEmbeddingConfig,
     # Combined Embedding models
     CombinedEmbeddingRequest,
     CombinedEmbeddingResult,
-    BatchEmbeddingRequest,
-    BatchEmbeddingResponse,
+    DatabaseSaveResult,
     EmbeddingCacheEntry,
-    CombinedEmbeddingConfig
+    MaterialProcessRequest,
+    PipelineConfiguration,
+    PipelineStatistics,
+    ProcessingResult,
+    ProcessingStage,
+    ProcessingStatus,
+    RAGNormalizationResult,
+    SKUSearchResult,
 )
 
 # Processing models for batch API
 from .processing_models import (
-    ProcessingStatus,
-    MaterialInput,
     BatchMaterialsRequest,
     BatchProcessingResponse,
+    BatchResponse,
     BatchValidationError,
-    ProcessingProgress,
-    ProcessingStatusResponse,
+    MaterialInput,
     MaterialProcessingResult,
-    ProcessingResultsResponse,
     ProcessingJobConfig,
+    ProcessingProgress,
+    ProcessingResultsResponse,
     ProcessingStatistics,
-    BatchResponse
+    ProcessingStatus,
+    ProcessingStatusResponse,
 )
 
 __all__ = [

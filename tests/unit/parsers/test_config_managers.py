@@ -4,18 +4,17 @@ Unit Tests for Parser Configuration Managers
 Tests for configuration management in core.parsers.config
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any, Optional, List
-from pathlib import Path
-import tempfile
 import json
 import os
+import tempfile
+from typing import Any
+
+import pytest
 
 from core.parsers.config import (
     get_parser_config_manager,
     get_system_prompts_manager,
-    get_units_config_manager
+    get_units_config_manager,
 )
 
 
@@ -198,7 +197,7 @@ class TestParserConfigManager:
             
             # Verify file exists and contains valid JSON
             assert os.path.exists(temp_path)
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 exported_data = json.load(f)
             
             assert isinstance(exported_data, dict)
@@ -272,7 +271,7 @@ class TestParserConfigManager:
         callback_profile = None
         callback_changes = None
         
-        def test_callback(profile: str, changes: Dict[str, Any]):
+        def test_callback(profile: str, changes: dict[str, Any]):
             nonlocal callback_called, callback_profile, callback_changes
             callback_called = True
             callback_profile = profile

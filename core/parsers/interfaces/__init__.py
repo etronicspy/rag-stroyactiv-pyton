@@ -5,49 +5,41 @@ This package contains all abstract base classes and interfaces for parser implem
 Provides type-safe contracts for parsing operations with support for generics and protocols.
 """
 
-from .parser_interface import (
-    # Generic types
-    InputType,
-    OutputType,
-    ConfigType,
-    
-    # Enums
-    ParseStatus,
-    
-    # Base models
-    ParseResult,
-    ParseRequest,
-    BatchParseRequest,
-    BatchParseResult,
-    
-    # Protocols
-    IParserHealthCheck,
-    IParserConfig,
-    IParserMetrics,
-    
-    # Base interface
-    IBaseParser
-)
-
 from .ai_parser_interface import (
-    # AI-specific types
-    EmbeddingType,
-    PromptType,
-    
     # AI enums
     AIModelType,
     AIParseMode,
-    
     # AI models
     AIParseRequest,
     AIParseResult,
-    MaterialParseData,
-    TextParseData,
-    
+    # AI-specific types
+    EmbeddingType,
     # AI interfaces
     IAIParser,
     IMaterialParser,
-    ITextParser
+    ITextParser,
+    MaterialParseData,
+    PromptType,
+    TextParseData,
+)
+from .parser_interface import (
+    BatchParseRequest,
+    BatchParseResult,
+    ConfigType,
+    # Base interface
+    IBaseParser,
+    # Generic types
+    InputType,
+    IParserConfig,
+    # Protocols
+    IParserHealthCheck,
+    IParserMetrics,
+    OutputType,
+    ParseRequest,
+    # Base models
+    ParseResult,
+    # Enums
+    ParseStatus,
 )
 
 # Version information

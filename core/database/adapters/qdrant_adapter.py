@@ -3,18 +3,17 @@
 Адаптер для Qdrant Vector Database с поддержкой облачной и локальной версий.
 """
 
-from typing import List, Dict, Any, Optional
-from core.logging import get_logger
 import asyncio
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, PointStruct, VectorParams
 
+from core.database.exceptions import ConnectionError, DatabaseError, QueryError
 from core.database.interfaces import IVectorDatabase
-from core.database.exceptions import ConnectionError, QueryError, DatabaseError
+from core.logging import get_logger
 from core.repositories.interfaces import IBatchProcessingRepository
-from datetime import datetime
-
 
 logger = get_logger(__name__)
 
@@ -152,7 +151,7 @@ class QdrantVectorDatabase(IVectorDatabase, IBatchProcessingRepository):
             
         except Exception as e:
             logger.error(f"Failed to upsert vectors to {collection_name}: {e}")
-            raise DatabaseError(f"Failed to upsert vectors", details=str(e))
+            raise DatabaseError("Failed to upsert vectors", details=str(e))
     
     async def search(self, collection_name: str, query_vector: List[float], 
                     limit: int = 10, filter_conditions: Optional[Dict] = None) -> List[Dict[str, Any]]:
@@ -362,7 +361,7 @@ class QdrantVectorDatabase(IVectorDatabase, IBatchProcessingRepository):
             
         except Exception as e:
             logger.error(f"Failed batch upsert to {collection_name}: {e}")
-            raise DatabaseError(f"Batch upsert failed", details=str(e))
+            raise DatabaseError("Batch upsert failed", details=str(e))
     
     async def health_check(self) -> Dict[str, Any]:
         """Check database health status.

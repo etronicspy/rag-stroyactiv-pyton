@@ -6,17 +6,15 @@ Optimized Search Service with Parallel Hybrid Search and Advanced Caching.
 
 import asyncio
 import time
-from core.logging import get_logger
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
-from core.schemas.materials import (
-    AdvancedSearchQuery, SearchResponse
-)
-from core.repositories.cached_materials import CachedMaterialsRepository
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import DatabaseError
+from core.logging import get_logger
+from core.repositories.cached_materials import CachedMaterialsRepository
+from core.schemas.materials import AdvancedSearchQuery, SearchResponse
 from services.advanced_search import AdvancedSearchService
 
 logger = get_logger(__name__)
@@ -219,7 +217,10 @@ class OptimizedSearchService(AdvancedSearchService):
         query: AdvancedSearchQuery
     ) -> SearchTaskResult:
         """Create and execute a search task with performance monitoring (через fallback manager)."""
-        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        from core.database.factories import (
+            AllDatabasesUnavailableError,
+            get_fallback_manager,
+        )
         async with self._search_semaphore:
             start_time = time.time()
             fallback_manager = get_fallback_manager()

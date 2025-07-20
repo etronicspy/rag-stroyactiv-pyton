@@ -4,16 +4,17 @@ Middleware factory for creating and configuring middleware stack.
 Provides centralized middleware configuration and eliminates duplication in main.py.
 """
 
-from typing import List, Tuple, Dict, Any, Type
+from typing import Any, Dict, List, Tuple, Type
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import Settings
 from core.middleware import LoggingMiddleware
-from core.middleware.security import SecurityMiddleware
+from core.middleware.body_cache import BodyCacheMiddleware
 from core.middleware.compression import CompressionMiddleware
 from core.middleware.rate_limiting import RateLimitMiddleware
-from core.middleware.body_cache import BodyCacheMiddleware
+from core.middleware.security import SecurityMiddleware
 
 
 class MiddlewareConfig:

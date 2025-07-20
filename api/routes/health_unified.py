@@ -1,11 +1,10 @@
-from datetime import datetime
 import time
+from datetime import datetime
 from typing import Any, Dict
 
 from fastapi import APIRouter
 
 from core.config import get_settings
-from core.database.factories import DatabaseFactory
 from core.logging import get_logger
 from core.schemas.response_models import ERROR_RESPONSES
 
@@ -35,7 +34,7 @@ def _basic_health() -> Dict[str, Any]:
 
 
 async def _vector_db_health() -> Dict[str, Any]:
-    """Check vector database connectivity, if configured."""
+    """Check vector database connectivity using fallback manager."""
 
     db_info: Dict[str, Any] = {
         "type": settings.DATABASE_TYPE.value if hasattr(settings, "DATABASE_TYPE") else "unknown",
@@ -43,11 +42,17 @@ async def _vector_db_health() -> Dict[str, Any]:
         "details": {},
     }
     try:
-        vector_db = DatabaseFactory.create_vector_database()
-        if hasattr(vector_db, "health_check"):
-            db_info.update(await vector_db.health_check())  # type: ignore
-        else:
-            db_info["status"] = "unknown"
+        from core.database.factories import (
+            AllDatabasesUnavailableError,
+            get_fallback_manager,
+        )
+        
+        fallback_manager = get_fallback_manager()
+        db_info.update(await fallback_manager.health_check())
+    except AllDatabasesUnavailableError as e:
+        db_info["status"] = "unavailable"
+        db_info["error"] = f"All databases unavailable: {str(e)}"
+        logger.error(f"All vector databases unavailable: {e}")
     except Exception as exc:
         db_info["status"] = "error"
         db_info["error"] = str(exc)

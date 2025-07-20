@@ -3,22 +3,29 @@
 Refactored materials API routes with new multi-database architecture.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
 from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
+from core.database.exceptions import DatabaseError
+from core.database.interfaces import IVectorDatabase
+from core.dependencies.database import (
+    get_ai_client_dependency,
+    get_vector_db_dependency,
+)
 from core.logging import get_logger
 from core.schemas.materials import (
-    MaterialCreate, MaterialUpdate, Material, MaterialSearchQuery, 
-    MaterialBatchCreate, MaterialBatchResponse, MaterialImportRequest
+    Material,
+    MaterialBatchCreate,
+    MaterialBatchResponse,
+    MaterialCreate,
+    MaterialImportRequest,
+    MaterialUpdate,
 )
 from core.schemas.response_models import ERROR_RESPONSES
-from core.database.interfaces import IVectorDatabase
-from core.dependencies.database import get_vector_db_dependency, get_ai_client_dependency
-from core.database.exceptions import DatabaseError
 from services.materials import MaterialsService
-
 
 logger = get_logger(__name__)
 router = APIRouter(
@@ -109,7 +116,6 @@ async def health_check(
     health_status = {
         "status": "healthy",
         "service": "MaterialsService",
-        "mode": "qdrant-only",
         "available_endpoints": {
             "search": "POST /api/v1/materials/search",
             "batch": "POST /api/v1/materials/batch", 
@@ -122,6 +128,19 @@ async def health_check(
         }
     }
     
+    # Determine mode based on configuration
+    from core.config import get_settings
+    settings = get_settings()
+    
+    if settings.QDRANT_ONLY_MODE:
+        health_status["mode"] = "qdrant-only"
+    elif settings.DISABLE_POSTGRESQL_CONNECTION and not settings.DISABLE_QDRANT_CONNECTION:
+        health_status["mode"] = "vector-only"
+    elif settings.DISABLE_QDRANT_CONNECTION and not settings.DISABLE_POSTGRESQL_CONNECTION:
+        health_status["mode"] = "relational-only"
+    else:
+        health_status["mode"] = "hybrid"
+    
     # Try to check service health
     if service is None:
         health_status.update({
@@ -131,11 +150,24 @@ async def health_check(
         })
     else:
         try:
-            # Try to check vector database health
-            vector_health = await service.vector_db.health_check()
+            # Try to check vector database health using fallback manager
+            from core.database.factories import (
+                AllDatabasesUnavailableError,
+                get_fallback_manager,
+            )
+            
+            fallback_manager = get_fallback_manager()
+            vector_health = await fallback_manager.health_check()
             health_status.update({
                 "vector_database": vector_health,
                 "service_status": "operational"
+            })
+        except AllDatabasesUnavailableError as e:
+            health_status.update({
+                "status": "degraded",
+                "service_status": "vector_db_error",
+                "vector_db_error": str(e),
+                "message": "All vector databases unavailable"
             })
         except Exception as e:
             health_status.update({

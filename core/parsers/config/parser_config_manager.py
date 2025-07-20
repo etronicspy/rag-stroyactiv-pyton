@@ -5,17 +5,15 @@ Advanced configuration management for parser operations with environment integra
 validation, and dynamic configuration updates.
 """
 
-import os
 import json
-from typing import Dict, Any, List, Optional, Union
-from pathlib import Path
-from functools import lru_cache
-from dataclasses import dataclass, asdict
 from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 # Core infrastructure imports
 from core.config.parsers import ParserConfig, get_parser_config
-from core.config.parsers import ParserConstants
 from core.logging import get_logger
 
 
@@ -463,7 +461,7 @@ class ParserConfigManager:
                 return False
             
             # Load configuration file
-            with open(input_path, 'r', encoding='utf-8') as f:
+            with open(input_path, encoding='utf-8') as f:
                 import_data = json.load(f)
             
             # Validate import data structure

@@ -4,11 +4,13 @@ Comprehensive PostgreSQL Connection Tests with SSH Tunnel Integration.
 Тесты проверяют подключение к PostgreSQL через существующий SSH tunnel service.
 """
 
-import pytest
 import asyncio
-from unittest.mock import patch, MagicMock, AsyncMock
-from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from core.config import get_settings
+from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
 from services.ssh_tunnel_service import get_tunnel_service
 
 
@@ -193,8 +195,8 @@ class TestPostgreSQLConnectionScenarios:
 
 if __name__ == "__main__":
     # Simple test runner
-    import sys
     import logging
+    import sys
     
     logging.basicConfig(level=logging.INFO)
     

@@ -6,20 +6,53 @@ conversion, and dynamic configuration for construction materials.
 """
 
 import json
-import time
-from typing import Dict, List, Set, Optional, Any, Union, Tuple
-from pathlib import Path
-from functools import lru_cache
-from dataclasses import dataclass, field, asdict
-from enum import Enum
+import logging
+import os
 import re
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-# Core infrastructure imports
-from core.config.parsers import ParserConfig, get_parser_config
-from core.config.constants import ParserConstants
-from core.logging.specialized.parsers import get_material_parser_logger
+logger = logging.getLogger(__name__)
 
-print("DEBUG: core/parsers/config/units_config_manager.py loaded")
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+def get_env_str(key: str, default: str) -> str:
+    """Get string value from environment variable."""
+    return os.getenv(key, default)
+
+
+def get_env_float(key: str, default: float) -> float:
+    """Get float value from environment variable."""
+    return float(os.getenv(key, str(default)))
+
+
+class ParserConstants:
+    """Constants for parser operations."""
+    DEFAULT_OPENAI_MODEL = get_env_str("PARSER_CONSTANT_DEFAULT_OPENAI_MODEL", "gpt-4o-mini")
+    DEFAULT_EMBEDDING_MODEL = get_env_str("PARSER_CONSTANT_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+    DEFAULT_EMBEDDING_DIMENSIONS = get_env_int("PARSER_CONSTANT_DEFAULT_EMBEDDING_DIMENSIONS", 1536)
+    DEFAULT_BATCH_SIZE = get_env_int("PARSER_CONSTANT_DEFAULT_BATCH_SIZE", 10)
+    MAX_BATCH_SIZE = get_env_int("PARSER_CONSTANT_MAX_BATCH_SIZE", 50)
+    MIN_BATCH_SIZE = get_env_int("PARSER_CONSTANT_MIN_BATCH_SIZE", 1)
+    DEFAULT_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_DEFAULT_CONFIDENCE_THRESHOLD", 0.85)
+    MIN_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_MIN_CONFIDENCE_THRESHOLD", 0.1)
+    MAX_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_MAX_CONFIDENCE_THRESHOLD", 1.0)
+    DEFAULT_PARSER_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_PARSER_TIMEOUT", 30)
+    DEFAULT_AI_REQUEST_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_AI_REQUEST_TIMEOUT", 45)
+    DEFAULT_BATCH_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_BATCH_TIMEOUT", 300)
+    DEFAULT_RETRY_ATTEMPTS = get_env_int("PARSER_CONSTANT_DEFAULT_RETRY_ATTEMPTS", 3)
+    MAX_RETRY_ATTEMPTS = get_env_int("PARSER_CONSTANT_MAX_RETRY_ATTEMPTS", 10)
+    DEFAULT_CACHE_TTL = get_env_int("PARSER_CONSTANT_DEFAULT_CACHE_TTL", 3600)  # 1 hour
+    DEFAULT_EMBEDDING_CACHE_TTL = get_env_int("PARSER_CONSTANT_DEFAULT_EMBEDDING_CACHE_TTL", 86400)  # 24 hours
+
 
 class UnitType(Enum):
     WEIGHT = "weight"
@@ -417,8 +450,7 @@ class UnitsConfigManager:
             self.stats["successful_material_hints"] += 1
             return "м3"
         
-        # Check legacy hints if available
-        # The legacy hints are removed, so this block is effectively removed.
+
         
         return None
     
@@ -447,8 +479,7 @@ class UnitsConfigManager:
                 self.stats["successful_validations"] += 1
             return is_valid
         
-        # Use legacy validation if available
-        # The legacy validation is removed, so this block is effectively removed.
+
         
         # Basic validation - coefficient should be positive
         is_valid = coefficient > 0
@@ -494,7 +525,7 @@ class UnitsConfigManager:
         Returns:
             List[str]: List of common units
         """
-        # The legacy hints are removed, so this block is effectively removed.
+
         
         # Return basic common units
         return ["кг", "г", "т", "м3", "л", "м2", "м", "шт", "упак"]
@@ -745,7 +776,7 @@ class UnitsConfigManager:
                 return False
             
             # Load configuration file
-            with open(input_path, 'r', encoding='utf-8') as f:
+            with open(input_path, encoding='utf-8') as f:
                 import_data = json.load(f)
             
             # Validate import data

@@ -5,14 +5,15 @@ Modern AI-powered material parser using OpenAI GPT with advanced type safety,
 logging integration, and configuration management.
 """
 
+import asyncio
 import json
 import time
-import asyncio
-from typing import Dict, Optional, List, Any, Union, cast
-from functools import lru_cache
-from dataclasses import dataclass, asdict
-from openai import OpenAI
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Any, Dict, List, Optional
+
+from openai import OpenAI
 
 # Core infrastructure imports
 from core.config.parsers import ParserConfig, get_parser_config
@@ -23,15 +24,10 @@ from core.parsers.config.units_config_manager import get_units_manager
 
 # Parser interface imports
 from ..interfaces import (
-    IAIParser,
     AIParseRequest,
     ParseStatus,
-    AIModelType,
-    AIParseMode,
-    InputType,
-    OutputType
 )
-from ..interfaces.ai_parser_interface import MaterialParseData, AIParseResult
+from ..interfaces.ai_parser_interface import AIParseResult, MaterialParseData
 
 print("DEBUG: core/parsers/services/ai_parser_service.py loaded")
 

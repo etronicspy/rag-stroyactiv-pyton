@@ -4,13 +4,13 @@
 """
 
 import json
-from core.logging import get_logger
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
+from core.database.exceptions import DatabaseError
+from core.database.interfaces import ICacheDatabase
+from core.logging import get_logger
 from core.repositories.interfaces import IMaterialsRepository
 from core.schemas.materials import Material, MaterialCreate, MaterialUpdate
-from core.database.interfaces import ICacheDatabase
-from core.database.exceptions import DatabaseError
 
 logger = get_logger(__name__)
 

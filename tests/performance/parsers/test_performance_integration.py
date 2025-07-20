@@ -5,26 +5,22 @@ Performance benchmarks for the enhanced parser integration service
 to ensure optimal performance under various load conditions.
 """
 
-import pytest
 import asyncio
-import time
 import statistics
-from typing import List, Dict, Any, Tuple
-from unittest.mock import Mock, patch
-import concurrent.futures
+import time
 
-from services.enhanced_parser_integration import (
-    EnhancedParserIntegrationService,
-    get_parser_service,
-    test_enhanced_parser
-)
+import pytest
+
 from core.schemas.enhanced_parsing import (
-    EnhancedParseRequest,
-    EnhancedParseResult,
     BatchParseRequest,
     BatchParseResponse,
+    EnhancedParseRequest,
+    EnhancedParseResult,
     ParserIntegrationConfig,
-    ParsingMethod
+    ParsingMethod,
+)
+from services.enhanced_parser_integration import (
+    get_parser_service,
 )
 
 
@@ -37,7 +33,7 @@ class TestEnhancedParserPerformance:
             start_time = time.time()
             
             # Initialize service multiple times
-            for i in range(10):
+            for _i in range(10):
                 service = get_parser_service()
                 assert service is not None
             
@@ -95,7 +91,7 @@ class TestEnhancedParserPerformance:
             max_time = max(parsing_times)
             min_time = min(parsing_times)
             
-            print(f"✅ Single parsing performance:")
+            print("✅ Single parsing performance:")
             print(f"   Average: {avg_time:.3f}s")
             print(f"   Median: {median_time:.3f}s")
             print(f"   Max: {max_time:.3f}s")
@@ -200,7 +196,7 @@ class TestEnhancedParserPerformance:
             else:
                 speedup = 1.0
             
-            print(f"✅ Parallel vs Sequential performance:")
+            print("✅ Parallel vs Sequential performance:")
             print(f"   Parallel time: {parallel_time:.3f}s")
             print(f"   Sequential time: {sequential_time:.3f}s")
             print(f"   Speedup: {speedup:.2f}x")
@@ -226,7 +222,7 @@ class TestEnhancedParserPerformance:
             # Number of concurrent requests
             num_concurrent = 5
             
-            async def single_request(request_id: int) -> Tuple[int, float, bool]:
+            async def single_request(request_id: int) -> tuple[int, float, bool]:
                 """Single parsing request"""
                 request = EnhancedParseRequest(
                     name=f"Конкурентный материал {request_id}",
@@ -266,7 +262,7 @@ class TestEnhancedParserPerformance:
                 max_processing_time = max(processing_times)
                 min_processing_time = min(processing_times)
                 
-                print(f"✅ Concurrent requests performance:")
+                print("✅ Concurrent requests performance:")
                 print(f"   Total time: {total_time:.3f}s")
                 print(f"   Successful requests: {successful_requests}/{num_concurrent}")
                 print(f"   Average processing time: {avg_processing_time:.3f}s")
@@ -283,8 +279,9 @@ class TestEnhancedParserPerformance:
     def test_memory_usage_performance(self):
         """Test memory usage during parsing operations"""
         try:
-            import psutil
             import os
+
+            import psutil
             
             process = psutil.Process(os.getpid())
             
@@ -293,7 +290,7 @@ class TestEnhancedParserPerformance:
             
             # Create multiple services to test memory usage
             services = []
-            for i in range(5):
+            for _i in range(5):
                 service = get_parser_service()
                 services.append(service)
             
@@ -310,7 +307,7 @@ class TestEnhancedParserPerformance:
             
             memory_increase = final_memory - initial_memory
             
-            print(f"✅ Memory usage performance:")
+            print("✅ Memory usage performance:")
             print(f"   Initial memory: {initial_memory:.2f} MB")
             print(f"   After services: {after_services_memory:.2f} MB")
             print(f"   Final memory: {final_memory:.2f} MB")
@@ -332,7 +329,7 @@ class TestEnhancedParserPerformance:
             # Test statistics collection performance
             start_time = time.time()
             
-            for i in range(100):
+            for _i in range(100):
                 stats = service.get_statistics()
                 assert isinstance(stats, dict)
             
@@ -340,7 +337,7 @@ class TestEnhancedParserPerformance:
             total_time = end_time - start_time
             avg_time = total_time / 100
             
-            print(f"✅ Statistics collection performance:")
+            print("✅ Statistics collection performance:")
             print(f"   Total time for 100 calls: {total_time:.3f}s")
             print(f"   Average time per call: {avg_time:.6f}s")
             
@@ -371,7 +368,7 @@ class TestEnhancedParserPerformance:
             total_time = end_time - start_time
             avg_time = total_time / 50
             
-            print(f"✅ Configuration handling performance:")
+            print("✅ Configuration handling performance:")
             print(f"   Total time for 50 configs: {total_time:.3f}s")
             print(f"   Average time per config: {avg_time:.6f}s")
             
@@ -400,13 +397,13 @@ class TestPerformanceThresholds:
             )
             
             start_time = time.time()
-            result = await service.parse_single_material(request)
+            await service.parse_single_material(request)
             response_time = time.time() - start_time
             
             # Define thresholds
             SINGLE_PARSE_THRESHOLD = 30.0  # seconds
             
-            print(f"✅ Response time thresholds:")
+            print("✅ Response time thresholds:")
             print(f"   Single parse time: {response_time:.3f}s (threshold: {SINGLE_PARSE_THRESHOLD}s)")
             
             # Assert thresholds
@@ -439,7 +436,7 @@ class TestPerformanceThresholds:
             )
             
             start_time = time.time()
-            response = await service.parse_batch_materials(batch_request)
+            await service.parse_batch_materials(batch_request)
             total_time = time.time() - start_time
             
             # Calculate throughput
@@ -451,7 +448,7 @@ class TestPerformanceThresholds:
             # Define threshold
             THROUGHPUT_THRESHOLD = 0.1  # items per second (conservative)
             
-            print(f"✅ Throughput thresholds:")
+            print("✅ Throughput thresholds:")
             print(f"   Batch throughput: {throughput:.3f} items/s (threshold: {THROUGHPUT_THRESHOLD} items/s)")
             
             # Assert threshold
@@ -482,9 +479,9 @@ class TestPerformanceRegression:
             
             # Run baseline test multiple times
             baseline_times = []
-            for i in range(3):
+            for _i in range(3):
                 start_time = time.time()
-                result = await service.parse_single_material(baseline_materials[0])
+                await service.parse_single_material(baseline_materials[0])
                 end_time = time.time()
                 baseline_times.append(end_time - start_time)
             
@@ -494,7 +491,7 @@ class TestPerformanceRegression:
             HISTORICAL_BASELINE = 30.0  # seconds
             REGRESSION_THRESHOLD = 1.5  # 50% slower than historical
             
-            print(f"✅ Performance regression test:")
+            print("✅ Performance regression test:")
             print(f"   Current avg time: {avg_baseline_time:.3f}s")
             print(f"   Historical baseline: {HISTORICAL_BASELINE}s")
             print(f"   Regression threshold: {HISTORICAL_BASELINE * REGRESSION_THRESHOLD}s")

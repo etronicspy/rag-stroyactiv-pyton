@@ -5,19 +5,18 @@ Performance tests for monitoring and health check system
 Объединяет тесты из:
 - test_monitoring.py
 """
-import pytest
 import time
 from unittest.mock import AsyncMock, patch
 
-from core.monitoring.metrics import (
-    MetricsCollector, 
-    DatabaseMetrics, 
-    PerformanceTracker
-)
-from core.monitoring.logger import (
-    DatabaseLogger
-)
+import pytest
+
 from api.routes.health import HealthChecker
+from core.monitoring.logger import DatabaseLogger
+from core.monitoring.metrics import (
+    DatabaseMetrics,
+    MetricsCollector,
+    PerformanceTracker,
+)
 
 
 class TestDatabaseMetricsPerformance:

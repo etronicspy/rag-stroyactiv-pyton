@@ -5,15 +5,40 @@ Dynamic Connection Pool Manager for optimal database performance.
 """
 
 import asyncio
-import time
-from core.logging import get_logger
+import logging
+import os
 import threading
-from typing import Dict, Any, Optional, Protocol, List
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Protocol
+
 import psutil
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
+
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+class DefaultTimeouts:
+    """Default timeout values for various operations."""
+    DATABASE = get_env_int("DEFAULT_TIMEOUT_DATABASE", 30)
+    AI_CLIENT = get_env_int("DEFAULT_TIMEOUT_AI_CLIENT", 30)
+    CONNECTION_POOL = get_env_int("DEFAULT_TIMEOUT_CONNECTION_POOL", 30)
+    REDIS = get_env_int("DEFAULT_TIMEOUT_REDIS", 10)
+    SSH_TUNNEL = get_env_int("DEFAULT_TIMEOUT_SSH_TUNNEL", 30)
+
+
+class ConnectionPools:
+    """Connection pool configuration."""
+    POSTGRESQL_POOL_SIZE = get_env_int("CONNECTION_POOL_POSTGRESQL_POOL_SIZE", 10)
+    POSTGRESQL_MAX_OVERFLOW = get_env_int("CONNECTION_POOL_POSTGRESQL_MAX_OVERFLOW", 20)
+    REDIS_MAX_CONNECTIONS = get_env_int("CONNECTION_POOL_REDIS_MAX_CONNECTIONS", 50)
+    BATCH_SIZE = get_env_int("CONNECTION_POOL_BATCH_SIZE", 100)
+    MAX_CONCURRENT_UPLOADS = get_env_int("CONNECTION_POOL_MAX_CONCURRENT_UPLOADS", 5)
 
 
 @dataclass
@@ -48,14 +73,14 @@ class PoolMetrics:
 class PoolConfig:
     """Dynamic pool configuration."""
     min_size: int = 2
-    max_size: int = 50
+    max_size: int = ConnectionPools.REDIS_MAX_CONNECTIONS
     target_utilization: float = 0.75  # 75% utilization target
     scale_up_threshold: float = 0.85   # Scale up at 85% utilization
     scale_down_threshold: float = 0.4  # Scale down at 40% utilization
     scale_factor: float = 1.5          # Multiplier for scaling
     monitoring_interval: float = 30.0  # Seconds between monitoring checks
     auto_scaling_enabled: bool = True
-    connection_timeout: float = 30.0
+    connection_timeout: float = DefaultTimeouts.CONNECTION_POOL
     idle_timeout: float = 300.0        # 5 minutes
 
 

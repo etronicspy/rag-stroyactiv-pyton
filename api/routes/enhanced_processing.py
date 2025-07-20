@@ -4,25 +4,24 @@ This stage 8.5: API endpoints for asynchronous material processing.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Union
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from core.logging import get_logger
 from core.schemas.processing_models import (
     BatchMaterialsRequest,
     BatchProcessingResponse,
     BatchValidationError,
-    ProcessingStatusResponse,
-    ProcessingResultsResponse,
-    ProcessingStatus,
-    ProcessingProgress,
     MaterialProcessingResult,
+    ProcessingResultsResponse,
     ProcessingStatistics,
-    BatchResponse
+    ProcessingStatus,
+    ProcessingStatusResponse,
 )
 from services.batch_processing_service import get_batch_processing_service
-from core.logging import get_logger
 
 # Создаем router
 router = APIRouter(

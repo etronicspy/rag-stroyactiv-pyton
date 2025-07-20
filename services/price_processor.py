@@ -3,16 +3,18 @@
 Сервис обработки цен для RAG Construction Materials API.
 """
 
-from typing import List, Dict, Any, Optional
-import pandas as pd
-from datetime import datetime
-from core.models.materials import Category, Unit
-from qdrant_client.http import models
 import uuid
-from core.logging import get_logger
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-from core.config import settings, get_vector_db_client, get_ai_client
-from qdrant_client.models import Distance, VectorParams, PointStruct
+import pandas as pd
+from qdrant_client.http import models
+from qdrant_client.models import Distance, PointStruct, VectorParams
+
+from core.config import get_ai_client, get_vector_db_client, settings
+from core.logging import get_logger
+from core.models.materials import Category, Unit
 
 logger = get_logger(__name__)
 
@@ -302,8 +304,7 @@ class PriceProcessor:
                 df = self.clean_raw_product_data(df)
                 return await self._process_raw_products(df, supplier_id, pricelistid)
             else:
-                # Legacy format is no longer supported – explicitly inform the caller
-                raise ValueError("Legacy price list format is no longer supported. Please use the new raw product format with columns: name, unit_price, calc_unit, …")
+                raise ValueError("Invalid price list format. Please use the new raw product format with columns: name, unit_price, calc_unit, …")
 
         except Exception as e:
             logger.error(f"Error processing price list: {e}")
@@ -427,7 +428,7 @@ class PriceProcessor:
             else:
                 points = results
             
-            # Format materials (support both legacy and new formats)
+            # Format materials
             materials = []
             for point in points:
                 material = {
@@ -436,14 +437,6 @@ class PriceProcessor:
                     "use_category": point.payload.get("use_category"),
                     "upload_date": point.payload.get("upload_date")
                 }
-                
-                # Legacy format fields
-                if point.payload.get("unit") is not None:
-                    material["unit"] = point.payload.get("unit")
-                if point.payload.get("price") is not None:
-                    material["price"] = point.payload.get("price")
-                if point.payload.get("description") is not None:
-                    material["description"] = point.payload.get("description", "")
                 
                 # Extended format fields
                 if point.payload.get("sku") is not None:
@@ -540,13 +533,7 @@ class PriceProcessor:
                     "upload_date": point.payload.get("upload_date")
                 }
                 
-                # Legacy format fields
-                if point.payload.get("unit") is not None:
-                    material["unit"] = point.payload.get("unit")
-                if point.payload.get("price") is not None:
-                    material["price"] = point.payload.get("price")
-                if point.payload.get("description") is not None:
-                    material["description"] = point.payload.get("description", "")
+
                 
                 # Extended format fields
                 if point.payload.get("sku") is not None:

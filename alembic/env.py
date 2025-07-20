@@ -3,19 +3,21 @@
 Конфигурация Alembic для асинхронных миграций PostgreSQL.
 """
 
-from logging.config import fileConfig
-from sqlalchemy import pool
-from sqlalchemy.engine import Connection
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import pool
+from sqlalchemy.engine import Connection
+
+from alembic import context
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Import models for autogenerate
-from core.database.adapters.postgresql_adapter import Base
 from core.config import settings
+from core.database.adapters.postgresql_adapter import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -6,7 +6,7 @@ This module defines interfaces for database operation logging:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, ContextManager, Union
+from typing import Any, ContextManager, Dict, Optional, Union
 
 
 class IDatabaseLogger(ABC):

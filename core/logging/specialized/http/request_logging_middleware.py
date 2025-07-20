@@ -5,8 +5,8 @@ This module provides a middleware for logging HTTP requests.
 """
 
 import time
-from typing import Any, Callable, Dict, Optional
 import uuid
+from typing import Any, Callable, Dict, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -98,6 +98,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         else:
             # Fallback to synchronous logger in a background thread to avoid blocking event loop
             from functools import partial
+
             import anyio
 
             sync_func = partial(
@@ -128,6 +129,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 )
             else:
                 from functools import partial
+
                 import anyio
 
                 sync_err = partial(
@@ -167,6 +169,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
         else:
             from functools import partial
+
             import anyio
 
             sync_resp = partial(
@@ -382,6 +385,7 @@ class AsyncRequestLoggingMiddleware:
         else:
             # Fallback to synchronous logger in a background thread to avoid blocking event loop
             from functools import partial
+
             import anyio
 
             sync_func = partial(
@@ -438,6 +442,7 @@ class AsyncRequestLoggingMiddleware:
                 )
             else:
                 from functools import partial
+
                 import anyio
 
                 sync_err = partial(

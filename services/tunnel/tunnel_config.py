@@ -1,15 +1,51 @@
 """
-SSH Tunnel configuration for RAG Construction Materials API.
+SSH Tunnel Configuration Module
 
-This module provides configuration management for SSH tunnel connections.
+This module provides configuration management for SSH tunnel connections,
+including connection settings, retry logic, and security parameters.
 """
 
 import os
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator
 from pathlib import Path
+from typing import Any, Dict, Optional
 
-from .exceptions import SSHTunnelConfigError
+from pydantic import BaseModel, Field, field_validator
+
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+def get_env_str(key: str, default: str) -> str:
+    """Get string value from environment variable."""
+    return os.getenv(key, default)
+
+
+class SSHDefaults:
+    """SSH tunnel default configuration."""
+    REMOTE_HOST = get_env_str("SSH_DEFAULT_REMOTE_HOST", "31.130.148.200")
+    REMOTE_USER = get_env_str("SSH_DEFAULT_REMOTE_USER", "root")
+    KEY_PATH = get_env_str("SSH_DEFAULT_KEY_PATH", "~/.ssh/postgres_key")
+    RETRY_ATTEMPTS = get_env_int("SSH_DEFAULT_RETRY_ATTEMPTS", 3)
+    RETRY_DELAY = get_env_int("SSH_DEFAULT_RETRY_DELAY", 5)
+    KEEP_ALIVE = get_env_int("SSH_DEFAULT_KEEP_ALIVE", 60)
+
+
+class DefaultPorts:
+    """Default port numbers for various services."""
+    POSTGRESQL = get_env_int("DEFAULT_PORT_POSTGRESQL", 5432)
+    REDIS = get_env_int("DEFAULT_PORT_REDIS", 6379)
+    SSH_TUNNEL_LOCAL = get_env_int("DEFAULT_PORT_SSH_TUNNEL_LOCAL", 5435)
+
+
+class DefaultTimeouts:
+    """Default timeout values for various operations."""
+    DATABASE = get_env_int("DEFAULT_TIMEOUT_DATABASE", 30)
+    AI_CLIENT = get_env_int("DEFAULT_TIMEOUT_AI_CLIENT", 30)
+    CONNECTION_POOL = get_env_int("DEFAULT_TIMEOUT_CONNECTION_POOL", 30)
+    REDIS = get_env_int("DEFAULT_TIMEOUT_REDIS", 10)
+    SSH_TUNNEL = get_env_int("DEFAULT_TIMEOUT_SSH_TUNNEL", 30)
 
 
 class TunnelConfig(BaseModel):
@@ -20,22 +56,22 @@ class TunnelConfig(BaseModel):
     """
     
     # Connection settings
-    local_port: int = Field(default=5435, description="Local port for SSH tunnel")
-    remote_host: str = Field(default="31.130.148.200", description="Remote host for SSH tunnel")
-    remote_user: str = Field(default="root", description="Remote user for SSH tunnel")
-    remote_port: int = Field(default=5432, description="Remote port for SSH tunnel")
+    local_port: int = Field(default=DefaultPorts.SSH_TUNNEL_LOCAL, description="Local port for SSH tunnel")
+    remote_host: str = Field(default=SSHDefaults.REMOTE_HOST, description="Remote host for SSH tunnel")
+    remote_user: str = Field(default=SSHDefaults.REMOTE_USER, description="Remote user for SSH tunnel")
+    remote_port: int = Field(default=DefaultPorts.POSTGRESQL, description="Remote port for SSH tunnel")
     
     # SSH settings
-    key_path: str = Field(default="~/.ssh/postgres_key", description="SSH private key path")
+    key_path: str = Field(default=SSHDefaults.KEY_PATH, description="SSH private key path")
     key_passphrase: Optional[str] = Field(default=None, description="SSH private key passphrase")
     
     # Connection timeouts and retries
-    timeout: int = Field(default=30, description="SSH tunnel connection timeout")
-    retry_attempts: int = Field(default=3, description="SSH tunnel retry attempts")
-    retry_delay: int = Field(default=5, description="SSH tunnel retry delay in seconds")
+    timeout: int = Field(default=DefaultTimeouts.SSH_TUNNEL, description="SSH tunnel connection timeout")
+    retry_attempts: int = Field(default=SSHDefaults.RETRY_ATTEMPTS, description="SSH tunnel retry attempts")
+    retry_delay: int = Field(default=SSHDefaults.RETRY_DELAY, description="SSH tunnel retry delay in seconds")
     
     # Monitoring settings
-    heartbeat_interval: int = Field(default=60, description="SSH tunnel heartbeat check interval")
+    heartbeat_interval: int = Field(default=SSHDefaults.KEEP_ALIVE, description="SSH tunnel heartbeat check interval")
     auto_restart: bool = Field(default=True, description="Auto restart SSH tunnel on failure")
     
     # Service settings

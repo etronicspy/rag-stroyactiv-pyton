@@ -12,21 +12,19 @@ import hashlib
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 from functools import lru_cache
+from typing import Dict, List, Optional
 
 import openai
 
 from core.config.base import Settings
 from core.schemas.pipeline_models import (
+    BatchEmbeddingResponse,
+    CombinedEmbeddingConfig,
     CombinedEmbeddingRequest,
     CombinedEmbeddingResult,
-    BatchEmbeddingRequest,
-    BatchEmbeddingResponse,
     EmbeddingCacheEntry,
-    CombinedEmbeddingConfig
 )
-
 
 logger = logging.getLogger(__name__)
 

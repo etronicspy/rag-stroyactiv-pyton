@@ -9,7 +9,7 @@ This module defines interfaces for factory classes:
 
 from abc import ABC, abstractmethod
 
-from .core import ILogger, IFormatter, IHandler
+from .core import IFormatter, IHandler, ILogger
 
 
 class ILoggerFactory(ABC):

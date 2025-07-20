@@ -10,17 +10,29 @@ Author: AI Assistant
 Created: 2024
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi import FastAPI, Request, Response
-from starlette.types import ASGIApp
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
+from starlette.types import ASGIApp
 
-from core.logging.integration.fastapi import LoggingMiddleware, LoggingRoute, setup_logging as setup_fastapi_logging
-from core.logging.integration.sqlalchemy import SQLAlchemyEventListener, SessionExtension, setup_logging as setup_sqlalchemy_logging
-from core.logging.integration.vector_db import QdrantLoggerMixin, WeaviateLoggerMixin, PineconeLoggerMixin, log_vector_db_operation
+from core.logging.integration.fastapi import LoggingMiddleware, LoggingRoute
+from core.logging.integration.fastapi import setup_logging as setup_fastapi_logging
+from core.logging.integration.sqlalchemy import (
+    SessionExtension,
+    SQLAlchemyEventListener,
+)
+from core.logging.integration.sqlalchemy import (
+    setup_logging as setup_sqlalchemy_logging,
+)
+from core.logging.integration.vector_db import (
+    PineconeLoggerMixin,
+    QdrantLoggerMixin,
+    WeaviateLoggerMixin,
+    log_vector_db_operation,
+)
 
 
 class TestFastAPIIntegration:

@@ -4,11 +4,12 @@ Task Manager для управления background tasks и async processing.
 """
 
 import asyncio
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Callable, Awaitable
-from enum import Enum
-from dataclasses import dataclass, field
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from core.logging import get_logger
 

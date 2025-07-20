@@ -5,13 +5,15 @@ Dynamic Batch Processor for optimized data processing.
 """
 
 import asyncio
-import psutil
 import time
-from core.logging import get_logger
-from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from collections import deque
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
+
+import psutil
+
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -7,11 +7,10 @@ including parameters, error handling, and business logic.
 """
 
 import ast
-import re
 import sys
-from pathlib import Path
-from typing import Dict, List, Set, Tuple
 from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Set
 
 
 @dataclass
@@ -51,7 +50,7 @@ class APIDocumentationChecker:
         issues = []
         
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 content = f.read()
             
             tree = ast.parse(content)
@@ -133,7 +132,7 @@ class APIDocumentationChecker:
                 issues=[]
             )
         
-        except Exception as e:
+        except Exception:
             return None
     
     def _find_function_name(self, node: ast.Call) -> str:

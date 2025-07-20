@@ -9,30 +9,29 @@ Integration tests for database operations
 - test_cached_repository.py
 - test_hybrid_repository.py
 """
-import pytest
 import unittest.mock
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
-from typing import Dict, Any, List
+from datetime import datetime, timedelta
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
+import redis.exceptions
 
 from core.database.adapters.postgresql_adapter import PostgreSQLAdapter
+from core.database.adapters.qdrant_adapter import QdrantVectorDatabase
 from core.database.adapters.redis_adapter import RedisDatabase
 from core.database.exceptions import ConnectionError, DatabaseError, QueryError
-from core.database.factories import DatabaseFactory
+from core.database.factories import (
+    AllDatabasesUnavailableError,
+    DatabaseFactory,
+    DatabaseFallbackManager,
+)
 from core.database.init_db import DatabaseInitializer
-from core.database.interfaces import IVectorDatabase, IRelationalDatabase
-from core.repositories.hybrid_materials import HybridMaterialsRepository
-from core.repositories.cached_materials import CachedMaterialsRepository
-from core.schemas.materials import MaterialCreate, Material
+from core.database.interfaces import IRelationalDatabase, IVectorDatabase
 from core.monitoring.logger import get_logger
-import redis.exceptions
-from core.database.factories import DatabaseFallbackManager, AllDatabasesUnavailableError
-from tests.fixtures.mock_fixtures import MockFactories
-import pytest
-import asyncio
-
-from core.database.adapters.qdrant_adapter import QdrantVectorDatabase
-from datetime import datetime, timedelta
+from core.repositories.cached_materials import CachedMaterialsRepository
+from core.repositories.hybrid_materials import HybridMaterialsRepository
+from core.schemas.materials import Material, MaterialCreate
 
 logger = get_logger(__name__)
 
@@ -781,6 +780,7 @@ class TestRealDBConnection:
     def test_create_test_collection(self, qdrant_client):
         """Test creating a test collection."""
         import time
+
         from qdrant_client.models import Distance, VectorParams
         
         test_collection_name = f"test_connection_{int(time.time())}"
@@ -813,7 +813,8 @@ class TestRealDBConnection:
     def test_insert_and_retrieve_data(self, qdrant_client):
         """Test inserting and retrieving data."""
         import time
-        from qdrant_client.models import Distance, VectorParams, PointStruct
+
+        from qdrant_client.models import Distance, PointStruct, VectorParams
         
         test_collection_name = f"test_data_{int(time.time())}"
         
@@ -1310,9 +1311,7 @@ class TestHealthCheckAndStatisticsFallbackManager:
 
 
 import pytest
-import asyncio
-from core.database.adapters.qdrant_adapter import QdrantVectorDatabase
-from datetime import datetime, timedelta
+
 
 @pytest.mark.integration
 class TestQdrantBatchProcessing:
@@ -1427,7 +1426,7 @@ class TestQdrantBatchProcessing:
     async def test_cleanup_old_records(self, qdrant_db):
         request_id = "batch-old-cleanup"
         # Создаём запись с датой в прошлом
-        from datetime import datetime, timedelta
+        from datetime import datetime
         old_date = (datetime.utcnow() - timedelta(days=40)).isoformat()
         materials = [
             {"material_id": "old1", "created_at": old_date, "updated_at": old_date},

@@ -1,7 +1,7 @@
 from core.logging import (
-    get_logger,
     DatabaseLogger,
     RequestLogger,
+    get_logger,
     setup_structured_logging,
 )
 

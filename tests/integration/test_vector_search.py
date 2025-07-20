@@ -6,15 +6,16 @@ Integration tests for vector search operations
 - test_qdrant_only_integration.py
 - test_qdrant_only_mode.py
 """
-import pytest
 import asyncio
 from unittest.mock import patch
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from core.config import get_settings
+from core.database.adapters.mock_adapters import MockCacheAdapter, MockRelationalAdapter
 from core.database.factories import DatabaseFactory
-from core.database.adapters.mock_adapters import MockRelationalAdapter, MockCacheAdapter
 
 
 @pytest.fixture

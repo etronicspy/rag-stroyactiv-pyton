@@ -4,12 +4,11 @@ Collection Initializer Service for RAG reference data.
 Сервис инициализации коллекций для справочных данных RAG.
 """
 
-import asyncio
-from typing import List, Dict, Any, Optional, Callable
-from core.logging import get_logger
-from core.database.interfaces import IVectorDatabase
-from core.database.collections import ColorCollection, UnitsCollection
+from typing import Any, Callable, Dict, Optional
+
 from core.config.base import get_settings
+from core.database.collections import ColorCollection, UnitsCollection
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -22,24 +21,30 @@ class CollectionInitializerService:
         self.logger = logger
 
     async def initialize_all_collections(self, force_recreate: bool = False) -> Dict[str, Any]:
-        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        from core.database.factories import (
+            AllDatabasesUnavailableError,
+            get_fallback_manager,
+        )
         fallback_manager = get_fallback_manager()
         results = {
-            "colors": {"success": False, "message": "", "count": 0},
-            "units": {"success": False, "message": "", "count": 0},
+            "construction_colors": {"success": False, "message": "", "count": 0},
+            "construction_units": {"success": False, "message": "", "count": 0},
+            "construction_categories": {"success": False, "message": "", "count": 0},
             "overall_success": False,
-            "total_collections": 0,
+            "total_collections": 3,
             "successful_collections": 0
         }
         try:
-            self.logger.info("Initializing colors collection...")
+            self.logger.info("Initializing construction_colors collection...")
             colors_result = await self.initialize_colors_collection(force_recreate)
-            results["colors"] = colors_result
-            self.logger.info("Initializing units collection...")
+            results["construction_colors"] = colors_result
+            self.logger.info("Initializing construction_units collection...")
             units_result = await self.initialize_units_collection(force_recreate)
-            results["units"] = units_result
-            results["total_collections"] = 2
-            results["successful_collections"] = sum(1 for r in [colors_result, units_result] if r["success"])
+            results["construction_units"] = units_result
+            self.logger.info("Initializing construction_categories collection...")
+            categories_result = await self.initialize_categories_collection(force_recreate)
+            results["construction_categories"] = categories_result
+            results["successful_collections"] = sum(1 for k in ["construction_colors", "construction_units", "construction_categories"] if results[k]["success"])
             results["overall_success"] = results["successful_collections"] == results["total_collections"]
             if results["overall_success"]:
                 self.logger.info("All collections initialized successfully!")
@@ -56,7 +61,10 @@ class CollectionInitializerService:
         return results
 
     async def initialize_colors_collection(self, force_recreate: bool = False) -> Dict[str, Any]:
-        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        from core.database.factories import (
+            AllDatabasesUnavailableError,
+            get_fallback_manager,
+        )
         fallback_manager = get_fallback_manager()
         collection_name = ColorCollection.collection_name
         try:
@@ -72,7 +80,7 @@ class CollectionInitializerService:
                 }
             if collection_exists and force_recreate:
                 await fallback_manager.delete_collection(collection_name)
-                self.logger.info(f"Deleted existing colors collection")
+                self.logger.info("Deleted existing colors collection")
             collection_config = ColorCollection.get_collection_config()
             await fallback_manager.create_collection(collection_config)
             self.logger.info(f"Created colors collection: {collection_name}")
@@ -109,7 +117,10 @@ class CollectionInitializerService:
             }
 
     async def initialize_units_collection(self, force_recreate: bool = False) -> Dict[str, Any]:
-        from core.database.factories import get_fallback_manager, AllDatabasesUnavailableError
+        from core.database.factories import (
+            AllDatabasesUnavailableError,
+            get_fallback_manager,
+        )
         fallback_manager = get_fallback_manager()
         collection_name = UnitsCollection.collection_name
         try:
@@ -125,7 +136,7 @@ class CollectionInitializerService:
                 }
             if collection_exists and force_recreate:
                 await fallback_manager.delete_collection(collection_name)
-                self.logger.info(f"Deleted existing units collection")
+                self.logger.info("Deleted existing units collection")
             collection_config = UnitsCollection.get_collection_config()
             await fallback_manager.create_collection(collection_config)
             self.logger.info(f"Created units collection: {collection_name}")
@@ -161,113 +172,88 @@ class CollectionInitializerService:
                 "action": "failed"
             }
     
-    async def _collection_exists(self, collection_name: str) -> bool:
-        """Check if collection exists in vector database.
-        
-        Проверить существует ли коллекция в векторной базе данных.
-        """
+    async def initialize_categories_collection(self, force_recreate: bool = False) -> Dict[str, Any]:
+        from core.database.factories import (
+            AllDatabasesUnavailableError,
+            get_fallback_manager,
+        )
+        fallback_manager = get_fallback_manager()
+        collection_name = "construction_categories"
         try:
-            # Try to get collection info
-            # This is a placeholder - implementation depends on vector DB interface
-            # await self.vector_db.get_collection_info(collection_name)
-            return False  # Default to False for now
-        except Exception:
-            return False
-    
-    async def _get_collection_count(self, collection_name: str) -> int:
-        """Get count of items in collection.
-        
-        Получить количество элементов в коллекции.
-        """
-        try:
-            # This is a placeholder - implementation depends on vector DB interface
-            # return await self.vector_db.count(collection_name)
-            return 0  # Default to 0 for now
-        except Exception:
-            return 0
-    
-    async def _delete_collection(self, collection_name: str) -> None:
-        """Delete collection from vector database.
-        
-        Удалить коллекцию из векторной базы данных.
-        """
-        try:
-            # This is a placeholder - implementation depends on vector DB interface
-            # await self.vector_db.delete_collection(collection_name)
-            pass
-        except Exception as e:
-            self.logger.error(f"Failed to delete collection {collection_name}: {e}")
-            raise
-    
-    async def _create_collection(self, collection_config: Dict[str, Any]) -> None:
-        """Create collection in vector database.
-        
-        Создать коллекцию в векторной базе данных.
-        """
-        try:
-            # This is a placeholder - implementation depends on vector DB interface
-            # await self.vector_db.create_collection(collection_config)
-            pass
-        except Exception as e:
-            self.logger.error(f"Failed to create collection {collection_config['collection_name']}: {e}")
-            raise
-    
-    async def _insert_batch(self, collection_name: str, batch_data: List[Dict[str, Any]]) -> None:
-        """Insert batch of data into collection.
-        
-        Вставить пакет данных в коллекцию.
-        """
-        try:
-            # This is a placeholder - implementation depends on vector DB interface
-            # await self.vector_db.upsert(collection_name, batch_data)
-            pass
-        except Exception as e:
-            self.logger.error(f"Failed to insert batch into {collection_name}: {e}")
-            raise
-    
-    async def get_collection_status(self) -> Dict[str, Any]:
-        """Get status of all reference collections.
-        
-        Получить статус всех справочных коллекций.
-        """
-        status = {
-            "colors": {
-                "collection_name": ColorCollection.collection_name,
-                "exists": False,
-                "count": 0,
-                "last_updated": None
-            },
-            "units": {
-                "collection_name": UnitsCollection.collection_name,
-                "exists": False,
-                "count": 0,
-                "last_updated": None
+            collection_exists = await fallback_manager.collection_exists(collection_name)
+            if collection_exists and not force_recreate:
+                count = await fallback_manager.get_collection_count(collection_name)
+                self.logger.info(f"Categories collection already exists with {count} items")
+                return {
+                    "success": True,
+                    "message": f"Collection already exists with {count} items",
+                    "count": count,
+                    "action": "skipped"
+                }
+            if collection_exists and force_recreate:
+                await fallback_manager.delete_collection(collection_name)
+                self.logger.info("Deleted existing categories collection")
+            # Пример конфигурации для categories
+            collection_config = {
+                "collection_name": collection_name,
+                "vector_size": 1536,
+                "distance": "cosine"
             }
-        }
-        
-        try:
-            # Check colors collection
-            colors_exists = await self._collection_exists(ColorCollection.collection_name)
-            status["colors"]["exists"] = colors_exists
-            if colors_exists:
-                status["colors"]["count"] = await self._get_collection_count(ColorCollection.collection_name)
-            
-            # Check units collection
-            units_exists = await self._collection_exists(UnitsCollection.collection_name)
-            status["units"]["exists"] = units_exists
-            if units_exists:
-                status["units"]["count"] = await self._get_collection_count(UnitsCollection.collection_name)
-                
+            await fallback_manager.create_collection(collection_config)
+            self.logger.info(f"Created categories collection: {collection_name}")
+            # Пример данных для категорий
+            categories_data = [
+                {
+                    "id": "cat-1",
+                    "vector": [0.0] * 1536,
+                    "payload": {
+                        "name": "Кирпич",
+                        "aliases": ["кирпич", "brick", "кирпич керамический"],
+                        "description": "Строительный материал для возведения стен"
+                    }
+                },
+                {
+                    "id": "cat-2",
+                    "vector": [0.0] * 1536,
+                    "payload": {
+                        "name": "Бетон",
+                        "aliases": ["бетон", "concrete", "монолит"],
+                        "description": "Материал для монолитных и сборных конструкций"
+                    }
+                },
+                {
+                    "id": "cat-3",
+                    "vector": [0.0] * 1536,
+                    "payload": {
+                        "name": "Доска",
+                        "aliases": ["доска", "board", "пиломатериал"],
+                        "description": "Пиломатериал для строительных работ"
+                    }
+                }
+            ]
+            await fallback_manager.insert_batch(collection_name, categories_data)
+            self.logger.info(f"Successfully initialized categories collection with {len(categories_data)} items")
+            return {
+                "success": True,
+                "message": f"Successfully initialized with {len(categories_data)} items",
+                "count": len(categories_data),
+                "action": "created" if not collection_exists else "recreated"
+            }
+        except AllDatabasesUnavailableError as e:
+            self.logger.error(f"All databases unavailable: {e}")
+            return {
+                "success": False,
+                "message": f"All databases unavailable: {str(e)}",
+                "count": 0,
+                "action": "failed"
+            }
         except Exception as e:
-            self.logger.error(f"Failed to get collection status: {e}")
-            status["error"] = str(e)
-        
-        return status
-    
-    async def reset_all_collections(self) -> Dict[str, Any]:
-        """Reset all reference collections (delete and recreate).
-        
-        Сбросить все справочные коллекции (удалить и пересоздать).
-        """
-        self.logger.info("Resetting all reference collections...")
-        return await self.initialize_all_collections(force_recreate=True) 
+            self.logger.error(f"Failed to initialize categories collection: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to initialize: {str(e)}",
+                "count": 0,
+                "action": "failed"
+            }
+
+    # Удалить устаревшие внутренние методы _collection_exists, _get_collection_count, _delete_collection, _create_collection, _insert_batch 

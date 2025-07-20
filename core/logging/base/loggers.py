@@ -65,8 +65,8 @@ def safe_log(logger, level: str, message: str, extra: Optional[dict] = None, cor
         extra: Additional data
         correlation_id: Correlation ID
     """
-    import sys
     import json
+    import sys
     import time
     
     try:

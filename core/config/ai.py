@@ -8,8 +8,35 @@ This module provides configuration factories for all supported AI providers:
 - Ollama
 """
 
-from typing import Dict, Any
-from .constants import DefaultTimeouts, ModelNames
+import os
+from typing import Any, Dict
+
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+def get_env_str(key: str, default: str) -> str:
+    """Get string value from environment variable."""
+    return os.getenv(key, default)
+
+
+class DefaultTimeouts:
+    """Default timeout values for various operations."""
+    DATABASE = get_env_int("DEFAULT_TIMEOUT_DATABASE", 30)
+    AI_CLIENT = get_env_int("DEFAULT_TIMEOUT_AI_CLIENT", 30)
+    CONNECTION_POOL = get_env_int("DEFAULT_TIMEOUT_CONNECTION_POOL", 30)
+    REDIS = get_env_int("DEFAULT_TIMEOUT_REDIS", 10)
+    SSH_TUNNEL = get_env_int("DEFAULT_TIMEOUT_SSH_TUNNEL", 30)
+
+
+class ModelNames:
+    """AI model names for different providers."""
+    OPENAI_EMBEDDING = get_env_str("MODEL_NAME_OPENAI_EMBEDDING", "text-embedding-3-small")
+    HUGGINGFACE_DEFAULT = get_env_str("MODEL_NAME_HUGGINGFACE_DEFAULT", "sentence-transformers/all-MiniLM-L6-v2")
+    AZURE_API_VERSION = get_env_str("MODEL_NAME_AZURE_API_VERSION", "2023-05-15")
+
 
 class BaseAIConfig:
     """Base configuration class with common AI provider settings."""

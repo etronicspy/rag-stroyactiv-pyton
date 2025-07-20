@@ -7,38 +7,35 @@ id, name, unit → AI_parser → RAG нормализация → Поиск SKU
 
 import asyncio
 import time
-from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
-from pathlib import Path
-import sys
+from typing import Any, Dict, List, Optional
 
-from core.logging import get_logger
 from core.config.base import get_settings
-from core.database.interfaces import IVectorDatabase
-from core.schemas.pipeline_models import (
-    MaterialProcessRequest,
-    ProcessingResult,
-    BatchProcessingRequest,
-    BatchProcessingResponse,
-    AIParsingResult,
-    RAGNormalizationResult,
-    SKUSearchResult,
-    DatabaseSaveResult,
-    ProcessingStage,
-    ProcessingStatus,
-    PipelineConfiguration,
-    PipelineStatistics
-)
-from core.schemas.enhanced_parsing import (
-    EnhancedParseRequest,
-    EnhancedParseResult,
-    ParsingMethod
-)
-from services.enhanced_parser_integration import EnhancedParserIntegrationService
-from services.embedding_comparison import EmbeddingComparisonService
-from services.sku_search_service import get_sku_search_service
 from core.database.collections.colors import ColorCollection
 from core.database.collections.units import UnitsCollection
+from core.database.interfaces import IVectorDatabase
+from core.logging import get_logger
+from core.schemas.enhanced_parsing import (
+    EnhancedParseRequest,
+    ParsingMethod,
+)
+from core.schemas.pipeline_models import (
+    AIParsingResult,
+    BatchProcessingRequest,
+    BatchProcessingResponse,
+    DatabaseSaveResult,
+    MaterialProcessRequest,
+    PipelineConfiguration,
+    PipelineStatistics,
+    ProcessingResult,
+    ProcessingStage,
+    ProcessingStatus,
+    RAGNormalizationResult,
+    SKUSearchResult,
+)
+from services.embedding_comparison import EmbeddingComparisonService
+from services.enhanced_parser_integration import EnhancedParserIntegrationService
+from services.sku_search_service import get_sku_search_service
 
 logger = get_logger(__name__)
 
@@ -428,7 +425,9 @@ class MaterialProcessingPipeline:
             self.logger.debug(f"SKU Search stage for: {request.name}")
             
             # Generate combined material embedding for SKU search
-            from services.combined_embedding_service import get_combined_embedding_service
+            from services.combined_embedding_service import (
+                get_combined_embedding_service,
+            )
             
             embedding_service = get_combined_embedding_service()
             
@@ -492,7 +491,7 @@ class MaterialProcessingPipeline:
         result: ProcessingResult
     ) -> DatabaseSaveResult:
         """
-        Stage 4: Database Save - Save processed material to reference database
+        Stage 4: Database Save - Save processed material using centralized fallback manager
         
         Args:
             request: Material processing request
@@ -506,10 +505,13 @@ class MaterialProcessingPipeline:
         try:
             self.logger.debug(f"Database Save stage for: {request.name}")
             
-            # Import materials reference collection
-            from core.database.collections.materials_reference import MaterialsReferenceCollection
+            # Use centralized fallback manager instead of legacy MaterialsReferenceCollection
+            from core.database.factories import (
+                AllDatabasesUnavailableError,
+                get_fallback_manager,
+            )
             
-            materials_ref = MaterialsReferenceCollection()
+            fallback_manager = get_fallback_manager()
             
             # Get SKU from search result
             sku = result.sku
@@ -535,32 +537,41 @@ class MaterialProcessingPipeline:
                     error_message="No combined embedding found for database save"
                 )
             
-            # Save material to reference database
-            save_success = await materials_ref.save_material_reference(
-                sku=sku,
-                name=request.name,
-                unit=normalized_unit or request.unit,
-                color=normalized_color,
-                embedding=material_embedding
-            )
-            
-            if save_success:
-                self.logger.info(
-                    f"✅ Saved material to reference database: {sku} - {request.name}"
+            # Save material using fallback manager
+            try:
+                save_result = await fallback_manager.save_processed_material(
+                    sku=sku,
+                    name=request.name,
+                    unit=normalized_unit or request.unit,
+                    color=normalized_color,
+                    embedding=material_embedding
                 )
                 
-                return DatabaseSaveResult(
-                    success=True,
-                    saved_id=sku,
-                    processing_time=time.time() - stage_start
-                )
-            else:
-                self.logger.error(f"❌ Failed to save material to reference database: {sku}")
-                
+                if save_result:
+                    self.logger.info(
+                        f"✅ Saved material via fallback manager: {sku} - {request.name}"
+                    )
+                    
+                    return DatabaseSaveResult(
+                        success=True,
+                        saved_id=sku,
+                        processing_time=time.time() - stage_start
+                    )
+                else:
+                    self.logger.error(f"❌ Failed to save material via fallback manager: {sku}")
+                    
+                    return DatabaseSaveResult(
+                        success=False,
+                        processing_time=time.time() - stage_start,
+                        error_message="Failed to save material via fallback manager"
+                    )
+                    
+            except AllDatabasesUnavailableError as e:
+                self.logger.error(f"All databases unavailable for saving material {sku}: {e.errors}")
                 return DatabaseSaveResult(
                     success=False,
                     processing_time=time.time() - stage_start,
-                    error_message="Failed to save material to reference database"
+                    error_message=f"All databases unavailable: {e.errors}"
                 )
                 
         except Exception as e:

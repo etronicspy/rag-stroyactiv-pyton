@@ -5,11 +5,10 @@ This module provides a provider for logging configuration.
 """
 
 import logging
-from typing import Dict, Optional, Any, TypeVar, cast
+from typing import Any, Dict, Optional, TypeVar, cast
 
 from core.logging.config.settings import LoggingSettings, get_logging_settings
 from core.logging.config.validator import validate_configuration
-
 
 T = TypeVar('T')
 

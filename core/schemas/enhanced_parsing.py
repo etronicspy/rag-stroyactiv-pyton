@@ -5,9 +5,10 @@ This module provides Pydantic schemas for the enhanced AI parser integration
 with support for color extraction and multiple embeddings.
 """
 
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator
 from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, Field, validator
 
 
 class ParsingMethod(str, Enum):

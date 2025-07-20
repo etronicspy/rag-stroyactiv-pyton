@@ -5,12 +5,12 @@ This module provides a provider for correlation ID management.
 """
 
 import uuid
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generator, Optional
+from typing import Optional
 
 from core.logging.interfaces import ICorrelationProvider
-
 
 # Context variable for correlation ID
 _correlation_id_var: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)

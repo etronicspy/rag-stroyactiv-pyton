@@ -6,32 +6,140 @@ It uses a modular approach with separate modules for different concerns.
 """
 
 import os
-from typing import List, Optional, Dict, Any
-from pydantic_settings import BaseSettings
-from pydantic import Field, ConfigDict, field_validator
+from typing import Any, Dict, List, Optional
 
-from .type_definitions import DatabaseType, AIProvider, Environment
-from .constants import (
-    VectorSize, 
-    DefaultTimeouts, 
-    DefaultPorts, 
-    FileSizeLimits,
-    DatabaseNames,
-    ModelNames,
-    ConnectionPools,
-    RateLimits,
-    SSHDefaults
-)
-from .database import DatabaseConfig
+from pydantic import ConfigDict, Field, field_validator
+from pydantic_settings import BaseSettings
+
 from .ai import AIConfig
+from .database import DatabaseConfig
+from .type_definitions import AIProvider, DatabaseType, Environment
+
+
+# Helper functions for environment variables
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+def get_env_str(key: str, default: str) -> str:
+    """Get string value from environment variable."""
+    return os.getenv(key, default)
+
+
+def get_env_float(key: str, default: float) -> float:
+    """Get float value from environment variable."""
+    return float(os.getenv(key, str(default)))
+
+
+# Constants moved to environment variables
+class VectorSize:
+    """Standard vector dimensions for different embedding models."""
+    OPENAI_SMALL = get_env_int("VECTOR_SIZE_OPENAI_SMALL", 1536)
+    OPENAI_LARGE = get_env_int("VECTOR_SIZE_OPENAI_LARGE", 3072)
+    OPENAI_ADA_002 = get_env_int("VECTOR_SIZE_OPENAI_ADA_002", 1536)
+    HUGGINGFACE_MINI = get_env_int("VECTOR_SIZE_HUGGINGFACE_MINI", 384)
+    HUGGINGFACE_BASE = get_env_int("VECTOR_SIZE_HUGGINGFACE_BASE", 768)
+
+
+class DefaultTimeouts:
+    """Default timeout values for various operations."""
+    DATABASE = get_env_int("DEFAULT_TIMEOUT_DATABASE", 30)
+    AI_CLIENT = get_env_int("DEFAULT_TIMEOUT_AI_CLIENT", 30)
+    CONNECTION_POOL = get_env_int("DEFAULT_TIMEOUT_CONNECTION_POOL", 30)
+    REDIS = get_env_int("DEFAULT_TIMEOUT_REDIS", 10)
+    SSH_TUNNEL = get_env_int("DEFAULT_TIMEOUT_SSH_TUNNEL", 30)
+
+
+class DefaultPorts:
+    """Default port numbers for various services."""
+    POSTGRESQL = get_env_int("DEFAULT_PORT_POSTGRESQL", 5432)
+    REDIS = get_env_int("DEFAULT_PORT_REDIS", 6379)
+    SSH_TUNNEL_LOCAL = get_env_int("DEFAULT_PORT_SSH_TUNNEL_LOCAL", 5435)
+
+
+class FileSizeLimits:
+    """File size limits for uploads and processing."""
+    MAX_UPLOAD_BYTES = get_env_int("FILE_SIZE_MAX_UPLOAD_BYTES", 52428800)  # 50MB
+    MAX_UPLOAD_MB = get_env_int("FILE_SIZE_MAX_UPLOAD_MB", 50)
+    MAX_CONFIG_FILE_BYTES = get_env_int("FILE_SIZE_MAX_CONFIG_FILE_BYTES", 104857600)  # 100MB
+    MAX_CONFIG_FILE_MB = get_env_int("FILE_SIZE_MAX_CONFIG_FILE_MB", 100)
+
+
+class DatabaseNames:
+    """Database and collection names."""
+    QDRANT_COLLECTION = get_env_str("DATABASE_NAME_QDRANT_COLLECTION", "materials")
+    WEAVIATE_CLASS = get_env_str("DATABASE_NAME_WEAVIATE_CLASS", "Material")
+    PINECONE_INDEX = get_env_str("DATABASE_NAME_PINECONE_INDEX", "materials")
+    POSTGRESQL_DB = get_env_str("DATABASE_NAME_POSTGRESQL_DB", "stbr_rag1")
+    REDIS_KEY_PREFIX = get_env_str("DATABASE_NAME_REDIS_KEY_PREFIX", "rag:")
+
+
+class ModelNames:
+    """AI model names for different providers."""
+    OPENAI_EMBEDDING = get_env_str("MODEL_NAME_OPENAI_EMBEDDING", "text-embedding-3-small")
+    HUGGINGFACE_DEFAULT = get_env_str("MODEL_NAME_HUGGINGFACE_DEFAULT", "sentence-transformers/all-MiniLM-L6-v2")
+    AZURE_API_VERSION = get_env_str("MODEL_NAME_AZURE_API_VERSION", "2023-05-15")
+
+
+class ConnectionPools:
+    """Connection pool configuration."""
+    POSTGRESQL_POOL_SIZE = get_env_int("CONNECTION_POOL_POSTGRESQL_POOL_SIZE", 10)
+    POSTGRESQL_MAX_OVERFLOW = get_env_int("CONNECTION_POOL_POSTGRESQL_MAX_OVERFLOW", 20)
+    REDIS_MAX_CONNECTIONS = get_env_int("CONNECTION_POOL_REDIS_MAX_CONNECTIONS", 50)
+    BATCH_SIZE = get_env_int("CONNECTION_POOL_BATCH_SIZE", 100)
+    MAX_CONCURRENT_UPLOADS = get_env_int("CONNECTION_POOL_MAX_CONCURRENT_UPLOADS", 5)
+
+
+class RateLimits:
+    """Rate limiting configuration."""
+    REQUESTS_PER_MINUTE = get_env_int("RATE_LIMIT_REQUESTS_PER_MINUTE", 60)
+    REQUESTS_PER_HOUR = get_env_int("RATE_LIMIT_REQUESTS_PER_HOUR", 1000)
+    BURST_LIMIT = get_env_int("RATE_LIMIT_BURST_LIMIT", 10)
+
+
+class SSHDefaults:
+    """SSH tunnel default configuration."""
+    REMOTE_HOST = get_env_str("SSH_DEFAULT_REMOTE_HOST", "31.130.148.200")
+    REMOTE_USER = get_env_str("SSH_DEFAULT_REMOTE_USER", "root")
+    KEY_PATH = get_env_str("SSH_DEFAULT_KEY_PATH", "~/.ssh/postgres_key")
+    RETRY_ATTEMPTS = get_env_int("SSH_DEFAULT_RETRY_ATTEMPTS", 3)
+    RETRY_DELAY = get_env_int("SSH_DEFAULT_RETRY_DELAY", 5)
+    KEEP_ALIVE = get_env_int("SSH_DEFAULT_KEEP_ALIVE", 60)
+
+
+class CacheSettings:
+    """Cache configuration settings."""
+    REDIS_DEFAULT_TTL = get_env_int("CACHE_REDIS_DEFAULT_TTL", 3600)  # 1 hour
+
+
+class ParserConstants:
+    """Constants for parser operations."""
+    DEFAULT_OPENAI_MODEL = get_env_str("PARSER_CONSTANT_DEFAULT_OPENAI_MODEL", "gpt-4o-mini")
+    DEFAULT_EMBEDDING_MODEL = get_env_str("PARSER_CONSTANT_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+    DEFAULT_EMBEDDING_DIMENSIONS = get_env_int("PARSER_CONSTANT_DEFAULT_EMBEDDING_DIMENSIONS", 1536)
+    DEFAULT_BATCH_SIZE = get_env_int("PARSER_CONSTANT_DEFAULT_BATCH_SIZE", 10)
+    MAX_BATCH_SIZE = get_env_int("PARSER_CONSTANT_MAX_BATCH_SIZE", 50)
+    MIN_BATCH_SIZE = get_env_int("PARSER_CONSTANT_MIN_BATCH_SIZE", 1)
+    DEFAULT_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_DEFAULT_CONFIDENCE_THRESHOLD", 0.85)
+    MIN_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_MIN_CONFIDENCE_THRESHOLD", 0.1)
+    MAX_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_MAX_CONFIDENCE_THRESHOLD", 1.0)
+    DEFAULT_PARSER_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_PARSER_TIMEOUT", 30)
+    DEFAULT_AI_REQUEST_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_AI_REQUEST_TIMEOUT", 45)
+    DEFAULT_BATCH_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_BATCH_TIMEOUT", 300)
+    DEFAULT_RETRY_ATTEMPTS = get_env_int("PARSER_CONSTANT_DEFAULT_RETRY_ATTEMPTS", 3)
+    MAX_RETRY_ATTEMPTS = get_env_int("PARSER_CONSTANT_MAX_RETRY_ATTEMPTS", 10)
+    DEFAULT_CACHE_TTL = get_env_int("PARSER_CONSTANT_DEFAULT_CACHE_TTL", 3600)  # 1 hour
+    DEFAULT_EMBEDDING_CACHE_TTL = get_env_int("PARSER_CONSTANT_DEFAULT_EMBEDDING_CACHE_TTL", 86400)  # 24 hours
+
 
 class Settings(BaseSettings):
-    """Main application settings with modular configuration."""
+    """Main application settings with environment variable support."""
     
     # === PROJECT SETTINGS ===
-    PROJECT_NAME: str = "RAG Construction Materials API"
-    VERSION: str = "1.0.0"
-    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str = Field(default="RAG Construction Materials API", description="Project name")
+    VERSION: str = Field(default="1.0.0", description="API version")
+    API_V1_STR: str = Field(default="/api/v1", description="API version string")
     
     # === OPENAPI DOCUMENTATION ===
     DESCRIPTION: str = """
@@ -105,229 +213,201 @@ class Settings(BaseSettings):
         }
     ]
     
-    # === ENVIRONMENT SETTINGS ===
-    ENVIRONMENT: Environment = Field(
-        default=Environment.DEVELOPMENT, 
-        description="Application environment"
-    )
-    BACKEND_CORS_ORIGINS: List[str] = Field(
-        default_factory=list,
-        description="CORS allowed origins"
-    )
+    # === ENVIRONMENT ===
+    ENVIRONMENT: str = Field(default="development", description="Application environment")
+    DEBUG: bool = Field(default=False, description="Debug mode")
+    LOG_LEVEL: str = Field(default="INFO", description="Logging level")
     
-    # === VECTOR DATABASE CONFIGURATION ===
-    DATABASE_TYPE: DatabaseType = Field(
-        default=DatabaseType.QDRANT_CLOUD,
-        description="Vector database type"
+    # === DATABASE CONFIGURATION ===
+    # Qdrant Vector Database
+    QDRANT_URL: str = Field(
+        default="https://your-cluster.qdrant.tech:6333",
+        description="Qdrant cluster URL"
     )
-    
-    # Qdrant settings
-    QDRANT_URL: str = Field(description="Qdrant instance URL")
-    QDRANT_API_KEY: str = Field(description="Qdrant API key")
+    QDRANT_API_KEY: str = Field(
+        default="your_qdrant_api_key",
+        description="Qdrant API key"
+    )
     QDRANT_COLLECTION_NAME: str = Field(
-        default=DatabaseNames.QDRANT_COLLECTION,
+        default=os.getenv("DATABASE_NAME_QDRANT_COLLECTION", "materials"),
         description="Qdrant collection name"
     )
     QDRANT_VECTOR_SIZE: int = Field(
-        default=VectorSize.OPENAI_SMALL,
-        description="Vector dimension size"
+        default=int(os.getenv("VECTOR_SIZE_OPENAI_SMALL", "1536")),
+        description="Vector dimensions for embeddings"
     )
     QDRANT_TIMEOUT: int = Field(
-        default=DefaultTimeouts.DATABASE,
+        default=int(os.getenv("DEFAULT_TIMEOUT_DATABASE", "30")),
         description="Qdrant connection timeout"
     )
     
-    # Alternative vector databases
-    WEAVIATE_URL: Optional[str] = Field(default=None, description="Weaviate instance URL")
-    WEAVIATE_API_KEY: Optional[str] = Field(default=None, description="Weaviate API key")
-    PINECONE_API_KEY: Optional[str] = Field(default=None, description="Pinecone API key")
-    PINECONE_ENVIRONMENT: Optional[str] = Field(default=None, description="Pinecone environment")
-    
-    # === POSTGRESQL CONFIGURATION ===
-    POSTGRESQL_URL: Optional[str] = Field(
-        default=None, 
+    # PostgreSQL Database
+    POSTGRESQL_URL: str = Field(
+        default="postgresql+asyncpg://user:pass@localhost:5432/stbr_rag1",
         description="PostgreSQL connection URL"
     )
-    POSTGRESQL_USER: Optional[str] = Field(default=None, description="PostgreSQL username")
-    POSTGRESQL_PASSWORD: Optional[str] = Field(default=None, description="PostgreSQL password")
-    POSTGRESQL_HOST: Optional[str] = Field(default="localhost", description="PostgreSQL host")
-    POSTGRESQL_PORT: int = Field(default=DefaultPorts.POSTGRESQL, description="PostgreSQL port")
-    POSTGRESQL_DATABASE: Optional[str] = Field(
-        default=DatabaseNames.POSTGRESQL_DB,
+    POSTGRESQL_DATABASE: str = Field(
+        default=os.getenv("DATABASE_NAME_POSTGRESQL_DB", "stbr_rag1"),
         description="PostgreSQL database name"
     )
+    POSTGRES_USER: str = Field(
+        default=os.getenv("POSTGRES_USER", "user"), 
+        description="PostgreSQL username"
+    )
+    POSTGRES_PASSWORD: str = Field(
+        default=os.getenv("POSTGRES_PASSWORD", "pass"), 
+        description="PostgreSQL password"
+    )
+    POSTGRESQL_HOST: str = Field(
+        default=os.getenv("POSTGRES_HOST", "localhost"), 
+        description="PostgreSQL host"
+    )
+    POSTGRESQL_PORT: int = Field(
+        default=int(os.getenv("POSTGRES_PORT", os.getenv("DEFAULT_PORT_POSTGRESQL", "5432"))),
+        description="PostgreSQL port"
+    )
     POSTGRESQL_POOL_SIZE: int = Field(
-        default=ConnectionPools.POSTGRESQL_POOL_SIZE,
+        default=int(os.getenv("CONNECTION_POOL_POSTGRESQL_POOL_SIZE", "10")),
         description="PostgreSQL connection pool size"
     )
     POSTGRESQL_MAX_OVERFLOW: int = Field(
-        default=ConnectionPools.POSTGRESQL_MAX_OVERFLOW,
-        description="PostgreSQL max pool overflow"
+        default=int(os.getenv("CONNECTION_POOL_POSTGRESQL_MAX_OVERFLOW", "20")),
+        description="PostgreSQL connection pool max overflow"
     )
     
-    # === REDIS CONFIGURATION ===
-    REDIS_URL: Optional[str] = Field(
-        default=f"redis://localhost:{DefaultPorts.REDIS}",
+    # Redis Cache
+    REDIS_URL: str = Field(
+        default=f"redis://localhost:{os.getenv('DEFAULT_PORT_REDIS', '6379')}",
         description="Redis connection URL"
     )
     REDIS_PASSWORD: Optional[str] = Field(default=None, description="Redis password")
-    REDIS_DB: int = Field(default=0, description="Redis database number")
     REDIS_MAX_CONNECTIONS: int = Field(
-        default=ConnectionPools.REDIS_MAX_CONNECTIONS,
+        default=int(os.getenv("CONNECTION_POOL_REDIS_MAX_CONNECTIONS", "50")),
         description="Redis max connections"
     )
     REDIS_TIMEOUT: int = Field(
-        default=DefaultTimeouts.REDIS,
+        default=int(os.getenv("DEFAULT_TIMEOUT_REDIS", "10")),
         description="Redis connection timeout"
     )
     
-    # === SSH TUNNEL CONFIGURATION ===
-    ENABLE_SSH_TUNNEL: bool = Field(
-        default=False, 
-        description="Enable SSH tunnel service"
-    )
+    # SSH Tunnel Configuration
+    ENABLE_SSH_TUNNEL: bool = Field(default=False, description="Enable SSH tunnel")
     SSH_TUNNEL_LOCAL_PORT: int = Field(
-        default=DefaultPorts.SSH_TUNNEL_LOCAL,
-        description="Local port for SSH tunnel"
+        default=int(os.getenv("DEFAULT_PORT_SSH_TUNNEL_LOCAL", "5435")),
+        description="SSH tunnel local port"
     )
     SSH_TUNNEL_REMOTE_HOST: str = Field(
-        default=SSHDefaults.REMOTE_HOST,
-        description="Remote host for SSH tunnel"
+        default=os.getenv("SSH_DEFAULT_REMOTE_HOST", "31.130.148.200"),
+        description="SSH tunnel remote host"
     )
     SSH_TUNNEL_REMOTE_USER: str = Field(
-        default=SSHDefaults.REMOTE_USER,
-        description="Remote user for SSH tunnel"
+        default=os.getenv("SSH_DEFAULT_REMOTE_USER", "root"),
+        description="SSH tunnel remote user"
     )
     SSH_TUNNEL_REMOTE_PORT: int = Field(
-        default=DefaultPorts.POSTGRESQL,
-        description="Remote port for SSH tunnel"
+        default=int(os.getenv("DEFAULT_PORT_POSTGRESQL", "5432")),
+        description="SSH tunnel remote port"
     )
     SSH_TUNNEL_KEY_PATH: str = Field(
-        default=SSHDefaults.KEY_PATH,
-        description="SSH private key path"
-    )
-    SSH_TUNNEL_KEY_PASSPHRASE: Optional[str] = Field(
-        default=None,
-        description="SSH key passphrase"
+        default=os.getenv("SSH_DEFAULT_KEY_PATH", "~/.ssh/postgres_key"),
+        description="SSH tunnel key path"
     )
     SSH_TUNNEL_TIMEOUT: int = Field(
-        default=DefaultTimeouts.SSH_TUNNEL,
-        description="SSH tunnel timeout"
+        default=int(os.getenv("DEFAULT_TIMEOUT_SSH_TUNNEL", "30")),
+        description="SSH tunnel connection timeout"
     )
     SSH_TUNNEL_RETRY_ATTEMPTS: int = Field(
-        default=SSHDefaults.RETRY_ATTEMPTS,
+        default=int(os.getenv("SSH_DEFAULT_RETRY_ATTEMPTS", "3")),
         description="SSH tunnel retry attempts"
     )
     SSH_TUNNEL_RETRY_DELAY: int = Field(
-        default=SSHDefaults.RETRY_DELAY,
+        default=int(os.getenv("SSH_DEFAULT_RETRY_DELAY", "5")),
         description="SSH tunnel retry delay"
     )
-    SSH_TUNNEL_HEARTBEAT_INTERVAL: int = Field(
-        default=60,
-        description="SSH tunnel heartbeat interval"
-    )
-    SSH_TUNNEL_AUTO_RESTART: bool = Field(
-        default=True,
-        description="Auto restart SSH tunnel"
-    )
-    SSH_TUNNEL_COMPRESSION: bool = Field(
-        default=True,
-        description="Enable SSH compression"
-    )
     SSH_TUNNEL_KEEP_ALIVE: int = Field(
-        default=SSHDefaults.KEEP_ALIVE,
-        description="SSH keep alive interval"
+        default=int(os.getenv("SSH_DEFAULT_KEEP_ALIVE", "60")),
+        description="SSH tunnel keep alive interval"
     )
-    SSH_TUNNEL_STRICT_HOST_KEY_CHECKING: bool = Field(
-        default=False,
-        description="Enable strict host key checking"
+    SSH_TUNNEL_KEEP_ALIVE_INTERVAL: int = Field(
+        default=int(os.getenv("SSH_DEFAULT_KEEP_ALIVE", "60")),
+        description="SSH tunnel keep alive interval"
     )
     
     # === AI CONFIGURATION ===
-    AI_PROVIDER: AIProvider = Field(
-        default=AIProvider.OPENAI,
-        description="AI provider for embeddings"
+    # OpenAI Configuration
+    OPENAI_API_KEY: str = Field(
+        default="sk-your_openai_api_key",
+        description="OpenAI API key"
     )
-    
-    # OpenAI settings
-    OPENAI_API_KEY: str = Field(description="OpenAI API key")
     OPENAI_MODEL: str = Field(
-        default=ModelNames.OPENAI_EMBEDDING,
+        default=os.getenv("MODEL_NAME_OPENAI_EMBEDDING", "text-embedding-3-small"),
         description="OpenAI embedding model"
     )
     OPENAI_MAX_RETRIES: int = Field(
-        default=3,
-        description="OpenAI max retries"
+        default=int(os.getenv("PARSER_CONSTANT_DEFAULT_RETRY_ATTEMPTS", "3")),
+        description="OpenAI max retry attempts"
     )
     OPENAI_TIMEOUT: int = Field(
-        default=DefaultTimeouts.AI_CLIENT,
+        default=int(os.getenv("DEFAULT_TIMEOUT_AI_CLIENT", "30")),
         description="OpenAI request timeout"
     )
     
-    # Azure OpenAI settings
-    AZURE_OPENAI_API_KEY: Optional[str] = Field(default=None, description="Azure OpenAI API key")
-    AZURE_OPENAI_ENDPOINT: Optional[str] = Field(default=None, description="Azure OpenAI endpoint")
-    AZURE_OPENAI_MODEL: Optional[str] = Field(default=None, description="Azure OpenAI model")
-    
-    # HuggingFace settings
+    # HuggingFace Configuration
+    HUGGINGFACE_API_KEY: Optional[str] = Field(default=None, description="HuggingFace API key")
     HUGGINGFACE_MODEL: str = Field(
-        default=ModelNames.HUGGINGFACE_DEFAULT,
+        default=os.getenv("MODEL_NAME_HUGGINGFACE_DEFAULT", "sentence-transformers/all-MiniLM-L6-v2"),
         description="HuggingFace model name"
     )
-    HUGGINGFACE_DEVICE: str = Field(
-        default="cpu",
-        description="HuggingFace device"
+    
+    # === DATABASE TYPE CONFIGURATION ===
+    DATABASE_TYPE: DatabaseType = Field(
+        default=DatabaseType.QDRANT_CLOUD,
+        description="Primary vector database type"
+    )
+    AI_PROVIDER: AIProvider = Field(
+        default=AIProvider.OPENAI,
+        description="Primary AI provider for embeddings"
     )
     
-    # Ollama settings
-    OLLAMA_URL: Optional[str] = Field(default=None, description="Ollama server URL")
-    OLLAMA_MODEL: Optional[str] = Field(default=None, description="Ollama model name")
-    
-    # === DATABASE INITIALIZATION ===
-    AUTO_MIGRATE: bool = Field(
-        default=True,
-        description="Automatically run migrations"
-    )
-    AUTO_SEED: bool = Field(
-        default=True,
-        description="Automatically seed reference data"
-    )
-    
-    # === FALLBACK SETTINGS ===
-    QDRANT_ONLY_MODE: bool = Field(
-        default=True,
-        description="Use only Qdrant without other databases"
-    )
+    # === FEATURE FLAGS ===
     ENABLE_FALLBACK_DATABASES: bool = Field(
         default=True,
-        description="Enable fallback to alternative databases"
+        description="Enable fallback to mock databases"
+    )
+    QDRANT_ONLY_MODE: bool = Field(
+        default=False,
+        description="Use only Qdrant database"
+    )
+    DISABLE_QDRANT_CONNECTION: bool = Field(
+        default=True,
+        description="Disable Qdrant connection"
     )
     DISABLE_REDIS_CONNECTION: bool = Field(
         default=True,
         description="Disable Redis connection"
     )
     DISABLE_POSTGRESQL_CONNECTION: bool = Field(
-        default=True,
+        default=False,
         description="Disable PostgreSQL connection"
     )
     
     # === PERFORMANCE SETTINGS ===
     MAX_UPLOAD_SIZE: int = Field(
-        default=FileSizeLimits.MAX_UPLOAD_BYTES,
+        default=int(os.getenv("FILE_SIZE_MAX_UPLOAD_BYTES", "52428800")),
         description="Maximum upload size in bytes"
     )
     BATCH_SIZE: int = Field(
-        default=ConnectionPools.BATCH_SIZE,
+        default=int(os.getenv("CONNECTION_POOL_BATCH_SIZE", "100")),
         description="Batch processing size"
     )
     MAX_CONCURRENT_UPLOADS: int = Field(
-        default=ConnectionPools.MAX_CONCURRENT_UPLOADS,
+        default=int(os.getenv("CONNECTION_POOL_MAX_CONCURRENT_UPLOADS", "5")),
         description="Maximum concurrent uploads"
     )
     
     # === SECURITY SETTINGS ===
     MAX_REQUEST_SIZE_MB: int = Field(
-        default=FileSizeLimits.MAX_UPLOAD_MB,
+        default=int(os.getenv("FILE_SIZE_MAX_UPLOAD_MB", "50")),
         description="Maximum request size in MB"
     )
     ENABLE_SECURITY_HEADERS: bool = Field(
@@ -345,15 +425,15 @@ class Settings(BaseSettings):
         description="Enable rate limiting"
     )
     RATE_LIMIT_RPM: int = Field(
-        default=RateLimits.REQUESTS_PER_MINUTE,
+        default=int(os.getenv("RATE_LIMIT_REQUESTS_PER_MINUTE", "60")),
         description="Requests per minute limit"
     )
     RATE_LIMIT_RPH: int = Field(
-        default=RateLimits.REQUESTS_PER_HOUR,
+        default=int(os.getenv("RATE_LIMIT_REQUESTS_PER_HOUR", "1000")),
         description="Requests per hour limit"
     )
     RATE_LIMIT_BURST: int = Field(
-        default=RateLimits.BURST_LIMIT,
+        default=int(os.getenv("RATE_LIMIT_BURST_LIMIT", "10")),
         description="Burst requests limit"
     )
     
@@ -367,70 +447,24 @@ class Settings(BaseSettings):
             ".env"
         ],
         env_file_encoding='utf-8',
-        validate_assignment=True,
-        extra='allow'
+        extra='ignore'
     )
     
-    # === FIELD VALIDATORS ===
-    @field_validator('QDRANT_URL')
-    @classmethod
-    def validate_qdrant_url(cls, v: str) -> str:
-        """Validate Qdrant URL format."""
-        if not v or not v.startswith(('http://', 'https://')):
-            raise ValueError('QDRANT_URL must be a valid HTTP/HTTPS URL')
-        return v
-    
-    @field_validator('OPENAI_API_KEY')
-    @classmethod
-    def validate_openai_key(cls, v: str) -> str:
-        """Validate OpenAI API key format."""
-        if not v or not v.startswith('sk-'):
-            raise ValueError('OPENAI_API_KEY must start with "sk-"')
-        return v
-    
-    @field_validator('POSTGRESQL_URL')
-    @classmethod
-    def validate_postgresql_url(cls, v: Optional[str]) -> Optional[str]:
-        """Validate PostgreSQL URL format."""
-        if v and not v.startswith('postgresql'):
-            raise ValueError('POSTGRESQL_URL must start with "postgresql://" or "postgresql+asyncpg://"')
-        
-        if v and '/stbr_rag1' not in v:
-            raise ValueError('POSTGRESQL_URL must connect to stbr_rag1 database only!')
-        
-        return v
-    
+    # === VALIDATORS ===
     @field_validator('POSTGRESQL_DATABASE')
-    @classmethod
-    def validate_postgresql_database(cls, v: Optional[str]) -> Optional[str]:
+    def validate_postgresql_database(cls, v):
         """Validate PostgreSQL database name."""
-        if v and v != DatabaseNames.POSTGRESQL_DB:
-            raise ValueError(f'Only "{DatabaseNames.POSTGRESQL_DB}" database is allowed.')
-        return v
-    
-    @field_validator('REDIS_URL')
-    @classmethod
-    def validate_redis_url(cls, v: Optional[str]) -> Optional[str]:
-        """Validate Redis URL format."""
-        if v and not v.startswith('redis://'):
-            raise ValueError('REDIS_URL must start with "redis://"')
-        return v
-    
-    @field_validator('QDRANT_VECTOR_SIZE')
-    @classmethod
-    def validate_vector_size(cls, v: int) -> int:
-        """Validate vector size."""
-        valid_sizes = [size.value for size in VectorSize]
-        if v not in valid_sizes:
-            raise ValueError(f'QDRANT_VECTOR_SIZE must be one of: {valid_sizes}')
+        if v and v != os.getenv("DATABASE_NAME_POSTGRESQL_DB", "stbr_rag1"):
+            raise ValueError(f'Only "{os.getenv("DATABASE_NAME_POSTGRESQL_DB", "stbr_rag1")}" database is allowed.')
         return v
     
     @field_validator('MAX_UPLOAD_SIZE')
-    @classmethod
-    def validate_max_upload_size(cls, v: int) -> int:
-        """Validate upload size is reasonable."""
-        if v > FileSizeLimits.MAX_CONFIG_FILE_BYTES:
-            raise ValueError(f'MAX_UPLOAD_SIZE cannot exceed {FileSizeLimits.MAX_CONFIG_FILE_MB}MB')
+    def validate_max_upload_size(cls, v):
+        """Validate maximum upload size."""
+        max_config_size = int(os.getenv("FILE_SIZE_MAX_CONFIG_FILE_BYTES", "104857600"))
+        if v > max_config_size:
+            max_mb = int(os.getenv("FILE_SIZE_MAX_CONFIG_FILE_MB", "100"))
+            raise ValueError(f'MAX_UPLOAD_SIZE cannot exceed {max_mb}MB')
         return v
     
     # === CONFIGURATION FACTORIES ===
@@ -469,7 +503,7 @@ class Settings(BaseSettings):
             connection_string = self.POSTGRESQL_URL
         else:
             connection_string = (
-                f"postgresql+asyncpg://{self.POSTGRESQL_USER}:{self.POSTGRESQL_PASSWORD}"
+                f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
                 f"@{self.POSTGRESQL_HOST}:{self.POSTGRESQL_PORT}/{self.POSTGRESQL_DATABASE}"
             )
         
@@ -562,10 +596,10 @@ class Settings(BaseSettings):
     
     # Logger caching settings
     LOG_CACHE_MAX_SIZE: int = Field(default=1000, description="Maximum logger cache size")
-    LOG_CACHE_TTL: int = Field(default=3600, description="Logger cache TTL in seconds")
+    LOG_CACHE_TTL: int = Field(default=CacheSettings.REDIS_DEFAULT_TTL, description="Logger cache TTL in seconds")
     
     # Batch processing settings
-    LOG_BATCH_SIZE: int = Field(default=100, description="Log batch size")
+    LOG_BATCH_SIZE: int = Field(default=ConnectionPools.BATCH_SIZE, description="Log batch size")
     LOG_FLUSH_INTERVAL: float = Field(default=1.0, description="Log flush interval in seconds")
     LOG_MAX_QUEUE_SIZE: int = Field(default=10000, description="Maximum log queue size")
     
@@ -596,7 +630,7 @@ class Settings(BaseSettings):
     # 🎯 ЭТАП 5.6: Metrics Integration Settings
     ENABLE_METRICS_INTEGRATION: bool = Field(default=True, description="Enable metrics integration with logging")
     METRICS_COLLECTION_INTERVAL: float = Field(default=30.0, description="Metrics collection interval in seconds")
-    METRICS_BATCH_SIZE: int = Field(default=500, description="Metrics batch size")
+    METRICS_BATCH_SIZE: int = Field(default=ConnectionPools.BATCH_SIZE, description="Metrics batch size")
     METRICS_AUTO_EXPORT: bool = Field(default=True, description="Enable automatic metrics export")
     METRICS_EXPORT_INTERVAL: float = Field(default=60.0, description="Metrics export interval in seconds")
     METRICS_RETENTION_HOURS: int = Field(default=24, description="Metrics retention period in hours")

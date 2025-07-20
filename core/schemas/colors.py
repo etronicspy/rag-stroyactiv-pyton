@@ -4,9 +4,10 @@ Color schemas for construction materials classification.
 Схемы для цветовой классификации строительных материалов.
 """
 
-from typing import Optional, List, Union
-from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ColorReference(BaseModel):

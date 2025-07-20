@@ -4,16 +4,17 @@ Supports multiple compression algorithms with intelligent selection.
 """
 
 import gzip
-import zlib
 import time
-from core.logging import get_logger
-from typing import Optional, List, Dict, Any, Callable
+import zlib
 from io import BytesIO
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import StreamingResponse
 from starlette.types import ASGIApp
+
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 

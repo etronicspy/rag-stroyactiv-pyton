@@ -6,8 +6,8 @@ Extracted and refactored from core/monitoring/context.py.
 """
 
 import logging
-from typing import Callable, Dict, Any
 from functools import wraps
+from typing import Any, Callable, Dict
 
 from .correlation import get_correlation_id
 

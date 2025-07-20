@@ -7,13 +7,14 @@ This module provides tunnel lifecycle management, monitoring, and recovery.
 """
 
 import asyncio
-from core.logging import get_logger
 import time
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
+from core.logging import get_logger
+
+from .exceptions import SSHTunnelError
 from .ssh_tunnel import SSHTunnel
 from .tunnel_config import TunnelConfig
-from .exceptions import SSHTunnelError
 
 logger = get_logger(__name__)
 

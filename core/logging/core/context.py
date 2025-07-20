@@ -6,10 +6,15 @@ This module provides implementations for context management.
 
 import contextvars
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Dict, Optional, Iterator
+from typing import Any, Dict, Optional
 
-from core.logging.interfaces import ILoggingContext, IContextProvider, ICorrelationProvider
+from core.logging.interfaces import (
+    IContextProvider,
+    ICorrelationProvider,
+    ILoggingContext,
+)
 
 
 class LoggingContext(ILoggingContext):

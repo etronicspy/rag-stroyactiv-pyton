@@ -6,7 +6,7 @@ This module defines interfaces for HTTP request and response logging:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, ContextManager
+from typing import Any, ContextManager, Dict, Optional
 
 
 class IRequestLogger(ABC):

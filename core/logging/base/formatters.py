@@ -5,8 +5,8 @@ Provides structured JSON formatting and colored console output.
 Extracted and refactored from core/monitoring/logger.py.
 """
 
-import logging
 import json
+import logging
 from datetime import datetime
 
 from .interfaces import FormatterInterface

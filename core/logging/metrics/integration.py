@@ -5,15 +5,15 @@ Integrates metrics collection with logging operations for comprehensive monitori
 Migrated and optimized from core/monitoring/metrics_integration.py.
 """
 
-import time
 import threading
-from typing import Dict, Any, Optional
+import time
 from contextlib import contextmanager
+from typing import Any, Dict, Optional
 
-from .collectors import get_metrics_collector
-from .performance import get_performance_optimizer
 from ..base.loggers import get_logger
 from ..context.correlation import get_correlation_id
+from .collectors import get_metrics_collector
+from .performance import get_performance_optimizer
 
 
 class MetricsIntegratedLogger:

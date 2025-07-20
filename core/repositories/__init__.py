@@ -3,11 +3,11 @@
 Абстракции и реализации репозиториев для мульти-БД архитектуры.
 """
 
-from .interfaces import IMaterialsRepository, ICategoriesRepository, IUnitsRepository
 from .base import BaseRepository
-from .redis_materials import RedisMaterialsRepository
-from .hybrid_materials import HybridMaterialsRepository
 from .cached_materials import CachedMaterialsRepository
+from .hybrid_materials import HybridMaterialsRepository
+from .interfaces import ICategoriesRepository, IMaterialsRepository, IUnitsRepository
+from .redis_materials import RedisMaterialsRepository
 
 __all__ = [
     "IMaterialsRepository",

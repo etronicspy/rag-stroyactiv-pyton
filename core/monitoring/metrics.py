@@ -1,18 +1,12 @@
-"""High-level re-exports for metrics utilities.
-
-This module previously contained dynamic fallbacks to the legacy implementation in
-``backup.core.monitoring.metrics``.  The project has fully migrated to the new
-implementation under ``core.logging.metrics``.  All legacy fallbacks have been
-removed to simplify the dependency graph and eliminate obsolete code paths.
-
-See also: ``PLAN_DOCS/LEGACY_CODE_REMOVAL_PLAN.md``.
-"""
+"""High-level re-exports for metrics utilities."""
 
 # NOTE: No runtime fallbacks – rely exclusively on the canonical metrics module.
 from core.logging.metrics import (
+    DatabaseMetrics,
     MetricsCollector,
     PerformanceTracker,
-    DatabaseMetrics,
+)
+from core.logging.metrics import (
     get_metrics_collector as _get_collector,
 )
 

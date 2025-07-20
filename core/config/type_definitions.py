@@ -7,6 +7,7 @@ to ensure consistency across the application.
 
 from enum import Enum
 
+
 class DatabaseType(str, Enum):
     """Supported database types for vector storage."""
     QDRANT_CLOUD = "qdrant_cloud"
@@ -35,7 +36,7 @@ class Environment(str, Enum):
     STAGING = "staging"
     PRODUCTION = "production"
     TESTING = "testing"
-    TEST = "test"  # legacy alias for unit tests
+
 
 class LogFormat(str, Enum):
     """Log output formats."""

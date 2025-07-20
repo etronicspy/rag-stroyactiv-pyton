@@ -1,7 +1,7 @@
 """005_processing_results_table
 
 Revision ID: 005_processing_results_table
-Revises: 002_add_materials_table
+Revises: 003_reference_tables
 Create Date: 2025-01-25 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '005_processing_results_table'
-down_revision = '002_add_materials_table'
+down_revision = '003_reference_tables'
 branch_labels = None
 depends_on = None
 

@@ -8,8 +8,9 @@ for various services used by the application.
 from functools import lru_cache
 from typing import Optional
 
-from .type_definitions import DatabaseType, AIProvider
 from .base import Settings, get_settings
+from .type_definitions import AIProvider, DatabaseType
+
 
 @lru_cache(maxsize=1)
 def get_vector_db_client(settings: Optional[Settings] = None):

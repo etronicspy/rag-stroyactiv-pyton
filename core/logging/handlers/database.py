@@ -7,8 +7,8 @@ Extracted and refactored from core/monitoring/logger.py.
 
 import logging
 import time
-from typing import Optional, Dict, Any
 from contextlib import contextmanager
+from typing import Any, Dict, Optional
 
 from ..base.interfaces import DatabaseLoggerInterface
 from ..context.correlation import get_correlation_id

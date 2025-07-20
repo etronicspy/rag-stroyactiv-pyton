@@ -5,23 +5,27 @@ Integrates logging, metrics, performance tracking, and correlation ID management
 Migrated and optimized from core/monitoring/unified_manager.py.
 """
 
+import asyncio
+import threading
 import time
 import uuid
-import threading
-from typing import Dict, Any, Optional
-from enum import Enum
-from dataclasses import dataclass
 from contextlib import contextmanager
-from functools import wraps
+from dataclasses import dataclass
 from datetime import datetime
-import asyncio
+from enum import Enum
+from functools import wraps
+from typing import Any, Dict, Optional
 
 from ..base.loggers import get_logger
+from ..context.correlation import get_correlation_id
 from ..handlers.database import DatabaseLogger
 from ..handlers.request import RequestLogger
-from ..metrics.collectors import MetricsCollector, PerformanceTracker, get_metrics_collector
+from ..metrics.collectors import (
+    MetricsCollector,
+    PerformanceTracker,
+    get_metrics_collector,
+)
 from ..metrics.performance import get_performance_optimizer
-from ..context.correlation import get_correlation_id
 
 
 class LogLevel(str, Enum):
@@ -425,7 +429,7 @@ class UnifiedLoggingManager:
         with self._operations_lock:
             self._active_operations.pop(operation_id, None)
 
-    # Legacy method for backward compatibility
+    
     def log_operation(self, operation: str, **kwargs):
         """Log operation (backward compatibility)."""
         self.logger.info(f"Operation: {operation}", extra=kwargs)

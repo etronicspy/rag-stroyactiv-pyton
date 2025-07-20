@@ -8,7 +8,10 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Union
 
-from core.logging.specialized.database.database_logger import DatabaseLogger, AsyncDatabaseLogger
+from core.logging.specialized.database.database_logger import (
+    AsyncDatabaseLogger,
+    DatabaseLogger,
+)
 
 
 class SqlLogger(DatabaseLogger):

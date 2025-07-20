@@ -5,14 +5,12 @@ Metrics collection and tracking for parser operations with integration
 into the main monitoring system.
 """
 
-import time
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
-from functools import lru_cache
 import threading
-
-from core.logging.interfaces.metrics import IMetricsCollector, IPerformanceTracker
+import time
+from collections import defaultdict, deque
+from datetime import datetime
+from functools import lru_cache
+from typing import Any, Dict, List, Optional
 
 
 class ParserMetrics:

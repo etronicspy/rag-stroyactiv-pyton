@@ -6,17 +6,12 @@ performance monitoring, and AI-specific logging capabilities.
 """
 
 import time
-import json
-import uuid
-from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 from functools import lru_cache
+from typing import Any, Dict, Optional
 
-from core.logging.core.logger import Logger
 from core.logging.context.correlation import CorrelationContext
-from core.logging.interfaces.core import ILogger
-from core.logging.interfaces.context import ICorrelationProvider
-from core.logging.interfaces.metrics import IMetricsCollector, IPerformanceTracker
+from core.logging.core.logger import Logger
 
 
 class ParserLogger:

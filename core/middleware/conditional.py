@@ -3,15 +3,17 @@ Conditional middleware wrapper for optimized performance.
 Allows middleware to be applied only to specific routes or conditions.
 """
 
-from core.logging import get_logger
-import time
-from typing import Callable, Optional, List, Union, Pattern
 import re
+import time
 from functools import lru_cache
+from re import Pattern
+from typing import Callable, List, Optional, Union
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 

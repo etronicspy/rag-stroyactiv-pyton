@@ -3,20 +3,18 @@
 Реализация гибридного репозитория материалов.
 """
 
-from typing import List, Dict, Any, Optional
-from core.logging import get_logger
-from datetime import datetime
 import asyncio
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from core.database.exceptions import DatabaseError
+from core.database.interfaces import IRelationalDatabase, IVectorDatabase
+from core.logging import DatabaseLogger, get_logger
+from core.logging.metrics import get_metrics_collector
 from core.repositories.base import BaseRepository
 from core.repositories.interfaces import IMaterialsRepository
-from core.database.interfaces import IVectorDatabase, IRelationalDatabase
-from core.database.exceptions import DatabaseError
 from core.schemas.materials import Material, MaterialCreate, MaterialUpdate
-from core.logging import DatabaseLogger
-from core.logging.metrics import get_metrics_collector
-
 
 logger = get_logger(__name__)
 
@@ -613,14 +611,19 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
             raise e
     
     async def health_check(self) -> Dict[str, Any]:
-        """Check health of both databases.
+        """Check health of hybrid repository using fallback manager.
         
         Returns:
-            Combined health status
+            Health status for both databases
         """
         try:
-            # Check both databases concurrently
-            vector_task = self.vector_db.health_check()
+            # Check vector database using fallback manager
+            from core.database.factories import (
+                get_fallback_manager,
+            )
+            
+            fallback_manager = get_fallback_manager()
+            vector_task = fallback_manager.health_check()
             relational_task = self.relational_db.health_check()
             
             vector_health, relational_health = await asyncio.gather(
@@ -666,7 +669,12 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
     # === Private helper methods ===
     
     async def _create_in_vector_db(self, material_data: Dict[str, Any]) -> None:
-        """Create material in vector database."""
+        """Create material in vector database using fallback manager."""
+        from core.database.factories import (
+            get_fallback_manager,
+        )
+        
+        fallback_manager = get_fallback_manager()
         vector_data = {
             "id": material_data["id"],
             "vector": material_data["embedding"],
@@ -681,7 +689,7 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
             }
         }
         
-        await self.vector_db.upsert(
+        await fallback_manager.upsert(
             collection_name=self.collection_name,
             vectors=[vector_data]
         )
@@ -696,12 +704,18 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
         limit: int, 
         min_score: float = 0.6
     ) -> List[Dict[str, Any]]:
-        """Search in vector database."""
+        """Search in vector database using fallback manager."""
+        from core.database.factories import (
+            get_fallback_manager,
+        )
+        
+        fallback_manager = get_fallback_manager()
+        
         # Generate query embedding
         query_embedding = await self.get_embedding(query)
         
         # Search in vector database
-        results = await self.vector_db.search(
+        results = await fallback_manager.search(
             collection_name=self.collection_name,
             query_vector=query_embedding,
             limit=limit,
@@ -785,9 +799,15 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
         return deduplicated
     
     async def _update_in_vector_db(self, material_id: str, update_data: Dict[str, Any]) -> None:
-        """Update material in vector database."""
+        """Update material in vector database using fallback manager."""
+        from core.database.factories import (
+            get_fallback_manager,
+        )
+        
+        fallback_manager = get_fallback_manager()
+        
         # Get current vector data
-        current_results = await self.vector_db.get_by_id(self.collection_name, material_id)
+        current_results = await fallback_manager.get_by_id(self.collection_name, material_id)
         if not current_results:
             return
         
@@ -807,7 +827,7 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
             "payload": current_payload
         }
         
-        await self.vector_db.upsert(
+        await fallback_manager.upsert(
             collection_name=self.collection_name,
             vectors=[vector_data]
         )
@@ -827,10 +847,15 @@ class HybridMaterialsRepository(BaseRepository, IMaterialsRepository):
             await self.relational_db.execute_command(query, params)
     
     async def _delete_from_vector_db(self, material_id: str) -> None:
-        """Delete material from vector database."""
-        await self.vector_db.delete(
+        """Delete material from vector database using fallback manager."""
+        from core.database.factories import (
+            get_fallback_manager,
+        )
+        
+        fallback_manager = get_fallback_manager()
+        await fallback_manager.delete(
             collection_name=self.collection_name,
-            vector_id=material_id
+            ids=[material_id]
         )
     
     async def _delete_from_relational_db(self, material_id: str) -> None:

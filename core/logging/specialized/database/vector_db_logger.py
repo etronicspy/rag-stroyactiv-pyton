@@ -4,11 +4,14 @@ Vector database logger implementation.
 This module provides a logger for vector database operations.
 """
 
-import logging
 import json
+import logging
 from typing import Any, Dict, List, Optional, Union
 
-from core.logging.specialized.database.database_logger import DatabaseLogger, AsyncDatabaseLogger
+from core.logging.specialized.database.database_logger import (
+    AsyncDatabaseLogger,
+    DatabaseLogger,
+)
 
 
 class VectorDbLogger(DatabaseLogger):

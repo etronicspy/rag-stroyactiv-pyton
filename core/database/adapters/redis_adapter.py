@@ -5,14 +5,15 @@
 
 import json
 import pickle
-from core.logging import get_logger
 import zlib
-from typing import Any, Dict, List, Optional, Union, Set
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Union
 
 import redis.asyncio as redis
 from redis.asyncio import ConnectionPool
 from redis.exceptions import RedisError
+
+from core.logging import get_logger
 
 # Try to import msgpack for optimized serialization
 try:
@@ -22,9 +23,8 @@ except ImportError:
     MSGPACK_AVAILABLE = False
     get_logger(__name__).warning("msgpack not available, falling back to JSON+pickle serialization")
 
-from core.database.interfaces import ICacheDatabase
 from core.database.exceptions import ConnectionError, DatabaseError
-
+from core.database.interfaces import ICacheDatabase
 
 logger = get_logger(__name__)
 
@@ -786,38 +786,22 @@ class RedisDatabase(ICacheDatabase):
                         return b'ZLIB_PICKLE:' + compressed
                 return b'PICKLE:' + pickled
         else:
-            # Legacy JSON+pickle fallback
-            try:
-                json_str = json.dumps(value, default=str, ensure_ascii=False)
-                json_bytes = json_str.encode('utf-8')
-                
-                if len(json_bytes) > 1024:
-                    compressed = zlib.compress(json_bytes, level=1)
-                    if len(compressed) < len(json_bytes):
-                        return b'ZLIB_JSON:' + compressed
-                
-                return b'JSON:' + json_bytes
-                
-            except (TypeError, ValueError):
-                # Fallback to pickle for complex objects
-                pickled = pickle.dumps(value)
-                if len(pickled) > 1024:
-                    compressed = zlib.compress(pickled, level=1)
-                    if len(compressed) < len(pickled):
-                        return b'ZLIB_PICKLE:' + compressed
-                return b'PICKLE:' + pickled
+            # Fallback to pickle for complex objects
+            pickled = pickle.dumps(value)
+            if len(pickled) > 1024:
+                compressed = zlib.compress(pickled, level=1)
+                if len(compressed) < len(pickled):
+                    return b'ZLIB_PICKLE:' + compressed
+            return b'PICKLE:' + pickled
     
     def _deserialize_value(self, value: Union[str, bytes]) -> Any:
         """Deserialize value from storage with automatic format detection."""
         if isinstance(value, str):
-            # Legacy string format (JSON or hex-encoded pickle)
+            # Try to decode as JSON string
             try:
                 return json.loads(value)
             except (json.JSONDecodeError, TypeError):
-                try:
-                    return pickle.loads(bytes.fromhex(value))
-                except (ValueError, pickle.PickleError):
-                    return value
+                return value
         
         if not isinstance(value, bytes):
             return value

@@ -5,8 +5,9 @@ This module provides a tracker for performance metrics.
 """
 
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Optional
+from typing import Any, Dict, Optional
 
 from core.logging.interfaces import IPerformanceTracker
 from core.logging.specialized.metrics.metrics_collector import MetricsCollector

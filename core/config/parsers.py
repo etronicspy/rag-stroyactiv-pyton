@@ -5,51 +5,61 @@ This module provides comprehensive configuration management for parser operation
 including AI model settings, performance tuning, validation rules, and debugging options.
 """
 
-from typing import Dict, Any, Optional, Literal, Union
+import os
+from functools import lru_cache
+from typing import Any, Dict, Literal, Optional
+
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from functools import lru_cache
-
-from core.config.constants import (
-    DefaultTimeouts,
-    DefaultRetries,
-    DefaultBatchSizes,
-    DefaultConfidenceThresholds
-)
 
 print("DEBUG: core/config/parsers.py loaded")
+
+
+def get_env_int(key: str, default: int) -> int:
+    """Get integer value from environment variable."""
+    return int(os.getenv(key, str(default)))
+
+
+def get_env_str(key: str, default: str) -> str:
+    """Get string value from environment variable."""
+    return os.getenv(key, default)
+
+
+def get_env_float(key: str, default: float) -> float:
+    """Get float value from environment variable."""
+    return float(os.getenv(key, str(default)))
 
 
 class ParserConstants:
     """Constants specific to parser operations."""
     
     # AI Model defaults
-    DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-    DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
-    DEFAULT_EMBEDDING_DIMENSIONS = 1536
+    DEFAULT_OPENAI_MODEL = get_env_str("PARSER_CONSTANT_DEFAULT_OPENAI_MODEL", "gpt-4o-mini")
+    DEFAULT_EMBEDDING_MODEL = get_env_str("PARSER_CONSTANT_DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small")
+    DEFAULT_EMBEDDING_DIMENSIONS = get_env_int("PARSER_CONSTANT_DEFAULT_EMBEDDING_DIMENSIONS", 1536)
     
     # Parsing defaults
-    DEFAULT_BATCH_SIZE = 10
-    MAX_BATCH_SIZE = 50
-    MIN_BATCH_SIZE = 1
+    DEFAULT_BATCH_SIZE = get_env_int("PARSER_CONSTANT_DEFAULT_BATCH_SIZE", 10)
+    MAX_BATCH_SIZE = get_env_int("PARSER_CONSTANT_MAX_BATCH_SIZE", 50)
+    MIN_BATCH_SIZE = get_env_int("PARSER_CONSTANT_MIN_BATCH_SIZE", 1)
     
     # Confidence thresholds
-    DEFAULT_CONFIDENCE_THRESHOLD = 0.85
-    MIN_CONFIDENCE_THRESHOLD = 0.1
-    MAX_CONFIDENCE_THRESHOLD = 1.0
+    DEFAULT_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_DEFAULT_CONFIDENCE_THRESHOLD", 0.85)
+    MIN_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_MIN_CONFIDENCE_THRESHOLD", 0.1)
+    MAX_CONFIDENCE_THRESHOLD = get_env_float("PARSER_CONSTANT_MAX_CONFIDENCE_THRESHOLD", 1.0)
     
     # Timeout settings
-    DEFAULT_PARSER_TIMEOUT = 30
-    DEFAULT_AI_REQUEST_TIMEOUT = 45
-    DEFAULT_BATCH_TIMEOUT = 300
+    DEFAULT_PARSER_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_PARSER_TIMEOUT", 30)
+    DEFAULT_AI_REQUEST_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_AI_REQUEST_TIMEOUT", 45)
+    DEFAULT_BATCH_TIMEOUT = get_env_int("PARSER_CONSTANT_DEFAULT_BATCH_TIMEOUT", 300)
     
     # Retry settings
-    DEFAULT_RETRY_ATTEMPTS = 3
-    MAX_RETRY_ATTEMPTS = 10
+    DEFAULT_RETRY_ATTEMPTS = get_env_int("PARSER_CONSTANT_DEFAULT_RETRY_ATTEMPTS", 3)
+    MAX_RETRY_ATTEMPTS = get_env_int("PARSER_CONSTANT_MAX_RETRY_ATTEMPTS", 10)
     
     # Cache settings
-    DEFAULT_CACHE_TTL = 3600  # 1 hour
-    DEFAULT_EMBEDDING_CACHE_TTL = 86400  # 24 hours
+    DEFAULT_CACHE_TTL = get_env_int("PARSER_CONSTANT_DEFAULT_CACHE_TTL", 3600)  # 1 hour
+    DEFAULT_EMBEDDING_CACHE_TTL = get_env_int("PARSER_CONSTANT_DEFAULT_EMBEDDING_CACHE_TTL", 86400)  # 24 hours
 
 
 class ParserModelConfig(BaseModel):

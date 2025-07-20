@@ -13,23 +13,25 @@ Author: AI Assistant
 Created: 2024
 """
 
-import pytest
 import asyncio
-import uuid
-import time
 import json
-from unittest.mock import Mock, patch, AsyncMock
+import time
+import uuid
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 from fastapi.testclient import TestClient
+
+from core.config import get_settings
+from core.middleware.request_logging import LoggingMiddleware
+from core.monitoring.context import CorrelationContext, get_correlation_id
+from core.monitoring.metrics_integration import get_metrics_integrated_logger
+from core.monitoring.performance_optimizer import get_performance_optimizer
+from core.monitoring.unified_manager import get_unified_logging_manager
 
 # Core imports
 from main import app
-from core.monitoring.unified_manager import get_unified_logging_manager
-from core.monitoring.context import CorrelationContext, get_correlation_id
-from core.monitoring.performance_optimizer import get_performance_optimizer
-from core.monitoring.metrics_integration import get_metrics_integrated_logger
-from core.middleware.request_logging import LoggingMiddleware
 from services.materials import MaterialsService
-from core.config import get_settings
 
 
 class TestMiddlewareIntegration:

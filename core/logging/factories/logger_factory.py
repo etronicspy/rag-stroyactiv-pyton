@@ -8,8 +8,8 @@ import logging
 from functools import lru_cache
 from typing import Dict, Union
 
-from core.logging.interfaces import ILoggerFactory, ILogger
-from core.logging.core import Logger, AsyncLogger
+from core.logging.core import AsyncLogger, Logger
+from core.logging.interfaces import ILogger, ILoggerFactory
 
 
 class LoggerFactory(ILoggerFactory):

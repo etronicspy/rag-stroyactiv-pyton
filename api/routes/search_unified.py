@@ -1,17 +1,18 @@
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field, ConfigDict
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 
+from core.logging import get_logger
 from core.schemas.materials import (
-    Material, AdvancedSearchQuery, SearchResponse as CoreSearchResponse,
-    SearchSuggestion, MaterialFilterOptions, PaginationOptions, SortOption
+    AdvancedSearchQuery,
+    Material,
+    SearchSuggestion,
 )
+from core.schemas.materials import SearchResponse as CoreSearchResponse
 from core.schemas.response_models import ERROR_RESPONSES
 from services.materials import MaterialsService
-from core.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -7,7 +7,7 @@ This module defines interfaces for context management and correlation ID trackin
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, TypeVar, ContextManager
+from typing import Any, ContextManager, Dict, Optional, TypeVar
 
 T = TypeVar('T')
 

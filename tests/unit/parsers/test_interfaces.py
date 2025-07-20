@@ -4,44 +4,28 @@ Unit Tests for Parser Interfaces
 Tests for ABC interfaces and type definitions in core.parsers.interfaces
 """
 
+from typing import Any
+
 import pytest
-from typing import List, Optional, Dict, Any
-from dataclasses import dataclass
 
 from core.parsers.interfaces import (
-    # Base types
-    InputType,
-    OutputType,
-    ConfigType,
-    ParseStatus,
-    ParseResult,
-    ParseRequest,
-    BatchParseRequest,
-    BatchParseResult,
-    
-    # Base interfaces
-    IBaseParser,
-    IParserHealthCheck,
-    IParserConfig,
-    IParserMetrics,
-    
-    # AI interfaces
-    IAIParser,
-    IMaterialParser,
-    ITextParser,
-    
     # AI types
     AIModelType,
     AIParseMode,
     AIParseRequest,
     AIParseResult,
+    BatchParseRequest,
+    BatchParseResult,
+    IBaseParser,
     MaterialParseData,
+    ParseRequest,
+    ParseResult,
+    ParseStatus,
     TextParseData,
-    
     # Utility functions
     get_interface_info,
     list_available_interfaces,
-    validate_interface_implementation
+    validate_interface_implementation,
 )
 
 
@@ -297,11 +281,11 @@ class TestConcreteParser(IBaseParser[str, MaterialParseData, dict]):
             total_processing_time=sum(r.processing_time for r in results if r.processing_time)
         )
     
-    def get_supported_input_types(self) -> List[str]:
+    def get_supported_input_types(self) -> list[str]:
         """Test implementation of get_supported_input_types"""
         return ["str", "text"]
     
-    def get_parser_info(self) -> Dict[str, Any]:
+    def get_parser_info(self) -> dict[str, Any]:
         """Test implementation of get_parser_info"""
         return {
             "name": "TestConcreteParser",

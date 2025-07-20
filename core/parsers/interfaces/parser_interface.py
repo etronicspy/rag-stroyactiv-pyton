@@ -6,10 +6,11 @@ Provides type-safe, generic interface for parsing operations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional, Union, Generic, TypeVar, Protocol
-from pydantic import BaseModel, Field
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, Generic, List, Optional, Protocol, TypeVar
+
+from pydantic import BaseModel, Field
 
 # Generic types for parser operations
 InputType = TypeVar('InputType')

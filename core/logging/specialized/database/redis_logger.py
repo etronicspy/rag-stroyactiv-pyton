@@ -7,7 +7,10 @@ This module provides a logger for Redis operations.
 import logging
 from typing import Any, List, Optional, Union
 
-from core.logging.specialized.database.database_logger import DatabaseLogger, AsyncDatabaseLogger
+from core.logging.specialized.database.database_logger import (
+    AsyncDatabaseLogger,
+    DatabaseLogger,
+)
 
 
 class RedisLogger(DatabaseLogger):

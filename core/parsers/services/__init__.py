@@ -8,11 +8,13 @@ AI-powered parsing, material-specific parsing, and batch processing.
 from functools import lru_cache
 from typing import Optional
 
+
 # Lazy import functions
 def get_ai_parser_service():
     """Get AI parser service instance (lazy import)."""
     try:
-        from .ai_parser_service import AIParserService, get_ai_parser_service as _get_service
+        from .ai_parser_service import AIParserService
+        from .ai_parser_service import get_ai_parser_service as _get_service
         return _get_service()
     except ImportError as e:
         raise ImportError(f"AI parser service not available: {e}")
@@ -20,7 +22,8 @@ def get_ai_parser_service():
 def get_material_parser_service():
     """Get material parser service instance (lazy import)."""
     try:
-        from .material_parser_service import MaterialParserService, get_material_parser_service as _get_service
+        from .material_parser_service import MaterialParserService
+        from .material_parser_service import get_material_parser_service as _get_service
         return _get_service()
     except ImportError as e:
         raise ImportError(f"Material parser service not available: {e}")
@@ -28,7 +31,8 @@ def get_material_parser_service():
 def get_batch_parser_service():
     """Get batch parser service instance (lazy import)."""
     try:
-        from .batch_parser_service import BatchParserService, get_batch_parser_service as _get_service
+        from .batch_parser_service import BatchParserService
+        from .batch_parser_service import get_batch_parser_service as _get_service
         return _get_service()
     except ImportError as e:
         raise ImportError(f"Batch parser service not available: {e}")
@@ -93,7 +97,7 @@ def check_services_health() -> dict:
                 health_status[service_name] = True  # Assume healthy if no health check
         except ImportError:
             health_status[service_name] = False
-        except Exception as e:
+        except Exception:
             health_status[service_name] = False
     
     return health_status

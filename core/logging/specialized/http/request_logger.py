@@ -4,14 +4,14 @@ Request logger implementation.
 This module provides a logger for HTTP requests.
 """
 
+import contextlib
 import json
 import logging
 import time
-import contextlib
-from typing import Any, Dict, Optional, Union, ContextManager
+from typing import Any, ContextManager, Dict, Optional, Union
 
-from core.logging.interfaces import IRequestLogger
 from core.logging.core import Logger
+from core.logging.interfaces import IRequestLogger
 
 
 class RequestLogger(Logger, IRequestLogger):

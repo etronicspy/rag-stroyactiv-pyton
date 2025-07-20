@@ -6,11 +6,12 @@ This module provides a logger for database operations.
 
 import logging
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Optional, Union
+from typing import Any, Dict, Optional, Union
 
-from core.logging.interfaces import IDatabaseLogger
 from core.logging.core import Logger
+from core.logging.interfaces import IDatabaseLogger
 
 
 class DatabaseLogger(Logger, IDatabaseLogger):

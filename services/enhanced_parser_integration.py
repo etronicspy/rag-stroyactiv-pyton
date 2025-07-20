@@ -7,35 +7,28 @@ with full async support and comprehensive error handling.
 
 import asyncio
 import time
-import logging
-from typing import List, Optional, Dict, Any, Tuple
-from pathlib import Path
-from dataclasses import asdict
+from typing import Any, Dict, List, Optional
+
+from core.config.base import get_settings
+from core.logging import get_logger
 
 # Modern core.parsers architecture
 from core.parsers import (
-    get_material_parser_service,
-    get_batch_parser_service,
-    get_parser_config_manager,
-    MaterialParseData,
-    AIParseRequest,
-    AIParseResult,
-    BatchParseResult,
     ParseStatus,
+    check_parser_availability,
+    get_batch_parser_service,
+    get_material_parser_service,
+    get_parser_config_manager,
     is_migration_complete,
-    check_parser_availability
 )
-
 from core.schemas.enhanced_parsing import (
-    EnhancedParseRequest,
-    EnhancedParseResult,
     BatchParseRequest,
     BatchParseResponse,
+    EnhancedParseRequest,
+    EnhancedParseResult,
     ParserIntegrationConfig,
-    ParsingMethod
+    ParsingMethod,
 )
-from core.config.base import get_settings
-from core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -80,8 +73,8 @@ class EnhancedParserIntegrationService:
         }
         
         self.logger.info(
-            f"Enhanced Parser Integration Service initialized "
-            f"(using new parsers)"
+            "Enhanced Parser Integration Service initialized "
+            "(using new parsers)"
         )
     
     def _initialize_new_parsers(self):

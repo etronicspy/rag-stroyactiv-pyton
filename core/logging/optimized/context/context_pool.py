@@ -5,7 +5,7 @@ This module provides a pool of logging contexts for efficient reuse.
 """
 
 import threading
-from typing import Dict, Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 from core.logging.interfaces import ILoggingContext
 

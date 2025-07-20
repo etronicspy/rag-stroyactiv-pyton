@@ -6,10 +6,11 @@
 
 import asyncio
 import time
-from typing import List, Dict, Any
-from core.database.factories import DatabaseFactory
-from services.combined_embedding_service import CombinedEmbeddingService
+
+from core.database.factories import AllDatabasesUnavailableError, get_fallback_manager
 from core.schemas.pipeline_models import CombinedEmbeddingRequest
+from services.combined_embedding_service import CombinedEmbeddingService
+
 
 async def regenerate_all_embeddings():
     """Перегенерировать эмбеддинги для всех материалов в справочнике"""
@@ -19,12 +20,12 @@ async def regenerate_all_embeddings():
     
     try:
         # Инициализация сервисов
-        vector_db = DatabaseFactory.create_vector_database()
+        fallback_manager = get_fallback_manager()
         embedding_service = CombinedEmbeddingService()
         
         # Получить все материалы из коллекции
         print("📊 Получение всех материалов из коллекции 'materials'...")
-        all_records = await vector_db.scroll_all("materials", with_payload=True, with_vectors=False)
+        all_records = await fallback_manager.scroll_all("materials", with_payload=True, with_vectors=False)
         
         if not all_records:
             print("❌ Материалы не найдены")
@@ -78,7 +79,7 @@ async def regenerate_all_embeddings():
                     print(f"   ⚠️  Предупреждение: получено {len(batch_response.results)} результатов для {len(batch_materials)} материалов")
                 
                 # Обновить векторы в Qdrant
-                print(f"   💾 Обновление векторов в Qdrant...")
+                print("   💾 Обновление векторов в Qdrant...")
                 print(f"   📈 Успешно: {batch_response.successful_count}, ошибок: {batch_response.failed_count}")
                 
                 for j, (material, result, record_id) in enumerate(zip(batch_materials, batch_response.results, batch_ids)):
@@ -93,7 +94,7 @@ async def regenerate_all_embeddings():
                             continue
                         
                         # Обновить вектор для материала
-                        await vector_db.upsert(
+                        await fallback_manager.upsert(
                             collection_name="materials",
                             vectors=[{
                                 "id": record_id,
@@ -133,7 +134,7 @@ async def regenerate_all_embeddings():
         
         print("🎉 ПЕРЕГЕНЕРАЦИЯ ЭМБЕДДИНГОВ ЗАВЕРШЕНА!")
         print("=" * 60)
-        print(f"📊 СТАТИСТИКА:")
+        print("📊 СТАТИСТИКА:")
         print(f"   ✅ Успешно обновлено: {updated_count} материалов")
         print(f"   ❌ Ошибок: {error_count}")
         print(f"   📋 Всего обработано: {len(all_records)} материалов")
@@ -143,14 +144,16 @@ async def regenerate_all_embeddings():
         
         if updated_count > 0:
             print("🔍 ТЕСТИРОВАНИЕ ОБНОВЛЕННЫХ ЭМБЕДДИНГОВ:")
-            await test_updated_embeddings(vector_db, embedding_service)
+            await test_updated_embeddings(fallback_manager, embedding_service)
         
+    except AllDatabasesUnavailableError as e:
+        print(f"❌ Все базы данных недоступны: {e}")
     except Exception as e:
         print(f"❌ Критическая ошибка: {e}")
         import traceback
         traceback.print_exc()
 
-async def test_updated_embeddings(vector_db, embedding_service):
+async def test_updated_embeddings(fallback_manager, embedding_service):
     """Тестирование обновленных эмбеддингов"""
     
     try:
@@ -177,7 +180,7 @@ async def test_updated_embeddings(vector_db, embedding_service):
             query_embedding = query_result.material_embedding
             
             # Поиск похожих материалов
-            results = await vector_db.search(
+            results = await fallback_manager.search(
                 collection_name="materials",
                 query_vector=query_embedding,
                 limit=3

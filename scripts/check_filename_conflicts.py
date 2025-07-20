@@ -6,12 +6,12 @@ Automatically detects potential filename conflicts with Python standard library
 and common third-party modules to prevent import issues.
 """
 
+import argparse
+import json
 import os
 import sys
-import json
-import argparse
 from pathlib import Path
-from typing import List, Dict, Set, Tuple
+from typing import Dict, List, Tuple
 
 # Critical Python standard library modules that MUST NOT be used as filenames
 FORBIDDEN_FILENAMES = {
@@ -208,7 +208,7 @@ def print_report(critical_conflicts: List[Dict], warnings: List[Dict],
             print()
     
     # Summary
-    print(f"\n📊 SUMMARY:")
+    print("\n📊 SUMMARY:")
     print(f"   Critical conflicts: {len(critical_conflicts)}")
     print(f"   Warnings: {len(warnings)}")
     print(f"   Third-party conflicts: {len(third_party_conflicts)}")

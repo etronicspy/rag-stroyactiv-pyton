@@ -5,8 +5,8 @@
 предоставляет функции для обнаружения устаревших переменных и вывода предупреждений.
 """
 
-import os
 import logging
+import os
 from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)

@@ -13,17 +13,18 @@ Author: AI Assistant
 Created: 2024
 """
 
-import pytest
 import asyncio
 import uuid
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 from fastapi.testclient import TestClient
+
+from core.monitoring.context import CorrelationContext, get_correlation_id
 
 # Core imports
 from main import app
-from core.monitoring.context import CorrelationContext, get_correlation_id
 from services.materials import MaterialsService
-from core.repositories.base import BaseRepository
 
 client = TestClient(app)
 
@@ -33,7 +34,6 @@ class TestUnitAPI:
         unit_data = {"name": "кг"}
         from services.materials import UnitService
         service = UnitService.__new__(UnitService)
-        from unittest.mock import AsyncMock
         vector_db_mock = AsyncMock()
         vector_db_mock.collection_exists = AsyncMock(return_value=True)
         vector_db_mock.create_collection = AsyncMock(return_value=None)
@@ -58,7 +58,6 @@ class TestUnitAPI:
         unit_data = {"name": "кг"}
         from services.materials import UnitService
         service = UnitService.__new__(UnitService)
-        from unittest.mock import AsyncMock
         vector_db_mock = AsyncMock()
         vector_db_mock.collection_exists = AsyncMock(return_value=True)
         vector_db_mock.create_collection = AsyncMock(return_value=None)

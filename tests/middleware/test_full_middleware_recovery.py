@@ -4,8 +4,10 @@ Testing all recovered components: Security, Logging, Compression, RateLimit.
 """
 
 import time
-from fastapi.testclient import TestClient
 from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
 from main import app
 
 client = TestClient(app)
@@ -215,7 +217,7 @@ class TestFullMiddlewareRecovery:
         security_headers_present = sum(1 for h in security_headers 
                                      if h in response.headers)
         
-        print(f"✅ Integration test passed:")
+        print("✅ Integration test passed:")
         print(f"    - Response time: {duration:.3f}s")
         print(f"    - Status: {response.status_code}")
         print(f"    - Security headers: {security_headers_present}/{len(security_headers)}")
@@ -250,7 +252,7 @@ class TestMiddlewarePerformance:
         avg_time = total_time / requests_count
         success_rate = (successful_requests / requests_count) * 100
         
-        print(f"✅ Performance results:")
+        print("✅ Performance results:")
         print(f"    - Average response time: {avg_time:.3f}s")
         print(f"    - Total time: {total_time:.3f}s")
         print(f"    - Success rate: {success_rate:.1f}%")

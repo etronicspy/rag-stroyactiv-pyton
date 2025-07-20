@@ -3,19 +3,24 @@
 Модуль сервисов для RAG Construction Materials API.
 """
 
-from .embedding_comparison import EmbeddingComparisonService
+# Batch processing service
+from .batch_processing_service import (
+    BatchProcessingService,
+    get_batch_processing_service,
+)
 from .collection_initializer import CollectionInitializerService
+
+# Combined embedding service (STAGE 5)
+from .combined_embedding_service import (
+    CombinedEmbeddingService,
+    get_combined_embedding_service,
+)
+from .embedding_comparison import EmbeddingComparisonService
 from .enhanced_parser_integration import EnhancedParserIntegrationService
 from .material_processing_pipeline import MaterialProcessingPipeline
 
-# Combined embedding service (STAGE 5)
-from .combined_embedding_service import CombinedEmbeddingService, get_combined_embedding_service
-
 # SKU search service (STAGE 6)  
 from .sku_search_service import SKUSearchService, get_sku_search_service
-
-# Batch processing service
-from .batch_processing_service import BatchProcessingService, get_batch_processing_service
 
 __all__ = [
     "MaterialsService",

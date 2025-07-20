@@ -7,13 +7,11 @@ with parallel processing, progress tracking, and comprehensive result management
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Any, Union, Callable, Awaitable
-from pathlib import Path
-from functools import lru_cache
-from dataclasses import dataclass, field
 from contextlib import asynccontextmanager
-from concurrent.futures import ThreadPoolExecutor
-import json
+from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Union
 
 # Core infrastructure imports
 from core.config.parsers import ParserConfig, get_parser_config
@@ -21,18 +19,13 @@ from core.logging import get_logger
 
 # Parser interface imports
 from ..interfaces import (
-    IBaseParser,
-    AIParseRequest,
-    ParseStatus,
-    BatchParseRequest,
     BatchParseResult,
-    InputType,
-    OutputType
+    ParseStatus,
 )
-from ..interfaces.ai_parser_interface import MaterialParseData, AIParseResult
+from ..interfaces.ai_parser_interface import AIParseResult, MaterialParseData
 
 # Service imports
-from .material_parser_service import MaterialParserService, get_material_parser_service
+from .material_parser_service import get_material_parser_service
 
 
 @dataclass
@@ -111,7 +104,7 @@ class BatchConfiguration:
     parallel_processing: bool = True
 
 
-class BatchParserService():
+class BatchParserService:
     """
     Specialized service for high-performance batch processing.
     

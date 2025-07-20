@@ -6,7 +6,8 @@ parser settings, system prompts, and units configuration.
 """
 
 from functools import lru_cache
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 
 # Lazy import functions
 def get_parser_config_manager():

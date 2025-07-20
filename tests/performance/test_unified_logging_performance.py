@@ -11,16 +11,18 @@ Author: AI Assistant
 Created: 2024
 """
 
-import pytest
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Any
+from typing import Any
+
+import pytest
+
+from core.monitoring.context import CorrelationContext, get_correlation_id
+from core.monitoring.logger import get_logger
 
 # Core imports
 from core.monitoring.unified_manager import get_unified_logging_manager
-from core.monitoring.context import CorrelationContext, get_correlation_id
-from core.monitoring.logger import get_logger
 
 
 class TestLoggerCachingPerformance:
@@ -99,7 +101,7 @@ class TestConcurrentLoggingPerformance:
         num_threads = 10
         operations_per_thread = 50
         
-        def worker_thread(thread_id: int) -> Dict[str, Any]:
+        def worker_thread(thread_id: int) -> dict[str, Any]:
             thread_start = time.perf_counter()
             operations_completed = 0
             
@@ -139,7 +141,7 @@ class TestConcurrentLoggingPerformance:
         total_operations = sum(r["operations_completed"] for r in results)
         overall_throughput = total_operations / total_duration
         
-        print(f"Concurrent Logging Performance Results:")
+        print("Concurrent Logging Performance Results:")
         print(f"Total operations: {total_operations}")
         print(f"Total duration: {total_duration:.4f}s")
         print(f"Overall throughput: {overall_throughput:.0f} operations/second")

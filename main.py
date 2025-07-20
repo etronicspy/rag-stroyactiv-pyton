@@ -4,24 +4,27 @@ RAG Construction Materials API
 Main FastAPI application module for construction materials API with AI-powered semantic search.
 """
 
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+
+# Import routers and middleware
+from api.routes import (
+    enhanced_processing,
+    health_unified,
+    materials_router,
+    prices_router,
+    reference_router,
+    search_unified,
+    tunnel_router,
+)
+
+# Import configuration
+from core.config import get_settings
 
 # Import logging
 from core.logging import get_logger
 from core.logging.base.loggers import setup_structured_logging
 from core.logging.metrics.collectors import get_metrics_collector
-from core.logging.context import CorrelationContext, with_correlation_context
-
-# Import routers and middleware
-from api.routes import (
-    materials_router, prices_router, reference_router,
-    tunnel_router, health_unified, search_unified, enhanced_processing
-)
-
-# Import configuration
-from core.config import get_settings
 from core.middleware.factory import setup_middleware
 
 # Initialize logging and configuration
@@ -43,14 +46,8 @@ app = FastAPI(
 )
 
 # Setup CORS
-if settings.BACKEND_CORS_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.BACKEND_CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# CORS middleware is handled by the security middleware factory
+# No need to manually add CORS middleware here as it's already configured in setup_middleware
 
 # Apply middleware
 setup_middleware(app, settings)

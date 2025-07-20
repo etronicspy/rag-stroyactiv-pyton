@@ -13,14 +13,14 @@ DIAGNOSTIC RESULTS (2025-06-15):
 STATUS: BROTLI IS WORKING CORRECTLY
 """
 
-import pytest
 import sys
-from core.monitoring.logger import get_logger
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from core.middleware.compression import CompressionMiddleware
-
+from core.monitoring.logger import get_logger
 
 logger = get_logger(__name__)
 

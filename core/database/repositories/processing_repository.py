@@ -4,20 +4,19 @@ Repository для работы с таблицей processing_results.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any, Tuple
-from sqlalchemy import select, update, delete, func, and_, or_, desc, asc
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy import text
+from typing import Any, Dict, List, Optional
 
-from core.schemas.processing_models import (
-    ProcessingStatus,
-    MaterialProcessingResult,
-    ProcessingProgress,
-    ProcessingStatistics
-)
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.logging import get_logger
 from core.repositories.interfaces import IBatchProcessingRepository
+from core.schemas.processing_models import (
+    MaterialProcessingResult,
+    ProcessingProgress,
+    ProcessingStatistics,
+    ProcessingStatus,
+)
 
 logger = get_logger(__name__)
 

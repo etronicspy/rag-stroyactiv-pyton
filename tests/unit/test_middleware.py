@@ -5,14 +5,15 @@ Unit тесты для компонентов middleware
 Объединяет тесты из:
 - test_middleware.py (Security, Logging, Rate Limiting)
 """
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from core.middleware import RateLimitMiddleware, LoggingMiddleware, SecurityMiddleware
-from core.config import settings, get_settings
+from core.config import get_settings, settings
+from core.middleware import LoggingMiddleware, RateLimitMiddleware, SecurityMiddleware
 
 
 class TestSecurityMiddleware:
