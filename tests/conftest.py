@@ -78,9 +78,9 @@ def setup_test_environment():
     for key, value in TEST_SETTINGS.items():
         original_env[key] = os.environ.get(key)
         os.environ[key] = value
-    
+
     yield
-    
+
     # Восстанавливаем оригинальные значения
     for key, original_value in original_env.items():
         if original_value is None:
@@ -114,7 +114,7 @@ def client_mock():
             LOG_RESPONSE_BODY=False
         )
         mock_settings.return_value = settings
-        
+
         # Provide stub vector database before any application modules import
         from unittest.mock import MagicMock
         stub_vdb = MagicMock()
@@ -124,34 +124,34 @@ def client_mock():
         stub_vdb.delete = AsyncMock(side_effect=lambda *a, **k: True)
         stub_vdb.get_by_id = AsyncMock(return_value=None)
         mock_create_vdb.return_value = stub_vdb
-        
+
         # Создаем минимальное приложение без middleware для unit тестов
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
         from api.routes import health, materials, prices, reference, search
-        
+
         app = FastAPI(title="Test API")
-        
+
         # Добавляем только роутеры без middleware
         app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
         app.include_router(reference.router, prefix="/api/v1/reference", tags=["reference"])
         app.include_router(materials.router, prefix="/api/v1/materials", tags=["materials"])
         app.include_router(prices.router, prefix="/api/v1/prices", tags=["prices"])
         app.include_router(search.router, prefix="/api/v1/search", tags=["search"])
-        
+
         @app.get("/")
         async def root():
             return {"message": "Welcome to Test API", "version": "1.0.0"}
-        
+
         with patch('core.config.get_vector_db_client') as mock_vector_client, \
              patch('core.config.get_ai_client') as mock_ai, \
              patch('qdrant_client.QdrantClient') as mock_qdrant:
-            
+
             mock_vector_client.return_value = Mock()
             mock_ai.return_value = Mock()
             mock_qdrant.return_value.get_collections.return_value = Mock()
-            
+
             return TestClient(app)
 
 @pytest.fixture
@@ -177,10 +177,10 @@ def client(test_mode):
 def qdrant_client_real():
     """Real Qdrant client для интеграционных тестов"""
     from core.config import settings
-    
+
     max_retries = 3
     retry_delay = 2
-    
+
     for attempt in range(max_retries):
         try:
             client = QdrantClient(
@@ -228,7 +228,7 @@ def cleanup_test_collections(test_mode, request):
     if test_mode != "real":
         yield
         return
-        
+
     try:
         # Получаем реальный клиент для очистки
         from core.config import settings
@@ -237,12 +237,12 @@ def cleanup_test_collections(test_mode, request):
             api_key=settings.QDRANT_API_KEY,
             timeout=30
         )
-        
+
         # Cleanup before test
         _cleanup_test_collections(client)
-        
+
         yield
-        
+
         # Cleanup after test (только если не production)
         if not _is_production_db():
             _cleanup_test_collections(client)
@@ -260,19 +260,19 @@ def _cleanup_test_collections(client: QdrantClient):
     try:
         collections = client.get_collections()
         test_collections = [
-            c.name for c in collections.collections 
-            if (c.name.startswith('supplier_TEST') or 
+            c.name for c in collections.collections
+            if (c.name.startswith('supplier_TEST') or
                 c.name.startswith('test_') or
                 c.name.startswith('supplier_SUP_TEST'))
         ]
-        
+
         for collection_name in test_collections:
             try:
                 client.delete_collection(collection_name)
                 logger.info(f"🧹 Deleted test collection: {collection_name}")
             except Exception as e:
                 logger.warning(f"⚠️ Error deleting collection {collection_name}: {e}")
-                
+
     except Exception as e:
         logger.warning(f"⚠️ Error getting collections: {e}")
 
@@ -296,7 +296,7 @@ def mock_vector_db():
 def mock_materials_service(sample_material):
     """Mock MaterialsService"""
     from core.schemas.materials import MaterialBatchResponse
-    
+
     service = Mock()
     service.create_material = AsyncMock(return_value=sample_material)
     service.get_material = AsyncMock(return_value=sample_material)
@@ -304,7 +304,7 @@ def mock_materials_service(sample_material):
     service.update_material = AsyncMock(return_value=sample_material)
     service.delete_material = AsyncMock(return_value=True)
     service.search_materials = AsyncMock(return_value=[sample_material])
-    
+
     # Mock batch response
     batch_response = MaterialBatchResponse(
         success=True,
@@ -418,7 +418,7 @@ def sample_price_data():
     return [
         {
             "name": "Cement Portland Test",
-            "use_category": "Building Materials", 
+            "use_category": "Building Materials",
             "unit": "kg",
             "price": 45.50,
             "description": "High quality cement for testing"
@@ -426,7 +426,7 @@ def sample_price_data():
         {
             "name": "Sand Construction Test",
             "use_category": "Building Materials",
-            "unit": "m3", 
+            "unit": "m3",
             "price": 1200.00,
             "description": "Washed construction sand for testing"
         }
@@ -455,7 +455,7 @@ def auto_mock_for_unit_tests(request, mock_materials_service, mock_category_serv
             # Если моки не могут быть применены, просто пропускаем
             yield
     else:
-        yield 
+        yield
 
 # ---------------------------------------------------------------------------
 # GLOBAL PATCHES FOR UNIT/FUNCTIONAL TESTS (mock mode)
@@ -482,7 +482,7 @@ def _patch_qdrant_client(monkeypatch, test_mode):
             self.search.return_value = []
 
     monkeypatch.setattr("qdrant_client.QdrantClient", _FakeQdrantClient)
-    yield 
+    yield
 
 @pytest.fixture(autouse=True)
 def _patch_openai(monkeypatch, test_mode):

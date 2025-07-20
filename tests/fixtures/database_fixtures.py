@@ -11,7 +11,7 @@ from .data_fixtures import TestDataProvider
 
 class DatabaseTestHelpers:
     """Вспомогательные методы для тестирования БД"""
-    
+
     @staticmethod
     async def create_test_collection(client, collection_name: str, vector_size: int = 1536):
         """Создание тестовой коллекции"""
@@ -22,7 +22,7 @@ class DatabaseTestHelpers:
         except Exception:
             pass
         return False
-    
+
     @staticmethod
     async def cleanup_test_collections(client, prefix: str = "test_"):
         """Очистка тестовых коллекций"""
@@ -34,7 +34,7 @@ class DatabaseTestHelpers:
                         await client.delete_collection(collection.name)
         except Exception:
             pass
-    
+
     @staticmethod
     def generate_test_vectors(count: int, dimension: int = 1536) -> List[List[float]]:
         """Генерация тестовых векторов"""
@@ -43,7 +43,7 @@ class DatabaseTestHelpers:
             vector = [0.1 * (i + 1)] * dimension
             vectors.append(vector)
         return vectors
-    
+
     @staticmethod
     def create_test_points(materials: List[Dict], vectors: List[List[float]]) -> List[Dict]:
         """Создание тестовых точек для векторной БД"""
@@ -87,7 +87,7 @@ def mock_vector_search_results():
     """Mock результаты векторного поиска"""
     materials = TestDataProvider.get_sample_materials()
     results = []
-    
+
     for i, material in enumerate(materials[:3]):  # Топ 3 результата
         result = {
             "id": f"test_{i}",
@@ -96,7 +96,7 @@ def mock_vector_search_results():
             "vector": [0.1 * (i + 1)] * 1536
         }
         results.append(result)
-    
+
     return results
 
 
@@ -134,30 +134,30 @@ def batch_operation_data():
 
 class VectorDBFixtures:
     """Фикстуры для векторных БД"""
-    
+
     @staticmethod
     @pytest.fixture
     def mock_qdrant_operations():
         """Mock операций с Qdrant"""
         mock_ops = Mock()
-        
+
         # Поиск
         mock_ops.search = AsyncMock(return_value=[])
         mock_ops.query = AsyncMock(return_value=[])
-        
+
         # Загрузка
         mock_ops.upsert = AsyncMock(return_value={"status": "completed", "operation_id": "test_op"})
         mock_ops.upload_points = AsyncMock(return_value={"status": "completed"})
-        
+
         # Получение
         mock_ops.retrieve = AsyncMock(return_value=[])
         mock_ops.scroll = AsyncMock(return_value=([], None))
-        
+
         # Удаление
         mock_ops.delete = AsyncMock(return_value={"status": "completed"})
-        
+
         return mock_ops
-    
+
     @staticmethod
     @pytest.fixture
     def vector_search_scenarios():
@@ -192,29 +192,29 @@ class VectorDBFixtures:
 
 class PostgreSQLFixtures:
     """Фикстуры для PostgreSQL"""
-    
+
     @staticmethod
     @pytest.fixture
     def mock_postgresql_operations():
         """Mock операций с PostgreSQL"""
         mock_ops = AsyncMock()
-        
+
         # Выполнение SQL
         mock_ops.execute = AsyncMock(return_value=None)
         mock_ops.executemany = AsyncMock(return_value=None)
-        
+
         # Получение данных
         mock_ops.fetch_all = AsyncMock(return_value=[])
         mock_ops.fetch_one = AsyncMock(return_value=None)
         mock_ops.fetch_val = AsyncMock(return_value=None)
-        
+
         # Транзакции
         mock_ops.begin = AsyncMock()
         mock_ops.commit = AsyncMock()
         mock_ops.rollback = AsyncMock()
-        
+
         return mock_ops
-    
+
     @staticmethod
     @pytest.fixture
     def sql_test_queries():
@@ -250,35 +250,35 @@ class PostgreSQLFixtures:
 
 class RedisFixtures:
     """Фикстуры для Redis"""
-    
+
     @staticmethod
     @pytest.fixture
     def mock_redis_operations():
         """Mock операций с Redis"""
         mock_ops = AsyncMock()
-        
+
         # Базовые операции
         mock_ops.get = AsyncMock(return_value=None)
         mock_ops.set = AsyncMock(return_value=True)
         mock_ops.delete = AsyncMock(return_value=1)
         mock_ops.exists = AsyncMock(return_value=False)
-        
+
         # Операции с TTL
         mock_ops.expire = AsyncMock(return_value=True)
         mock_ops.ttl = AsyncMock(return_value=-1)
-        
+
         # Hash операции
         mock_ops.hget = AsyncMock(return_value=None)
         mock_ops.hset = AsyncMock(return_value=True)
         mock_ops.hgetall = AsyncMock(return_value={})
         mock_ops.hdel = AsyncMock(return_value=1)
-        
+
         # Pub/Sub
         mock_ops.publish = AsyncMock(return_value=1)
         mock_ops.subscribe = AsyncMock()
-        
+
         return mock_ops
-    
+
     @staticmethod
     @pytest.fixture
     def cache_test_scenarios():
@@ -310,4 +310,4 @@ pytest_plugins = [
     VectorDBFixtures,
     PostgreSQLFixtures,
     RedisFixtures
-] 
+]

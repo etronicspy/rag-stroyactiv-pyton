@@ -26,7 +26,7 @@ def event_loop():
 def mock_env_vars():
     """Фикстура для мокирования переменных окружения"""
     original_env = os.environ.copy()
-    
+
     # Устанавливаем тестовые значения
     test_env = {
         'OPENAI_API_KEY': 'sk-test-openai-key-1234567890',
@@ -34,9 +34,9 @@ def mock_env_vars():
         'QDRANT_API_KEY': 'test-qdrant-key'
     }
     os.environ.update(test_env)
-    
+
     yield test_env
-    
+
     # Восстанавливаем оригинальные переменные
     os.environ.clear()
     os.environ.update(original_env)
@@ -54,7 +54,7 @@ def temp_materials_data():
             "description": None
         },
         {
-            "sku": "TEST002", 
+            "sku": "TEST002",
             "name": "Тестовый песок речной",
             "use_category": "Песок",
             "unit": "м³",
@@ -63,7 +63,7 @@ def temp_materials_data():
         {
             "sku": "TEST003",
             "name": "Тестовый кирпич красный",
-            "use_category": "Кирпич", 
+            "use_category": "Кирпич",
             "unit": "шт",
             "description": None
         }
@@ -85,7 +85,7 @@ def sample_search_results():
             }
         },
         {
-            "id": "material-2", 
+            "id": "material-2",
             "score": 0.87,
             "payload": {
                 "name": "Песок строительный мытый",
@@ -116,7 +116,7 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "integration" in item.nodeid:
             item.add_marker(pytest.mark.integration)
-        
+
         # Маркируем асинхронные тесты как потенциально медленные
         if hasattr(item.function, '_pytestfixturefunction'):
             continue
@@ -149,4 +149,4 @@ def skip_if_no_qdrant():
                 pytest.skip("Qdrant server not available")
         except Exception:
             pytest.skip("Qdrant server not available")
-    return _skip_if_no_qdrant 
+    return _skip_if_no_qdrant

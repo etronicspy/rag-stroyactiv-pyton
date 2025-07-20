@@ -31,4 +31,4 @@ def get_test_file_path(file_key: str) -> str:
 def read_test_file_content(file_key: str) -> str:
     """Read content of test data file"""
     with open(TEST_FILES[file_key], encoding='utf-8') as f:
-        return f.read() 
+        return f.read()

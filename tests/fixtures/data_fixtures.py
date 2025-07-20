@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 class TestDataProvider:
     """Поставщик тестовых данных"""
-    
+
     @staticmethod
     def get_sample_materials() -> List[Dict[str, Any]]:
         """Образцы материалов для тестирования"""
@@ -22,7 +22,7 @@ class TestDataProvider:
             },
             {
                 "name": "Construction Sand Test",
-                "use_category": "Building Materials", 
+                "use_category": "Building Materials",
                 "unit": "m3",
                 "price": 1200.00,
                 "description": "Washed construction sand for testing",
@@ -45,7 +45,7 @@ class TestDataProvider:
                 "sku": "BRICK001_TEST"
             }
         ]
-    
+
     @staticmethod
     def get_sample_categories() -> List[Dict[str, str]]:
         """Образцы категорий для тестирования"""
@@ -55,7 +55,7 @@ class TestDataProvider:
                 "description": "Basic construction materials like cement, sand, gravel"
             },
             {
-                "name": "Steel Products", 
+                "name": "Steel Products",
                 "description": "Steel bars, beams, sheets and other steel products"
             },
             {
@@ -67,7 +67,7 @@ class TestDataProvider:
                 "description": "Thermal and sound insulation materials"
             }
         ]
-    
+
     @staticmethod
     def get_sample_units() -> List[Dict[str, str]]:
         """Образцы единиц измерения для тестирования"""
@@ -93,7 +93,7 @@ class TestDataProvider:
                 "description": "Square meter - unit of area"
             }
         ]
-    
+
     @staticmethod
     def get_price_list_csv_data() -> str:
         """CSV данные для тестирования загрузки прайс-листов"""
@@ -103,7 +103,7 @@ Construction Sand Washed,Building Materials,m3,1200.00,Washed construction sand
 Steel Rebar 12mm,Steel Products,m,78.90,Steel reinforcement bar 12mm diameter
 Red Clay Brick,Masonry,pcs,5.25,Red clay brick standard size
 Mineral Wool Insulation,Insulation,m2,125.00,Thermal insulation mineral wool"""
-    
+
     @staticmethod
     def get_search_queries() -> List[Dict[str, Any]]:
         """Тестовые поисковые запросы"""
@@ -124,7 +124,7 @@ Mineral Wool Insulation,Insulation,m2,125.00,Thermal insulation mineral wool"""
                 "description": "Russian language search"
             }
         ]
-    
+
     @staticmethod
     def get_invalid_data_samples() -> Dict[str, List[Dict[str, Any]]]:
         """Образцы некорректных данных для тестирования валидации"""
@@ -138,7 +138,7 @@ Mineral Wool Insulation,Insulation,m2,125.00,Thermal insulation mineral wool"""
                 },
                 {
                     "name": "Test Material",
-                    "unit": "kg", 
+                    "unit": "kg",
                     "price": 45.50
                     # Отсутствует use_category
                 }
@@ -169,7 +169,7 @@ Mineral Wool Insulation,Insulation,m2,125.00,Thermal insulation mineral wool"""
                 }
             ]
         }
-    
+
     @staticmethod
     def get_supplier_data() -> Dict[str, Any]:
         """Данные поставщика для тестирования"""
@@ -186,7 +186,7 @@ Mineral Wool Insulation,Insulation,m2,125.00,Thermal insulation mineral wool"""
                 "test_flag": True
             }
         }
-    
+
     @staticmethod
     def get_embedding_vectors() -> Dict[str, List[float]]:
         """Тестовые векторы эмбеддингов"""
@@ -196,7 +196,7 @@ Mineral Wool Insulation,Insulation,m2,125.00,Thermal insulation mineral wool"""
             "brick_vector": [0.3] * 1536,
             "sand_vector": [0.4] * 1536
         }
-    
+
     @staticmethod
     def get_batch_operations_data() -> Dict[str, Any]:
         """Данные для тестирования batch операций"""
@@ -209,4 +209,4 @@ Mineral Wool Insulation,Insulation,m2,125.00,Thermal insulation mineral wool"""
                 "small": 10,
                 "large": 100
             }
-        } 
+        }
