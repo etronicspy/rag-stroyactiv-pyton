@@ -51,7 +51,7 @@ class MaterialsService(BaseRepository):
     - JSON import functionality
     - Performance tracking and metrics collection
     """
-    
+
     def __init__(self, vector_db: IVectorDatabase = None, ai_client = None):
         """Initialize Materials Service with dependency injection.
         
@@ -67,7 +67,7 @@ class MaterialsService(BaseRepository):
             except Exception as e:
                 logger.warning(f"Failed to get vector DB client: {e}")
                 vector_db = None
-        
+
         if ai_client is None:
             try:
                 from core.database.factories import AIClientFactory
@@ -80,19 +80,19 @@ class MaterialsService(BaseRepository):
                     message="Failed to initialize AI client for embeddings",
                     details=f"Cannot proceed without OpenAI API access: {str(e)}"
                 )
-        
+
         super().__init__(vector_db=vector_db, ai_client=ai_client)
         self.collection_name = "materials"
-        
+
         # Initialize performance tracking
         self.metrics_collector = get_metrics_collector()
         self.performance_tracker = self.metrics_collector.get_performance_tracker()
-        
+
         # 🎯 ЭТАП 5.4: Initialize metrics-integrated logger
         self.metrics_logger = get_metrics_integrated_logger("materials_service")
-        
+
         logger.info("MaterialsService initialized with consolidated architecture, performance tracking, and metrics integration")
-    
+
     async def initialize(self) -> None:
         """Initialize service and ensure collection exists.
         
@@ -108,7 +108,7 @@ class MaterialsService(BaseRepository):
                 message="Failed to initialize MaterialsService",
                 details=str(e)
             )
-    
+
     async def _ensure_collection_exists(self) -> None:
         """Ensure materials collection exists with proper configuration using fallback manager."""
         try:
@@ -116,9 +116,9 @@ class MaterialsService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Check if collection exists using fallback manager
             if not await fallback_manager.collection_exists(self.collection_name):
                 logger.info(f"Creating collection: {self.collection_name}")
@@ -143,9 +143,9 @@ class MaterialsService(BaseRepository):
                 message=f"Failed to create collection {self.collection_name}",
                 details=str(e)
             )
-    
+
     # === CRUD Operations ===
-    
+
     @with_correlation_context
     @log_database_operation_decorator("qdrant", "create_material")  # Используем новый декоратор
     async def create_material(self, material: MaterialCreate) -> Material:
@@ -162,23 +162,23 @@ class MaterialsService(BaseRepository):
         """
         get_correlation_id()
         logger.info(f"Creating material: {material.name}")
-        
+
         with self.performance_tracker.time_operation("materials_service", "create_material", 1):
             try:
                 await self._ensure_collection_exists()
-                
+
                 # Duplicate validation (name + unit must be unique)
                 if await self._is_duplicate(material):
                     raise ValueError(f"Duplicate material (name + unit) already exists: {material.name} / {material.unit}")
-                
+
                 # Generate embedding for semantic search
                 text_for_embedding = self._prepare_text_for_embedding(material)
                 embedding = await self.get_embedding(text_for_embedding)
-                
+
                 # Create material ID and timestamps
                 material_id = str(uuid.uuid4())
                 current_time = datetime.utcnow()
-                
+
                 # Prepare vector data
                 vector_data = {
                     "id": material_id,
@@ -198,21 +198,21 @@ class MaterialsService(BaseRepository):
                         "updated_at": current_time.isoformat()
                     }
                 }
-                
+
                 # Store in database using fallback manager
                 from core.database.factories import (
                     AllDatabasesUnavailableError,
                     get_fallback_manager,
                 )
-                
+
                 fallback_manager = get_fallback_manager()
                 await fallback_manager.upsert(
                     collection_name=self.collection_name,
                     vectors=[vector_data]
                 )
-                
+
                 logger.info(f"Material created successfully: {material.name} (ID: {material_id})")
-                
+
                 return Material(
                     id=material_id,
                     name=material.name,
@@ -229,7 +229,7 @@ class MaterialsService(BaseRepository):
                     created_at=current_time,
                     updated_at=current_time
                 )
-                
+
             except AllDatabasesUnavailableError as e:
                 logger.error(f"All databases unavailable for creating material '{material.name}': {e.errors}")
                 raise DatabaseError(
@@ -239,7 +239,7 @@ class MaterialsService(BaseRepository):
             except Exception as e:
                 logger.error(f"Failed to create material '{material.name}': {e}")
                 await self._handle_database_error("create_material", e)
-    
+
     @with_correlation_context
     async def get_material(self, material_id: str) -> Optional[Material]:
         """Get material by ID using fallback manager.
@@ -255,27 +255,27 @@ class MaterialsService(BaseRepository):
         """
         get_correlation_id()
         logger.debug(f"Retrieving material: {material_id}")
-        
+
         try:
             await self._ensure_collection_exists()
-            
+
             from core.database.factories import (
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
             result = await fallback_manager.get_by_id(
                 collection_name=self.collection_name,
                 vector_id=material_id
             )
-            
+
             if not result:
                 logger.debug(f"Material not found: {material_id}")
                 return None
-            
+
             return self._convert_vector_result_to_material(result)
-            
+
         except AllDatabasesUnavailableError as e:
             logger.error(f"All databases unavailable for getting material {material_id}: {e.errors}")
             raise DatabaseError(
@@ -285,7 +285,7 @@ class MaterialsService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to get material {material_id}: {e}")
             await self._handle_database_error("get_material", e)
-    
+
     async def update_material(self, material_id: str, material_update: MaterialUpdate) -> Optional[Material]:
         """Update existing material using fallback manager.
         
@@ -305,24 +305,24 @@ class MaterialsService(BaseRepository):
             if not existing:
                 logger.debug(f"Material not found for update: {material_id}")
                 return None
-            
+
             # Update fields
             updated_data = existing.model_dump()
             for field, value in material_update.model_dump(exclude_unset=True).items():
                 updated_data[field] = value
-            
+
             # Generate new embedding if content changed
             material_create = MaterialCreate(**{
-                k: v for k, v in updated_data.items() 
+                k: v for k, v in updated_data.items()
                 if k in MaterialCreate.model_fields
             })
             text_for_embedding = self._prepare_text_for_embedding(material_create)
             embedding = await self.get_embedding(text_for_embedding)
-            
+
             # Update timestamps
             current_time = datetime.utcnow()
             updated_data["updated_at"] = current_time
-            
+
             # Prepare updated vector data
             vector_data = {
                 "id": material_id,
@@ -333,29 +333,34 @@ class MaterialsService(BaseRepository):
                     "unit": updated_data["unit"],
                     "sku": updated_data.get("sku"),
                     "description": updated_data.get("description"),
+                    # Enhanced fields
+                    "color": updated_data.get("color"),
+                    "normalized_color": updated_data.get("normalized_color"),
+                    "normalized_parsed_unit": updated_data.get("normalized_parsed_unit"),
+                    "unit_coefficient": updated_data.get("unit_coefficient"),
                     "created_at": updated_data["created_at"].isoformat(),
                     "updated_at": current_time.isoformat()
                 }
             }
-            
+
             # Update in database using fallback manager
             from core.database.factories import (
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
             await fallback_manager.upsert(
                 collection_name=self.collection_name,
                 vectors=[vector_data]
             )
-            
+
             logger.info(f"Material updated successfully: {material_id}")
-            
+
             # Return updated material
             updated_data["embedding"] = embedding[:10]  # Truncate for response
             return Material(**updated_data)
-            
+
         except AllDatabasesUnavailableError as e:
             logger.error(f"All databases unavailable for updating material {material_id}: {e.errors}")
             raise DatabaseError(
@@ -365,7 +370,7 @@ class MaterialsService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to update material {material_id}: {e}")
             await self._handle_database_error("update_material", e)
-    
+
     async def delete_material(self, material_id: str) -> bool:
         """Delete a material using fallback manager.
         
@@ -383,28 +388,28 @@ class MaterialsService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Check if material exists
             existing_data = await fallback_manager.get_by_id(
                 collection_name=self.collection_name,
                 vector_id=material_id
             )
-            
+
             if not existing_data:
                 logger.warning(f"Material not found for deletion: {material_id}")
                 return False
-            
+
             # Delete the material using fallback manager
             await fallback_manager.delete(
                 collection_name=self.collection_name,
                 vector_id=material_id
             )
-            
+
             logger.info(f"Material deleted successfully: {material_id}")
             return True
-            
+
         except AllDatabasesUnavailableError as e:
             logger.error(f"All databases unavailable for deleting material {material_id}: {e.errors}")
             raise DatabaseError(
@@ -414,9 +419,9 @@ class MaterialsService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to delete material {material_id}: {e}")
             await self._handle_database_error("delete_material", e)
-    
+
     # === Search Operations ===
-    
+
     @with_correlation_context
     @log_database_operation_decorator("qdrant", "search_materials")
     async def search_materials(self, query: str, limit: int = 10) -> List[Material]:
@@ -434,35 +439,35 @@ class MaterialsService(BaseRepository):
             except AllDatabasesUnavailableError as e:
                 logger.error(f"All databases unavailable for search_materials: {e.errors}")
                 raise
-    
+
     async def _search_vector(self, query: str, limit: int) -> List[Material]:
         """Perform vector semantic search using fallback manager."""
         try:
             # Get query embedding
             query_embedding = await self.get_embedding(query)
-            
+
             # Search using fallback manager
             from core.database.factories import (
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
             results = await fallback_manager.search(
                 collection_name=self.collection_name,
                 query_vector=query_embedding,
                 limit=limit
             )
-            
+
             # Convert results to Material objects
             materials = []
             for result in results:
                 material = self._convert_vector_result_to_material(result)
                 if material:
                     materials.append(material)
-            
+
             return materials
-            
+
         except AllDatabasesUnavailableError as e:
             logger.error(f"All databases unavailable for vector search: {e}")
             raise DatabaseError(
@@ -475,7 +480,7 @@ class MaterialsService(BaseRepository):
                 message="Vector search failed",
                 details=str(e)
             )
-    
+
     async def get_materials(self, skip: int = 0, limit: int = 100, category: Optional[str] = None) -> List[Material]:
         """Get all materials with optional category filter using fallback manager.
         
@@ -493,18 +498,18 @@ class MaterialsService(BaseRepository):
         with self.performance_tracker.time_operation("materials_service", "get_materials", limit):
             try:
                 await self._ensure_collection_exists()
-                
+
                 # Build filter conditions
                 filter_conditions = None
                 if category:
                     filter_conditions = {"use_category": category}
-                
+
                 # Get materials using fallback manager
                 from core.database.factories import (
                     AllDatabasesUnavailableError,
                     get_fallback_manager,
                 )
-                
+
                 fallback_manager = get_fallback_manager()
                 all_results = await fallback_manager.search(
                     collection_name=self.collection_name,
@@ -512,7 +517,7 @@ class MaterialsService(BaseRepository):
                     limit=limit + skip,
                     filter_conditions=filter_conditions
                 )
-                
+
                 # Apply skip and convert to Material objects
                 materials = []
                 for i, result in enumerate(all_results):
@@ -520,14 +525,14 @@ class MaterialsService(BaseRepository):
                         continue
                     if len(materials) >= limit:
                         break
-                        
+
                     material = self._convert_vector_result_to_material(result)
                     if material:
                         materials.append(material)
-                
+
                 logger.info(f"Retrieved {len(materials)} materials (skip={skip}, limit={limit})")
                 return materials
-                
+
             except AllDatabasesUnavailableError as e:
                 logger.error(f"All databases unavailable for getting materials: {e.errors}")
                 raise DatabaseError(
@@ -537,9 +542,9 @@ class MaterialsService(BaseRepository):
             except Exception as e:
                 logger.error(f"Failed to get materials: {e}")
                 await self._handle_database_error("get_materials", e)
-    
+
     # === Batch Operations ===
-    
+
     @with_correlation_context
     @log_database_operation_decorator("qdrant", "create_materials_batch")  # Используем новый декоратор
     async def create_materials_batch(self, materials: List[MaterialCreate], batch_size: int = 100) -> MaterialBatchResponse:
@@ -556,10 +561,10 @@ class MaterialsService(BaseRepository):
             DatabaseError: If batch creation fails
         """
         import time
-        
+
         get_correlation_id()
         logger.info(f"Starting batch creation of {len(materials)} materials")
-        
+
         start_time = time.time()
         successful_creates = 0
         failed_creates = 0
@@ -567,25 +572,25 @@ class MaterialsService(BaseRepository):
         created_materials = []
         failed_materials_list = []
         seen_keys = set()
-        
+
         try:
             await self._ensure_collection_exists()
-            
+
             logger.info(f"Starting batch creation of {len(materials)} materials")
-            
+
             # Process materials in batches
             for i in range(0, len(materials), batch_size):
                 chunk = materials[i:i + batch_size]
                 current_time = datetime.utcnow()
-                
+
                 logger.debug(f"Processing batch {i//batch_size + 1}: {len(chunk)} materials")
-                
+
                 # Generate embeddings for the batch
                 texts_for_embedding = [
-                    self._prepare_text_for_embedding(material) 
+                    self._prepare_text_for_embedding(material)
                     for material in chunk
                 ]
-                
+
                 try:
                     embeddings = await self.get_embeddings_batch(texts_for_embedding)
                 except Exception as e:
@@ -600,10 +605,10 @@ class MaterialsService(BaseRepository):
                             "material": material.dict()
                         })
                     continue
-                
+
                 # Prepare vector data for batch upsert
                 vectors = []
-                
+
                 for j, (material, embedding) in enumerate(zip(chunk, embeddings)):
                     try:
                         # Check duplicates inside DB and within the same batch
@@ -613,7 +618,7 @@ class MaterialsService(BaseRepository):
                         seen_keys.add(key)
 
                         material_id = str(uuid.uuid4())
-                        
+
                         vector_data = {
                             "id": material_id,
                             "vector": embedding,
@@ -633,7 +638,7 @@ class MaterialsService(BaseRepository):
                             }
                         }
                         vectors.append(vector_data)
-                        
+
                         # Create Material object for response
                         created_material = Material(
                             id=material_id,
@@ -652,7 +657,7 @@ class MaterialsService(BaseRepository):
                             updated_at=current_time
                         )
                         created_materials.append(created_material)
-                        
+
                     except Exception as e:
                         failed_creates += 1
                         error_msg = f"Material '{material.name}': {str(e)}"
@@ -662,7 +667,7 @@ class MaterialsService(BaseRepository):
                             "material": material.dict()
                         })
                         continue
-                
+
                 # Batch upsert to database using fallback manager
                 if vectors:
                     try:
@@ -670,7 +675,7 @@ class MaterialsService(BaseRepository):
                             AllDatabasesUnavailableError,
                             get_fallback_manager,
                         )
-                        
+
                         fallback_manager = get_fallback_manager()
                         await fallback_manager.upsert(
                             collection_name=self.collection_name,
@@ -702,12 +707,12 @@ class MaterialsService(BaseRepository):
                                     "material": material.dict()
                                 })
                         created_materials = created_materials[:-len(vectors)]
-            
+
             end_time = time.time()
             processing_time = end_time - start_time
-            
+
             logger.info(f"Batch creation completed: {successful_creates} successful, {failed_creates} failed, {processing_time:.2f}s")
-            
+
             return MaterialBatchResponse(
                 success=failed_creates == 0,
                 total_processed=len(materials),
@@ -716,13 +721,13 @@ class MaterialsService(BaseRepository):
                 processing_time_seconds=processing_time,
                 errors=errors
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to create materials batch: {e}")
             await self._handle_database_error("create_materials_batch", e)
-    
-    async def import_materials_from_json(self, 
-                                       import_items: List[MaterialImportItem], 
+
+    async def import_materials_from_json(self,
+                                       import_items: List[MaterialImportItem],
                                        default_category: str = "Стройматериалы",
                                        default_unit: str = "шт",
                                        batch_size: int = 100) -> MaterialBatchResponse:
@@ -745,14 +750,14 @@ class MaterialsService(BaseRepository):
             materials_to_create = []
             category_map = self._get_category_mapping()
             unit_map = self._get_unit_mapping()
-            
+
             for item in import_items:
                 # Try to infer category from name or use default
                 category = self._infer_category(item.name, category_map) or default_category
-                
-                # Try to infer unit from name or use default  
+
+                # Try to infer unit from name or use default
                 unit = self._infer_unit(item.name, unit_map) or default_unit
-                
+
                 material = MaterialCreate(
                     name=item.name,
                     use_category=category,
@@ -761,18 +766,18 @@ class MaterialsService(BaseRepository):
                     description=None
                 )
                 materials_to_create.append(material)
-            
+
             logger.info(f"Importing {len(materials_to_create)} materials from JSON")
-            
+
             # Use existing batch create method
             return await self.create_materials_batch(materials_to_create, batch_size)
-            
+
         except Exception as e:
             logger.error(f"Failed to import materials from JSON: {e}")
             await self._handle_database_error("import_materials_from_json", e)
-    
+
     # === Helper Methods ===
-    
+
     def _prepare_text_for_embedding(self, material: MaterialCreate) -> str:
         """Prepare text for embedding generation using name, unit, color and optional description.
         
@@ -784,18 +789,18 @@ class MaterialsService(BaseRepository):
         # Use normalized fields if available, otherwise fallback to original
         unit_text = material.normalized_parsed_unit or material.unit
         color_text = material.normalized_color or material.color or ""
-        
+
         return f"{material.name} {unit_text} {color_text} {material.description or ''}".strip()
-    
+
     def _convert_vector_result_to_material(self, result: Dict[str, Any]) -> Optional[Material]:
         """Convert vector database result to Material object."""
         try:
             payload = result.get("payload", {})
-            
+
             # Parse timestamps
             created_at = self._parse_timestamp(payload.get("created_at"))
             updated_at = self._parse_timestamp(payload.get("updated_at"))
-            
+
             # Handle embedding - always provide some data instead of None
             embedding_data = result.get("vector", [])
             if embedding_data:
@@ -805,7 +810,7 @@ class MaterialsService(BaseRepository):
             else:
                 # Even if no embedding data, we'll let the model_dump handle the display
                 formatted_embedding = None
-            
+
             return Material(
                 id=str(result.get("id")),
                 name=payload.get("name"),
@@ -825,7 +830,7 @@ class MaterialsService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to convert vector result to material: {e}")
             return None
-    
+
     def _parse_timestamp(self, timestamp_str: Optional[str]) -> datetime:
         """Parse timestamp string or return current time."""
         if timestamp_str:
@@ -834,7 +839,7 @@ class MaterialsService(BaseRepository):
             except:
                 pass
         return datetime.utcnow()
-    
+
     def _get_category_mapping(self) -> Dict[str, str]:
         """Get category mapping for inference."""
         return {
@@ -873,7 +878,7 @@ class MaterialsService(BaseRepository):
             "линолеум": "Линолеум",
             "паркет": "Паркет"
         }
-    
+
     def _get_unit_mapping(self) -> Dict[str, str]:
         """Get unit mapping for inference."""
         return {
@@ -897,7 +902,7 @@ class MaterialsService(BaseRepository):
             "банка": "банка",
             "тюбик": "тюбик"
         }
-    
+
     def _infer_category(self, name: str, category_map: Dict[str, str]) -> Optional[str]:
         """Infer category from material name."""
         name_lower = name.lower()
@@ -905,7 +910,7 @@ class MaterialsService(BaseRepository):
             if keyword in name_lower:
                 return category
         return None
-    
+
     def _infer_unit(self, name: str, unit_map: Dict[str, str]) -> Optional[str]:
         """Infer unit from material name."""
         name_lower = name.lower()
@@ -928,9 +933,9 @@ class MaterialsService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Search for exact name match
             results = await fallback_manager.search(
                 collection_name=self.collection_name,
@@ -940,9 +945,9 @@ class MaterialsService(BaseRepository):
                 score_threshold=0.95,  # High threshold for exact matches
                 filter_conditions={"name": {"$eq": material.name}}
             )
-            
+
             return len(results) > 0
-            
+
         except AllDatabasesUnavailableError as e:
             logger.warning(f"Database unavailable for duplicate check: {e}")
             return False
@@ -955,12 +960,12 @@ class MaterialsService(BaseRepository):
 
 class CategoryService(BaseRepository):
     """Service for managing material categories with Qdrant persistence and AI embedding."""
-    
+
     def __init__(self, vector_db: IVectorDatabase = None, ai_client=None):
         super().__init__(vector_db=vector_db, ai_client=ai_client)
         self.collection_name = "construction_categories"  # Новая коллекция с 1536
         logger.info("CategoryService initialized with Qdrant persistence and AI embedding support")
-    
+
     async def _ensure_collection_exists(self) -> None:
         """Ensure categories collection exists using fallback manager."""
         try:
@@ -968,9 +973,9 @@ class CategoryService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Check if collection exists using fallback manager
             if not await fallback_manager.collection_exists(self.collection_name):
                 logger.info(f"Creating collection: {self.collection_name}")
@@ -987,7 +992,7 @@ class CategoryService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to ensure categories collection: {e}")
             raise e
-    
+
     async def create_category(self, category_data: CategoryCreate) -> Category:
         """Create a new category using fallback manager.
         
@@ -1003,27 +1008,27 @@ class CategoryService(BaseRepository):
         try:
             # Ensure collection exists
             await self._ensure_collection_exists()
-            
+
             # Generate UUID for Qdrant ID
             import uuid
             category_id = str(uuid.uuid4())
-            
+
             if not self.ai_client:
                 raise Exception("AI client not available for embedding generation")
-            
+
             # Формируем текст для embedding: name + description + aliases
             embedding_text = category_data.name
             if category_data.description:
                 embedding_text += f" {category_data.description}"
             if category_data.aliases:
                 embedding_text += " " + " ".join(category_data.aliases)
-            
+
             # Generate AI embedding using BaseRepository method
             embedding = await self.get_embedding(embedding_text)
-            
+
             if not embedding or not isinstance(embedding, list) or len(embedding) == 0:
                 raise Exception("Failed to generate embedding for category")
-            
+
             category = Category(
                 id=category_id,
                 name=category_data.name,
@@ -1031,13 +1036,13 @@ class CategoryService(BaseRepository):
                 aliases=category_data.aliases,
                 embedding=embedding
             )
-            
+
             # Save using fallback manager
             from core.database.factories import (
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
             await fallback_manager.upsert(
                 collection_name=self.collection_name,
@@ -1054,7 +1059,7 @@ class CategoryService(BaseRepository):
                     }
                 }]
             )
-            
+
             logger.info(f"Category '{category_data.name}' created and saved with ID {category_id}")
             return category
         except AllDatabasesUnavailableError as e:
@@ -1063,7 +1068,7 @@ class CategoryService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to create category {getattr(category_data, 'name', None)}: {e}")
             raise e
-    
+
     async def get_categories(self) -> List[Category]:
         """Get all categories using fallback manager."""
         try:
@@ -1071,19 +1076,19 @@ class CategoryService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Ensure collection exists
             await self._ensure_collection_exists()
-            
+
             # Get all categories using fallback manager
             results = await fallback_manager.scroll_all(
                 collection_name=self.collection_name,
                 with_payload=True,
                 with_vectors=True
             )
-            
+
             categories = []
             for result in results:
                 payload = result.get("payload", {})
@@ -1098,12 +1103,12 @@ class CategoryService(BaseRepository):
                         updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
                     )
                     categories.append(category)
-            
+
             # Сортируем по дате создания (старые сначала, новые в конце)
             categories.sort(key=lambda x: x.created_at)
-            
+
             return categories
-            
+
         except AllDatabasesUnavailableError as e:
             logger.warning(f"All databases unavailable for categories retrieval: {e}")
             return []
@@ -1111,7 +1116,7 @@ class CategoryService(BaseRepository):
             logger.error(f"Failed to get categories: {e}")
             # Return empty list instead of raising error
             return []
-    
+
     async def update_category(self, category_id: str, category_update) -> Optional["Category"]:
         """Update existing category using fallback manager.
         
@@ -1126,24 +1131,24 @@ class CategoryService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Получить текущую категорию
             existing = await fallback_manager.get_by_id(self.collection_name, category_id)
             if not existing:
                 logger.info(f"Category not found for update: {category_id}")
                 return None
-                
+
             payload = existing.get("payload", {})
-            
+
             # Обновить поля
             updated_data = {
                 "name": category_update.name if category_update.name is not None else payload.get("name"),
                 "description": category_update.description if category_update.description is not None else payload.get("description"),
                 "aliases": category_update.aliases if category_update.aliases is not None else payload.get("aliases", []),
             }
-            
+
             # Пересчитать embedding
             embedding_text = updated_data["name"]
             if updated_data["description"]:
@@ -1151,11 +1156,11 @@ class CategoryService(BaseRepository):
             if updated_data["aliases"]:
                 embedding_text += " " + " ".join(updated_data["aliases"])
             embedding = await self.get_embedding(embedding_text)
-            
+
             # Обновить timestamps
             from datetime import datetime
             updated_at = datetime.utcnow().isoformat()
-            
+
             # Upsert вектор using fallback manager
             await fallback_manager.upsert(
                 collection_name=self.collection_name,
@@ -1170,7 +1175,7 @@ class CategoryService(BaseRepository):
                     }
                 }]
             )
-            
+
             logger.info(f"Category updated successfully: {category_id}")
             from core.schemas.materials import Category
             return Category(
@@ -1196,21 +1201,21 @@ class CategoryService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             deleted = await fallback_manager.delete(
                 collection_name=self.collection_name,
                 ids=[category_id]
             )
-            
+
             if deleted:
                 logger.info(f"Category deleted successfully: {category_id}")
                 return True
             else:
                 logger.warning(f"Category not found for deletion: {category_id}")
                 return False
-                
+
         except AllDatabasesUnavailableError as e:
             logger.error(f"All databases unavailable for category deletion: {e}")
             return False
@@ -1235,9 +1240,9 @@ class UnitService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Check if collection exists using fallback manager
             if not await fallback_manager.collection_exists(self.collection_name):
                 logger.info(f"Creating collection: {self.collection_name}")
@@ -1254,39 +1259,39 @@ class UnitService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to ensure units collection: {e}")
             raise e
-    
+
     async def create_unit(self, unit_data: Unit) -> Unit:
         """Create a new unit using fallback manager."""
         try:
             # Ensure collection exists
             await self._ensure_collection_exists()
-            
+
             # Generate UUID for Qdrant ID
             import uuid
             unit_id = str(uuid.uuid4())
-            
+
             if not self.ai_client:
                 raise Exception("AI client not available for embedding generation")
-            
+
             # Generate AI embedding
             embedding = await self.get_embedding(unit_data.name)
-            
+
             if not embedding or not isinstance(embedding, list) or len(embedding) == 0:
                 raise Exception("Failed to generate embedding for unit")
-            
+
             unit = Unit(
                 id=unit_id,
                 name=unit_data.name,
                 description=unit_data.description,
                 embedding=embedding
             )
-            
+
             # Save using fallback manager
             from core.database.factories import (
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
             await fallback_manager.upsert(
                 collection_name=self.collection_name,
@@ -1302,7 +1307,7 @@ class UnitService(BaseRepository):
                     }
                 }]
             )
-            
+
             logger.info(f"Unit '{unit_data.name}' created and saved with ID {unit_id}")
             return unit
         except AllDatabasesUnavailableError as e:
@@ -1311,7 +1316,7 @@ class UnitService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to create unit {getattr(unit_data, 'name', None)}: {e}")
             raise e
-    
+
     async def update_unit(self, unit_id: str, unit_update) -> Optional["Unit"]:
         """Update existing unit using fallback manager."""
         try:
@@ -1319,30 +1324,30 @@ class UnitService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Получить текущую единицу
             existing = await fallback_manager.get_by_id(self.collection_name, unit_id)
             if not existing:
                 logger.info(f"Unit not found for update: {unit_id}")
                 return None
-                
+
             payload = existing.get("payload", {})
-            
+
             # Обновить поля
             updated_data = {
                 "name": unit_update.name if unit_update.name is not None else payload.get("name"),
                 "description": unit_update.description if unit_update.description is not None else payload.get("description"),
             }
-            
+
             # Пересчитать embedding
             embedding = await self.get_embedding(updated_data["name"])
-            
+
             # Обновить timestamps
             from datetime import datetime
             updated_at = datetime.utcnow().isoformat()
-            
+
             # Upsert вектор using fallback manager
             await fallback_manager.upsert(
                 collection_name=self.collection_name,
@@ -1357,7 +1362,7 @@ class UnitService(BaseRepository):
                     }
                 }]
             )
-            
+
             logger.info(f"Unit updated successfully: {unit_id}")
             from core.schemas.materials import Unit
             return Unit(
@@ -1374,7 +1379,7 @@ class UnitService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to update unit {unit_id}: {e}")
             return None
-    
+
     async def get_units(self) -> List[Unit]:
         """Get all units using fallback manager."""
         try:
@@ -1382,19 +1387,19 @@ class UnitService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Ensure collection exists
             await self._ensure_collection_exists()
-            
+
             # Get all units using fallback manager
             results = await fallback_manager.scroll_all(
                 collection_name=self.collection_name,
                 with_payload=True,
                 with_vectors=True
             )
-            
+
             units = []
             for result in results:
                 payload = result.get("payload", {})
@@ -1408,19 +1413,19 @@ class UnitService(BaseRepository):
                         updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
                     )
                     units.append(unit)
-            
+
             # Сортируем по дате создания
             units.sort(key=lambda x: x.created_at)
-            
+
             return units
-            
+
         except AllDatabasesUnavailableError as e:
             logger.warning(f"All databases unavailable for units retrieval: {e}")
             return []
         except Exception as e:
             logger.error(f"Failed to get units: {e}")
             return []
-    
+
     async def delete_unit(self, unit_id: str) -> bool:
         """Delete a unit using fallback manager."""
         try:
@@ -1428,21 +1433,21 @@ class UnitService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             deleted = await fallback_manager.delete(
                 collection_name=self.collection_name,
                 ids=[unit_id]
             )
-            
+
             if deleted:
                 logger.info(f"Unit deleted successfully: {unit_id}")
                 return True
             else:
                 logger.warning(f"Unit not found for deletion: {unit_id}")
                 return False
-                
+
         except AllDatabasesUnavailableError as e:
             logger.error(f"All databases unavailable for unit deletion: {e}")
             return False
@@ -1453,7 +1458,7 @@ class UnitService(BaseRepository):
 
 class ColorService(BaseRepository):
     """Service for managing color references with Qdrant persistence."""
-    
+
     def __init__(self, vector_db: IVectorDatabase = None, ai_client = None):
         # Use factory defaults if not provided
         if vector_db is None:
@@ -1463,7 +1468,7 @@ class ColorService(BaseRepository):
             except Exception as e:
                 logger.warning(f"Failed to get vector DB client: {e}")
                 vector_db = None
-        
+
         if ai_client is None:
             try:
                 from core.database.factories import AIClientFactory
@@ -1471,11 +1476,11 @@ class ColorService(BaseRepository):
             except Exception as e:
                 logger.error(f"Failed to create AI client for ColorService: {e}")
                 ai_client = None
-        
+
         super().__init__(vector_db=vector_db, ai_client=ai_client)
         self.collection_name = "construction_colors"
         logger.info("ColorService initialized with Qdrant persistence")
-    
+
     async def _ensure_collection_exists(self) -> None:
         """Ensure colors collection exists using fallback manager."""
         try:
@@ -1483,9 +1488,9 @@ class ColorService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Check if collection exists using fallback manager
             if not await fallback_manager.collection_exists(self.collection_name):
                 logger.info(f"Creating collection: {self.collection_name}")
@@ -1502,26 +1507,26 @@ class ColorService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to ensure colors collection: {e}")
             raise e
-    
+
     async def create_color(self, color_data: ColorCreate) -> ColorReference:
         """Create a new color using fallback manager."""
         try:
             # Ensure collection exists
             await self._ensure_collection_exists()
-            
+
             # Generate UUID for Qdrant ID
             import uuid
             color_id = str(uuid.uuid4())
-            
+
             if not self.ai_client:
                 raise Exception("AI client not available for embedding generation")
-            
+
             # Generate AI embedding
             embedding = await self.get_embedding(color_data.name)
-            
+
             if not embedding or not isinstance(embedding, list) or len(embedding) == 0:
                 raise Exception("Failed to generate embedding for color")
-            
+
             color = ColorReference(
                 id=color_id,
                 name=color_data.name,
@@ -1529,13 +1534,13 @@ class ColorService(BaseRepository):
                 description=color_data.description,
                 embedding=embedding
             )
-            
+
             # Save using fallback manager
             from core.database.factories import (
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
             await fallback_manager.upsert(
                 collection_name=self.collection_name,
@@ -1552,7 +1557,7 @@ class ColorService(BaseRepository):
                     }
                 }]
             )
-            
+
             logger.info(f"Color '{color_data.name}' created and saved with ID {color_id}")
             return color
         except AllDatabasesUnavailableError as e:
@@ -1561,7 +1566,7 @@ class ColorService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to create color {getattr(color_data, 'name', None)}: {e}")
             raise e
-    
+
     async def get_colors(self) -> List[ColorReference]:
         """Get all colors using fallback manager."""
         try:
@@ -1569,19 +1574,19 @@ class ColorService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Ensure collection exists
             await self._ensure_collection_exists()
-            
+
             # Get all colors using fallback manager
             results = await fallback_manager.scroll_all(
                 collection_name=self.collection_name,
                 with_payload=True,
                 with_vectors=True
             )
-            
+
             colors = []
             for result in results:
                 payload = result.get("payload", {})
@@ -1596,19 +1601,19 @@ class ColorService(BaseRepository):
                         updated_at=datetime.fromisoformat(payload.get("updated_at", datetime.utcnow().isoformat()))
                     )
                     colors.append(color)
-            
+
             # Сортируем по дате создания
             colors.sort(key=lambda x: x.created_at)
-            
+
             return colors
-            
+
         except AllDatabasesUnavailableError as e:
             logger.warning(f"All databases unavailable for colors retrieval: {e}")
             return []
         except Exception as e:
             logger.error(f"Failed to get colors: {e}")
             return []
-    
+
     async def update_color(self, color_id: str, color_update) -> Optional["ColorReference"]:
         """Update existing color using fallback manager."""
         try:
@@ -1616,31 +1621,31 @@ class ColorService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             # Получить текущий цвет
             existing = await fallback_manager.get_by_id(self.collection_name, color_id)
             if not existing:
                 logger.info(f"Color not found for update: {color_id}")
                 return None
-                
+
             payload = existing.get("payload", {})
-            
+
             # Обновить поля
             updated_data = {
                 "name": color_update.name if color_update.name is not None else payload.get("name"),
                 "hex_code": color_update.hex_code if color_update.hex_code is not None else payload.get("hex_code"),
                 "description": color_update.description if color_update.description is not None else payload.get("description"),
             }
-            
+
             # Пересчитать embedding
             embedding = await self.get_embedding(updated_data["name"])
-            
+
             # Обновить timestamps
             from datetime import datetime
             updated_at = datetime.utcnow().isoformat()
-            
+
             # Upsert вектор using fallback manager
             await fallback_manager.upsert(
                 collection_name=self.collection_name,
@@ -1655,7 +1660,7 @@ class ColorService(BaseRepository):
                     }
                 }]
             )
-            
+
             logger.info(f"Color updated successfully: {color_id}")
             from core.schemas.colors import ColorReference
             return ColorReference(
@@ -1673,7 +1678,7 @@ class ColorService(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to update color {color_id}: {e}")
             return None
-    
+
     async def delete_color(self, color_id: str) -> bool:
         """Delete a color using fallback manager."""
         try:
@@ -1681,21 +1686,21 @@ class ColorService(BaseRepository):
                 AllDatabasesUnavailableError,
                 get_fallback_manager,
             )
-            
+
             fallback_manager = get_fallback_manager()
-            
+
             deleted = await fallback_manager.delete(
                 collection_name=self.collection_name,
                 ids=[color_id]
             )
-            
+
             if deleted:
                 logger.info(f"Color deleted successfully: {color_id}")
                 return True
             else:
                 logger.warning(f"Color not found for deletion: {color_id}")
                 return False
-                
+
         except AllDatabasesUnavailableError as e:
             logger.error(f"All databases unavailable for color deletion: {e}")
             return False
@@ -1710,4 +1715,3 @@ class ColorService(BaseRepository):
 
 MaterialsService._search_in_vector_db = MaterialsService._search_vector  # type: ignore[attr-defined]
 
- 

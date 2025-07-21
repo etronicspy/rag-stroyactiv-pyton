@@ -51,7 +51,7 @@ class MaterialModel(Base):
     Включает расширенные поля для парсинга и нормализации.
     """
     __tablename__ = "materials"
-    
+
     # Primary fields
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
@@ -59,23 +59,23 @@ class MaterialModel(Base):
     unit: Mapped[str] = mapped_column(String(50), nullable=False)
     sku: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, unique=True, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
+
     # Enhanced material fields for parsing and normalization
     color: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     normalized_color: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     normalized_parsed_unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     unit_coefficient: Mapped[Optional[float]] = mapped_column(Float, nullable=True, index=True)
-    
+
     # Vector embedding for semantic search (pgvector support)
     embedding: Mapped[Optional[List[float]]] = mapped_column(ARRAY(REAL), nullable=True)
-    
+
     # Metadata
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Full-text search support
     search_vector: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Will use PostgreSQL tsvector
-    
+
     # Indexes for performance
     __table_args__ = (
         Index('idx_materials_name_gin', 'name', postgresql_using='gin', postgresql_ops={'name': 'gin_trgm_ops'}),
@@ -93,17 +93,17 @@ class RawProductModel(Base):
     Модель сырых продуктов из прайс-листов поставщиков.
     """
     __tablename__ = "raw_products"
-    
+
     # Primary fields
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     sku: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     use_category: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
-    
+
     # Supplier information
     supplier_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     pricelistid: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    
+
     # Pricing information
     unit_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     unit_price_currency: Mapped[str] = mapped_column(String(3), default="RUB", nullable=False)
@@ -113,23 +113,23 @@ class RawProductModel(Base):
     buy_price_currency: Mapped[str] = mapped_column(String(3), default="RUB", nullable=False)
     sale_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     sale_price_currency: Mapped[str] = mapped_column(String(3), default="RUB", nullable=False)
-    
+
     # Units and quantities
     calc_unit: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    
+
     # Processing status
     is_processed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
-    
+
     # Vector embedding
     embedding: Mapped[Optional[List[float]]] = mapped_column(ARRAY(REAL), nullable=True)
-    
+
     # Timestamps
     created: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     modified: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     upload_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     date_price_change: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    
+
     # Indexes
     __table_args__ = (
         Index('idx_raw_products_supplier_pricelist', 'supplier_id', 'pricelistid'),
@@ -140,7 +140,7 @@ class RawProductModel(Base):
 
 class PostgreSQLAdapter(IRelationalDatabase):
     """PostgreSQL adapter with SSH tunnel integration."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize PostgreSQL adapter with configuration.
@@ -149,19 +149,19 @@ class PostgreSQLAdapter(IRelationalDatabase):
             config: Configuration dictionary with PostgreSQL settings
         """
         from core.config import get_settings
-        
+
         # If config is a Settings object, use it directly
         if hasattr(config, 'POSTGRES_USER'):
             self.settings = config
         else:
             # If config is a dict, create Settings object
             self.settings = get_settings()
-        
-        self.engine = None
-        self.session_factory = None
-        self._connection_string = None
+
+        self.engine: Optional[create_async_engine] = None
+        self.session_factory: Optional[async_sessionmaker] = None
+        self._connection_string: Optional[str] = None
         self._tunnel_service = None
-        
+
     async def connect(self) -> bool:
         """Connect to PostgreSQL with automatic SSH tunnel detection."""
         try:
@@ -184,9 +184,9 @@ class PostgreSQLAdapter(IRelationalDatabase):
                     f"{self.settings.POSTGRES_PASSWORD}@{self.settings.POSTGRESQL_HOST}:"
                     f"{self.settings.POSTGRESQL_PORT}/{self.settings.POSTGRESQL_DATABASE}"
                 )
-            
+
             self._connection_string = connection_string
-            
+
             # Create engine with connection pooling
             self.engine = create_async_engine(
                 connection_string,
@@ -197,26 +197,26 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 echo=self.settings.LOG_LEVEL == "DEBUG",
                 future=True
             )
-            
+
             # Create session factory
             self.session_factory = async_sessionmaker(
                 bind=self.engine,
                 class_=AsyncSession,
                 expire_on_commit=False
             )
-            
+
             # Test connection
             async with self.engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
-            
+
             logger.info("PostgreSQL connection established successfully")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to PostgreSQL: {e}")
             await self.disconnect()
             raise ConnectionError("postgresql", f"PostgreSQL connection failed: {e}")
-    
+
     async def disconnect(self) -> None:
         """Disconnect from PostgreSQL."""
         if self.engine:
@@ -224,7 +224,7 @@ class PostgreSQLAdapter(IRelationalDatabase):
             self.engine = None
             self.session_factory = None
             logger.info("PostgreSQL connection closed")
-    
+
     async def health_check(self) -> Dict[str, Any]:
         """Perform comprehensive health check."""
         if not self.engine:
@@ -237,13 +237,13 @@ class PostgreSQLAdapter(IRelationalDatabase):
                     "message": f"Failed to connect: {str(e)}",
                     "tunnel_status": "unknown"
                 }
-        
+
         try:
             # Check database connection
             async with self.engine.begin() as conn:
                 result = await conn.execute(text("SELECT version(), current_database(), current_user"))
                 version_info = result.fetchone()
-            
+
             # Check tunnel status
             tunnel_status = "not_used"
             if self._tunnel_service:
@@ -251,7 +251,7 @@ class PostgreSQLAdapter(IRelationalDatabase):
                     tunnel_status = "active"
                 else:
                     tunnel_status = "inactive"
-            
+
             return {
                 "status": "healthy",
                 "database": version_info[1] if version_info else None,
@@ -260,7 +260,7 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 "tunnel_status": tunnel_status,
                 "connection_type": "tunneled" if tunnel_status == "active" else "direct"
             }
-            
+
         except Exception as e:
             logger.error(f"PostgreSQL health check failed: {e}")
             return {
@@ -268,7 +268,7 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 "message": str(e),
                 "tunnel_status": "unknown"
             }
-    
+
     async def create_tables(self) -> None:
         """Create all database tables.
         
@@ -282,19 +282,19 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 # Enable required PostgreSQL extensions
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))  # Trigram similarity
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gin"))  # GIN indexes
-                
+
                 # Create all tables
                 await conn.run_sync(Base.metadata.create_all)
-                
+
             logger.info("PostgreSQL tables created successfully")
-            
+
         except SQLAlchemyError as e:
             logger.error(f"Failed to create PostgreSQL tables: {e}")
             raise DatabaseError(
                 message="Failed to create database tables",
                 details=str(e)
             )
-    
+
     async def drop_tables(self) -> None:
         """Drop all database tables.
         
@@ -306,18 +306,18 @@ class PostgreSQLAdapter(IRelationalDatabase):
         try:
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.drop_all)
-                
+
             logger.info("PostgreSQL tables dropped successfully")
-            
+
         except SQLAlchemyError as e:
             logger.error(f"Failed to drop PostgreSQL tables: {e}")
             raise DatabaseError(
                 message="Failed to drop database tables",
                 details=str(e)
             )
-    
+
     @asynccontextmanager
-    async def get_session(self):
+    async def get_session(self) -> AsyncSession:
         """Get async database session with automatic cleanup.
         
         Контекстный менеджер для работы с сессией БД.
@@ -338,7 +338,7 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 message="Database session error",
                 details=str(e)
             )
-    
+
     async def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Execute SQL query and return results.
         
@@ -355,13 +355,13 @@ class PostgreSQLAdapter(IRelationalDatabase):
         try:
             async with self.get_session() as session:
                 result = await session.execute(text(query), params or {})
-                
+
                 # Convert result to list of dictionaries
                 columns = result.keys()
                 rows = result.fetchall()
-                
+
                 return [dict(zip(columns, row)) for row in rows]
-                
+
         except SQLAlchemyError as e:
             logger.error(f"Query execution failed: {e}")
             raise QueryError(
@@ -369,7 +369,7 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 details=str(e),
                 query=query
             )
-    
+
     async def execute_command(self, command: str, params: Optional[Dict[str, Any]] = None) -> int:
         """Execute SQL command (INSERT, UPDATE, DELETE).
         
@@ -387,9 +387,9 @@ class PostgreSQLAdapter(IRelationalDatabase):
             async with self.get_session() as session:
                 result = await session.execute(text(command), params or {})
                 await session.commit()
-                
+
                 return result.rowcount
-                
+
         except SQLAlchemyError as e:
             logger.error(f"Command execution failed: {e}")
             raise QueryError(
@@ -397,9 +397,9 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 details=str(e),
                 query=command
             )
-    
+
     @asynccontextmanager
-    async def begin_transaction(self):
+    async def begin_transaction(self) -> AsyncSession:
         """Begin database transaction as async context manager.
         
         Yields:
@@ -414,7 +414,7 @@ class PostgreSQLAdapter(IRelationalDatabase):
             # Транзакция начинается автоматически при создании сессии
             yield session
             await session.commit()
-            
+
         except SQLAlchemyError as e:
             logger.error(f"Transaction failed: {e}")
             if session:
@@ -426,11 +426,11 @@ class PostgreSQLAdapter(IRelationalDatabase):
         finally:
             if session:
                 await session.close()
-    
 
-    
+
+
     # === Material-specific methods ===
-    
+
     async def create_material(self, material_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create new material in PostgreSQL.
         
@@ -447,7 +447,7 @@ class PostgreSQLAdapter(IRelationalDatabase):
             async with self.get_session() as session:
                 # Prepare search vector for full-text search
                 search_text = f"{material_data.get('name', '')} {material_data.get('description', '')} {material_data.get('use_category', '')}"
-                
+
                 material = MaterialModel(
                     id=material_data.get('id', str(uuid.uuid4())),
                     name=material_data['name'],
@@ -465,13 +465,13 @@ class PostgreSQLAdapter(IRelationalDatabase):
                     created_at=material_data.get('created_at', datetime.utcnow()),
                     updated_at=material_data.get('updated_at', datetime.utcnow())
                 )
-                
+
                 session.add(material)
                 await session.commit()
                 await session.refresh(material)
-                
+
                 logger.info(f"Material created in PostgreSQL: {material.name} (ID: {material.id})")
-                
+
                 return {
                     'id': material.id,
                     'name': material.name,
@@ -488,17 +488,17 @@ class PostgreSQLAdapter(IRelationalDatabase):
                     'created_at': material.created_at,
                     'updated_at': material.updated_at
                 }
-                
+
         except SQLAlchemyError as e:
             logger.error(f"Failed to create material in PostgreSQL: {e}")
             raise DatabaseError(
                 message="Failed to create material",
                 details=str(e)
             )
-    
+
     async def search_materials_hybrid(
-        self, 
-        query: str, 
+        self,
+        query: str,
         limit: int = 10,
         similarity_threshold: float = 0.3
     ) -> List[Dict[str, Any]]:
@@ -545,17 +545,17 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 ).order_by(
                     text('total_similarity DESC')
                 ).limit(limit)
-                
+
                 result = await session.execute(search_query)
                 rows = result.fetchall()
-                
+
                 materials = []
                 for row in rows:
                     material = row[0]  # MaterialModel instance
                     name_sim = row[1]
                     desc_sim = row[2]
                     total_sim = row[3]
-                    
+
                     materials.append({
                         'id': material.id,
                         'name': material.name,
@@ -575,10 +575,10 @@ class PostgreSQLAdapter(IRelationalDatabase):
                         'name_similarity': float(name_sim) if name_sim else 0.0,
                         'description_similarity': float(desc_sim) if desc_sim else 0.0
                     })
-                
+
                 logger.info(f"Hybrid search found {len(materials)} materials for query: '{query}'")
                 return materials
-                
+
         except SQLAlchemyError as e:
             logger.error(f"Hybrid search failed: {e}")
             raise QueryError(
@@ -586,11 +586,11 @@ class PostgreSQLAdapter(IRelationalDatabase):
                 details=str(e),
                 query=query
             )
-    
+
     async def get_materials(
-        self, 
-        skip: int = 0, 
-        limit: int = 100, 
+        self,
+        skip: int = 0,
+        limit: int = 100,
         category: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get materials with pagination and filtering.
@@ -609,15 +609,15 @@ class PostgreSQLAdapter(IRelationalDatabase):
         try:
             async with self.get_session() as session:
                 query = select(MaterialModel)
-                
+
                 if category:
                     query = query.where(MaterialModel.use_category.ilike(f'%{category}%'))
-                
+
                 query = query.offset(skip).limit(limit).order_by(MaterialModel.created_at.desc())
-                
+
                 result = await session.execute(query)
                 materials = result.scalars().all()
-                
+
                 return [
                     {
                         'id': material.id,
@@ -637,14 +637,76 @@ class PostgreSQLAdapter(IRelationalDatabase):
                     }
                     for material in materials
                 ]
-                
+
         except SQLAlchemyError as e:
             logger.error(f"Failed to get materials: {e}")
             raise QueryError(
                 message="Failed to get materials",
                 details=str(e)
             )
-    
+
+    async def get_by_id(self, collection_name: str, vector_id: str) -> Optional[dict]:
+        """
+        Get material by ID (vector interface compatibility).
+
+        Args:
+            collection_name: Ignored for SQL, kept for interface compatibility
+            vector_id: Material ID
+        Returns:
+            Material as dict or None if not found
+        """
+        try:
+            async with self.get_session() as session:
+                result = await session.execute(
+                    select(MaterialModel).where(MaterialModel.id == vector_id)
+                )
+                material = result.scalar_one_or_none()
+                if material is None:
+                    return None
+                return {
+                    'id': material.id,
+                    'name': material.name,
+                    'use_category': material.use_category,
+                    'unit': material.unit,
+                    'sku': material.sku,
+                    'description': material.description,
+                    'color': material.color,
+                    'normalized_color': material.normalized_color,
+                    'normalized_parsed_unit': material.normalized_parsed_unit,
+                    'unit_coefficient': material.unit_coefficient,
+                    'embedding': material.embedding,
+                    'created_at': material.created_at,
+                    'updated_at': material.updated_at
+                }
+        except Exception as e:
+            logger.error(f"Failed to get material by id {vector_id}: {e}")
+            return None
+
+    async def delete(self, material_id: str) -> bool:
+        """
+        Delete material by ID.
+
+        Args:
+            material_id: Material ID
+        Returns:
+            True if deleted, False if not found
+        """
+        try:
+            async with self.get_session() as session:
+                result = await session.execute(
+                    select(MaterialModel).where(MaterialModel.id == material_id)
+                )
+                material = result.scalar_one_or_none()
+                if material is None:
+                    return False
+                await session.delete(material)
+                await session.commit()
+                logger.info(f"Material deleted from PostgreSQL: {material_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to delete material {material_id}: {e}")
+            return False
+
     async def close(self) -> None:
         """Close database connections.
         
@@ -653,14 +715,14 @@ class PostgreSQLAdapter(IRelationalDatabase):
         try:
             await self.engine.dispose()
             logger.info("PostgreSQL connections closed")
-            
+
         except Exception as e:
             logger.error(f"Error closing PostgreSQL connections: {e}")
-    
+
     async def __aenter__(self):
         """Async context manager entry"""
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit"""
-        await self.close() 
+        await self.close()

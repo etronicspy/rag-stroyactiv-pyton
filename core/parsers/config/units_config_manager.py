@@ -16,6 +16,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
+from core.config.parsers import ParserConfig, get_parser_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,11 +83,11 @@ class UnitValidationRule:
     max_coefficient: float
     typical_range: Tuple[float, float]
     description: str
-    
+
     def validate(self, coefficient: float) -> bool:
         """Validate coefficient against rule"""
         return self.min_coefficient <= coefficient <= self.max_coefficient
-    
+
     def is_typical(self, coefficient: float) -> bool:
         """Check if coefficient is in typical range"""
         return self.typical_range[0] <= coefficient <= self.typical_range[1]
@@ -99,7 +101,7 @@ class MaterialUnitMapping:
     alternative_units: List[str]
     confidence_boost: float = 0.1
     description: str = ""
-    
+
     def matches_material(self, material_name: str) -> bool:
         """Check if material name matches this mapping"""
         material_lower = material_name.lower()
@@ -113,7 +115,7 @@ class UnitsConfigManager:
     Provides comprehensive unit management including validation, conversion,
     normalization, and dynamic configuration for construction materials.
     """
-    
+
     def __init__(self, config: Optional[ParserConfig] = None):
         """
         Initialize Units Config Manager.
@@ -123,22 +125,22 @@ class UnitsConfigManager:
         """
         self.config = config or get_parser_config()
         self.logger = get_material_parser_logger()
-        
+
         # Units storage
         self._units: Dict[str, UnitInfo] = {}
         self._unit_aliases: Dict[str, str] = {}
         self._validation_rules: Dict[str, UnitValidationRule] = {}
         self._material_mappings: List[MaterialUnitMapping] = []
-        
+
         # Unit categories
         self._metric_units: Set[str] = set()
         self._non_metric_units: Set[str] = set()
         self._block_materials: Set[str] = set()
-        
+
         # Service metadata
         self._service_name = "units_config_manager"
         self._version = "2.0.0"
-        
+
         # Statistics
         self.stats = {
             "total_units": 0,
@@ -150,27 +152,27 @@ class UnitsConfigManager:
             "material_hint_requests": 0,
             "successful_material_hints": 0
         }
-        
+
         # Initialize units system
         self._initialize_units_system()
-        
+
         self.logger.info(f"Units Config Manager v{self._version} initialized")
-    
+
     def _initialize_units_system(self):
         """Initialize units system with default configuration"""
-        
+
         self._initialize_basic_units()
-        
+
         # Initialize validation rules
         self._initialize_validation_rules()
-        
+
         # Initialize material mappings
         self._initialize_material_mappings()
-        
+
         # Update statistics
         self.stats["total_units"] = len(self._units)
         self.stats["total_aliases"] = len(self._unit_aliases)
-    
+
     def _initialize_basic_units(self):
         """Initialize basic units when legacy system is not available"""
         # Basic units
@@ -185,25 +187,25 @@ class UnitsConfigManager:
             "шт": UnitInfo("шт", "pcs", UnitType.COUNT, aliases=["штука"]),
             "упак": UnitInfo("упак", "pack", UnitType.PACKAGING, aliases=["упаковка"])
         }
-        
+
         for unit_key, unit_info in basic_units.items():
             self._units[unit_key] = unit_info
-            
+
             # Create aliases
             self._unit_aliases[unit_info.name] = unit_key
             self._unit_aliases[unit_info.symbol] = unit_key
             for alias in unit_info.aliases:
                 self._unit_aliases[alias.lower()] = unit_key
-        
+
         # Basic metric units
         self._metric_units = {"кг", "г", "т", "м3", "л", "м2", "м"}
         self._non_metric_units = {"шт", "упак"}
-        
+
         # Basic block materials
         self._block_materials = {"кирпич", "газобетон", "пеноблок", "шлакоблок", "блок"}
-        
+
         self.logger.info("Initialized basic units system")
-    
+
     def _initialize_validation_rules(self):
         """Initialize validation rules for units"""
         validation_rules = {
@@ -250,9 +252,9 @@ class UnitsConfigManager:
                 description="Count in pieces"
             )
         }
-        
+
         self._validation_rules = validation_rules
-    
+
     def _initialize_material_mappings(self):
         """Initialize material-to-unit mappings"""
         material_mappings = [
@@ -299,19 +301,19 @@ class UnitsConfigManager:
                 description="Linear materials measured in length"
             )
         ]
-        
+
         self._material_mappings = material_mappings
-    
+
     @property
     def service_name(self) -> str:
         """Get service name"""
         return self._service_name
-    
+
     @property
     def version(self) -> str:
         """Get service version"""
         return self._version
-    
+
     def normalize_unit(self, unit: str) -> Optional[str]:
         """
         Normalize unit string to standard format.
@@ -323,24 +325,24 @@ class UnitsConfigManager:
             Optional[str]: Normalized unit or None if not found
         """
         self.stats["normalization_requests"] += 1
-        
+
         if not unit:
             return None
-        
+
         # Clean and lowercase
         unit_clean = unit.strip().lower()
-        
+
         # Direct lookup
         if unit_clean in self._unit_aliases:
             self.stats["successful_normalizations"] += 1
             return self._unit_aliases[unit_clean]
-        
+
         # Try partial matching for common variations
         for alias, standard in self._unit_aliases.items():
             if unit_clean in alias or alias in unit_clean:
                 self.stats["successful_normalizations"] += 1
                 return standard
-        
+
         # Try regex patterns for common unit formats
         unit_patterns = [
             (r'(\d+)?\s*кг', 'кг'),
@@ -352,15 +354,15 @@ class UnitsConfigManager:
             (r'кв\.?\s*м', 'м2'),
             (r'п\.?\s*м', 'м'),
         ]
-        
+
         for pattern, standard_unit in unit_patterns:
             if re.search(pattern, unit_clean):
                 self.stats["successful_normalizations"] += 1
                 return standard_unit
-        
+
         self.logger.debug(f"Could not normalize unit: {unit}")
         return None
-    
+
     def is_metric_unit(self, unit: str) -> bool:
         """
         Check if unit is a metric unit requiring coefficient calculation.
@@ -373,7 +375,7 @@ class UnitsConfigManager:
         """
         normalized = self.normalize_unit(unit)
         return normalized in self._metric_units if normalized else False
-    
+
     def is_packaging_unit(self, unit: str) -> bool:
         """
         Check if unit is a packaging unit.
@@ -387,10 +389,10 @@ class UnitsConfigManager:
         normalized = self.normalize_unit(unit)
         if not normalized:
             return False
-        
+
         unit_info = self._units.get(normalized)
         return unit_info.unit_type == UnitType.PACKAGING if unit_info else False
-    
+
     def get_unit_type(self, unit: str) -> Optional[UnitType]:
         """
         Get unit type for a given unit.
@@ -404,10 +406,10 @@ class UnitsConfigManager:
         normalized = self.normalize_unit(unit)
         if not normalized:
             return None
-        
+
         unit_info = self._units.get(normalized)
         return unit_info.unit_type if unit_info else None
-    
+
     def is_block_material(self, material_name: str) -> bool:
         """
         Check if material is a block material that should be measured in volume.
@@ -420,10 +422,10 @@ class UnitsConfigManager:
         """
         if not material_name:
             return False
-        
+
         material_lower = material_name.lower()
         return any(block_keyword in material_lower for block_keyword in self._block_materials)
-    
+
     def get_material_hint(self, material_name: str) -> Optional[str]:
         """
         Get unit hint for a material based on its name.
@@ -435,25 +437,25 @@ class UnitsConfigManager:
             Optional[str]: Suggested unit or None
         """
         self.stats["material_hint_requests"] += 1
-        
+
         if not material_name:
             return None
-        
+
         # Check material mappings
         for mapping in self._material_mappings:
             if mapping.matches_material(material_name):
                 self.stats["successful_material_hints"] += 1
                 return mapping.preferred_unit
-        
+
         # Check if it's a block material
         if self.is_block_material(material_name):
             self.stats["successful_material_hints"] += 1
             return "м3"
-        
 
-        
+
+
         return None
-    
+
     def validate_unit_coefficient(self, unit: str, coefficient: float) -> bool:
         """
         Validate unit coefficient against expected ranges.
@@ -466,11 +468,11 @@ class UnitsConfigManager:
             bool: True if valid
         """
         self.stats["validation_requests"] += 1
-        
+
         normalized = self.normalize_unit(unit)
         if not normalized:
             return False
-        
+
         # Check validation rules
         validation_rule = self._validation_rules.get(normalized)
         if validation_rule:
@@ -478,16 +480,16 @@ class UnitsConfigManager:
             if is_valid:
                 self.stats["successful_validations"] += 1
             return is_valid
-        
 
-        
+
+
         # Basic validation - coefficient should be positive
         is_valid = coefficient > 0
         if is_valid:
             self.stats["successful_validations"] += 1
-        
+
         return is_valid
-    
+
     def get_coefficient_confidence(self, unit: str, coefficient: float) -> float:
         """
         Get confidence score for unit coefficient.
@@ -502,22 +504,22 @@ class UnitsConfigManager:
         normalized = self.normalize_unit(unit)
         if not normalized:
             return 0.0
-        
+
         validation_rule = self._validation_rules.get(normalized)
         if not validation_rule:
             return 0.5  # Default confidence
-        
+
         # Check if coefficient is in typical range
         if validation_rule.is_typical(coefficient):
             return 0.9
-        
+
         # Check if coefficient is valid but not typical
         if validation_rule.validate(coefficient):
             return 0.6
-        
+
         # Invalid coefficient
         return 0.1
-    
+
     def get_common_units_for_ai(self) -> List[str]:
         """
         Get list of common units for AI prompts.
@@ -526,10 +528,10 @@ class UnitsConfigManager:
             List[str]: List of common units
         """
 
-        
+
         # Return basic common units
         return ["кг", "г", "т", "м3", "л", "м2", "м", "шт", "упак"]
-    
+
     def get_all_unit_aliases(self) -> List[str]:
         """
         Get all available unit aliases.
@@ -538,7 +540,7 @@ class UnitsConfigManager:
             List[str]: List of all aliases
         """
         return list(self._unit_aliases.keys())
-    
+
     def get_units_by_type(self, unit_type: UnitType) -> List[str]:
         """
         Get units by type.
@@ -553,10 +555,10 @@ class UnitsConfigManager:
             unit_key for unit_key, unit_info in self._units.items()
             if unit_info.unit_type == unit_type
         ]
-    
+
     def add_unit(
-        self, 
-        unit_key: str, 
+        self,
+        unit_key: str,
         unit_info: UnitInfo,
         aliases: Optional[List[str]] = None
     ) -> bool:
@@ -574,35 +576,35 @@ class UnitsConfigManager:
         try:
             # Add unit
             self._units[unit_key] = unit_info
-            
+
             # Add aliases
             self._unit_aliases[unit_info.name] = unit_key
             self._unit_aliases[unit_info.symbol] = unit_key
-            
+
             for alias in unit_info.aliases:
                 self._unit_aliases[alias.lower()] = unit_key
-            
+
             if aliases:
                 for alias in aliases:
                     self._unit_aliases[alias.lower()] = unit_key
-            
+
             # Update categories
             if unit_info.unit_type in [UnitType.WEIGHT, UnitType.VOLUME, UnitType.AREA, UnitType.LENGTH]:
                 self._metric_units.add(unit_key)
             else:
                 self._non_metric_units.add(unit_key)
-            
+
             # Update statistics
             self.stats["total_units"] = len(self._units)
             self.stats["total_aliases"] = len(self._unit_aliases)
-            
+
             self.logger.info(f"Added new unit: {unit_key}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error adding unit: {e}")
             return False
-    
+
     def remove_unit(self, unit_key: str) -> bool:
         """
         Remove unit from the system.
@@ -617,37 +619,37 @@ class UnitsConfigManager:
             if unit_key not in self._units:
                 self.logger.error(f"Unit '{unit_key}' not found")
                 return False
-            
+
             # Get unit info
             unit_info = self._units[unit_key]
-            
+
             # Remove unit
             del self._units[unit_key]
-            
+
             # Remove aliases
             aliases_to_remove = []
             for alias, target_unit in self._unit_aliases.items():
                 if target_unit == unit_key:
                     aliases_to_remove.append(alias)
-            
+
             for alias in aliases_to_remove:
                 del self._unit_aliases[alias]
-            
+
             # Update categories
             self._metric_units.discard(unit_key)
             self._non_metric_units.discard(unit_key)
-            
+
             # Update statistics
             self.stats["total_units"] = len(self._units)
             self.stats["total_aliases"] = len(self._unit_aliases)
-            
+
             self.logger.info(f"Removed unit: {unit_key}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error removing unit: {e}")
             return False
-    
+
     def add_material_mapping(self, mapping: MaterialUnitMapping) -> bool:
         """
         Add material-to-unit mapping.
@@ -662,11 +664,11 @@ class UnitsConfigManager:
             self._material_mappings.append(mapping)
             self.logger.info(f"Added material mapping for: {mapping.material_keywords}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error adding material mapping: {e}")
             return False
-    
+
     def add_validation_rule(self, rule: UnitValidationRule) -> bool:
         """
         Add validation rule for unit.
@@ -681,11 +683,11 @@ class UnitsConfigManager:
             self._validation_rules[rule.unit] = rule
             self.logger.info(f"Added validation rule for: {rule.unit}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error adding validation rule: {e}")
             return False
-    
+
     def export_configuration(self, output_path: Union[str, Path]) -> bool:
         """
         Export units configuration to file.
@@ -697,11 +699,11 @@ class UnitsConfigManager:
             bool: True if successful
         """
         output_path = Path(output_path)
-        
+
         try:
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Create export data
             export_data = {
                 "metadata": {
@@ -745,18 +747,18 @@ class UnitsConfigManager:
                     "block_materials": list(self._block_materials)
                 }
             }
-            
+
             # Write to file
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(export_data, f, ensure_ascii=False, indent=2)
-            
+
             self.logger.info(f"Units configuration exported to: {output_path}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error exporting configuration: {e}")
             return False
-    
+
     def import_configuration(self, input_path: Union[str, Path]) -> bool:
         """
         Import units configuration from file.
@@ -768,22 +770,22 @@ class UnitsConfigManager:
             bool: True if successful
         """
         input_path = Path(input_path)
-        
+
         try:
             # Check if file exists
             if not input_path.exists():
                 self.logger.error(f"Configuration file not found: {input_path}")
                 return False
-            
+
             # Load configuration file
             with open(input_path, encoding='utf-8') as f:
                 import_data = json.load(f)
-            
+
             # Validate import data
             if "units" not in import_data:
                 self.logger.error("Invalid configuration file format")
                 return False
-            
+
             # Import units
             imported_units = 0
             for unit_key, unit_data in import_data["units"].items():
@@ -796,13 +798,13 @@ class UnitsConfigManager:
                         conversion_factor=unit_data.get("conversion_factor", 1.0),
                         aliases=unit_data.get("aliases", [])
                     )
-                    
+
                     if self.add_unit(unit_key, unit_info):
                         imported_units += 1
-                        
+
                 except Exception as e:
                     self.logger.warning(f"Error importing unit {unit_key}: {e}")
-            
+
             # Import validation rules
             if "validation_rules" in import_data:
                 for unit, rule_data in import_data["validation_rules"].items():
@@ -817,7 +819,7 @@ class UnitsConfigManager:
                         self.add_validation_rule(rule)
                     except Exception as e:
                         self.logger.warning(f"Error importing validation rule for {unit}: {e}")
-            
+
             # Import material mappings
             if "material_mappings" in import_data:
                 for mapping_data in import_data["material_mappings"]:
@@ -832,14 +834,14 @@ class UnitsConfigManager:
                         self.add_material_mapping(mapping)
                     except Exception as e:
                         self.logger.warning(f"Error importing material mapping: {e}")
-            
+
             self.logger.info(f"Imported {imported_units} units from configuration")
             return imported_units > 0
-            
+
         except Exception as e:
             self.logger.error(f"Error importing configuration: {e}")
             return False
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """
         Get units manager statistics.
@@ -873,7 +875,7 @@ class UnitsConfigManager:
             },
             "operations": self.stats.copy()
         }
-    
+
     def get_unit_info(self, unit: str) -> Optional[Dict[str, Any]]:
         """
         Get detailed information about a unit.
@@ -887,11 +889,11 @@ class UnitsConfigManager:
         normalized = self.normalize_unit(unit)
         if not normalized:
             return None
-        
+
         unit_info = self._units.get(normalized)
         if not unit_info:
             return None
-        
+
         return {
             "name": unit_info.name,
             "symbol": unit_info.symbol,
@@ -996,4 +998,4 @@ def get_common_units_for_ai() -> List[str]:
         List[str]: List of common units
     """
     manager = get_units_manager()
-    return manager.get_common_units_for_ai() 
+    return manager.get_common_units_for_ai()

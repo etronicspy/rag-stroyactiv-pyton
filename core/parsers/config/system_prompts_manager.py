@@ -14,6 +14,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from core.config.parsers import ParserConfig, get_parser_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,18 +75,18 @@ class PromptTemplate:
     updated_at: float = field(default_factory=time.time)
     usage_count: int = 0
     success_rate: float = 0.0
-    
+
     def render(self, **kwargs) -> str:
         """Render prompt template with variables"""
         try:
             return self.template.format(**kwargs)
         except KeyError as e:
             raise ValueError(f"Missing variable {e} for prompt template '{self.name}'")
-    
+
     def validate_variables(self, **kwargs) -> bool:
         """Validate that all required variables are provided"""
         return all(var in kwargs for var in self.variables)
-    
+
     def update_usage_stats(self, success: bool) -> None:
         """Update usage statistics"""
         self.usage_count += 1
@@ -115,7 +117,7 @@ class SystemPromptsManager:
     Provides dynamic prompt generation, optimization, caching, and
     context-aware prompt selection for AI parsing operations.
     """
-    
+
     def __init__(self, config: Optional[ParserConfig] = None):
         """
         Initialize System Prompts Manager.
@@ -125,21 +127,21 @@ class SystemPromptsManager:
         """
         self.config = config or get_parser_config()
         self.logger = get_material_parser_logger()
-        
+
         # Prompt templates storage
         self._templates: Dict[str, PromptTemplate] = {}
-        
+
         # Prompt cache
         self._prompt_cache: Dict[str, str] = {}
         self._cache_max_size = 1000
-        
+
         # Optimization context
         self._default_context = PromptOptimizationContext()
-        
+
         # Service metadata
         self._service_name = "system_prompts_manager"
         self._version = "2.0.0"
-        
+
         # Statistics
         self.stats = {
             "total_prompts_generated": 0,
@@ -148,15 +150,15 @@ class SystemPromptsManager:
             "optimization_requests": 0,
             "template_updates": 0
         }
-        
+
         # Initialize default templates
         self._initialize_default_templates()
-        
+
         self.logger.info(f"System Prompts Manager v{self._version} initialized")
-    
+
     def _initialize_default_templates(self):
         """Initialize default prompt templates"""
-        
+
         # System prompt template
         system_template = PromptTemplate(
             name="material_parsing_system",
@@ -166,7 +168,7 @@ class SystemPromptsManager:
             description="Main system prompt for material parsing"
         )
         self._templates[system_template.name] = system_template
-        
+
         # User prompt template
         user_template = PromptTemplate(
             name="material_parsing_user",
@@ -176,7 +178,7 @@ class SystemPromptsManager:
             description="User prompt for specific material parsing"
         )
         self._templates[user_template.name] = user_template
-        
+
         # Embeddings prompt template
         embeddings_template = PromptTemplate(
             name="embeddings_generation",
@@ -186,10 +188,10 @@ class SystemPromptsManager:
             description="Prompt for embeddings generation"
         )
         self._templates[embeddings_template.name] = embeddings_template
-        
+
         # Specialized prompts
         self._initialize_specialized_templates()
-    
+
     def _get_default_system_prompt(self) -> str:
         """Get default system prompt"""
         return """
@@ -210,7 +212,7 @@ price_coefficient = number of metric units in 1 original unit
 
 Return ONLY JSON without additional text.
 """
-    
+
     def _get_default_user_prompt(self) -> str:
         """Get default user prompt"""
         return """
@@ -231,7 +233,7 @@ Example Output:
     "color": "null"
 }}
 """
-    
+
     def _get_default_embeddings_prompt(self) -> str:
         """Get default embeddings prompt"""
         return """
@@ -248,7 +250,7 @@ Example: "Цемент 50кг" → "cement, 50kg, construction material, binder,
 
 Output only the descriptive embedding string, nothing else.
 """
-    
+
     def _initialize_specialized_templates(self):
         """Initialize specialized prompt templates"""
         specialized_prompts = {
@@ -259,21 +261,21 @@ Output only the descriptive embedding string, nothing else.
 - Использовать стандартные объемы для типовых изделий
 - Примеры: кирпич, газобетон, пеноблок, шлакоблок
             """,
-            
+
             "liquid_materials": """
 ЖИДКИЕ МАТЕРИАЛЫ - СПЕЦИАЛЬНЫЕ ПРАВИЛА:
 - Переводить в литры (л)
 - Учитывать плотность для расчета объема
 - Примеры: краски, лаки, грунтовки, растворители
             """,
-            
+
             "sheet_materials": """
 ЛИСТОВЫЕ МАТЕРИАЛЫ - СПЕЦИАЛЬНЫЕ ПРАВИЛА:
 - Переводить в м² (площадь)
 - Рассчитывать площадь по размерам листа
 - Примеры: фанера, OSB, гипсокартон, профлист
             """,
-            
+
             "bulk_materials": """
 СЫПУЧИЕ МАТЕРИАЛЫ - СПЕЦИАЛЬНЫЕ ПРАВИЛА:
 - Переводить в кг (вес) или м³ (объем)
@@ -281,7 +283,7 @@ Output only the descriptive embedding string, nothing else.
 - Примеры: песок, щебень, цемент, сухие смеси
             """
         }
-        
+
         for name, template in specialized_prompts.items():
             prompt_template = PromptTemplate(
                 name=f"specialized_{name}",
@@ -291,17 +293,17 @@ Output only the descriptive embedding string, nothing else.
                 description=f"Specialized prompt for {name}"
             )
             self._templates[prompt_template.name] = prompt_template
-    
+
     @property
     def service_name(self) -> str:
         """Get service name"""
         return self._service_name
-    
+
     @property
     def version(self) -> str:
         """Get service version"""
         return self._version
-    
+
     def get_system_prompt(self, common_units: List[str]) -> str:
         """
         Get system prompt for material parsing.
@@ -313,35 +315,35 @@ Output only the descriptive embedding string, nothing else.
             str: System prompt
         """
         cache_key = f"system_prompt_{hash(tuple(common_units))}"
-        
+
         # Check cache first
         if cache_key in self._prompt_cache:
             self.stats["cache_hits"] += 1
             return self._prompt_cache[cache_key]
-        
+
         # Generate prompt
         template = self._templates.get("material_parsing_system")
         if not template:
             raise ValueError("System prompt template not found")
-        
+
         # Render template
         units_text = ', '.join(common_units)
         prompt = template.render(common_units=units_text)
-        
+
         # Cache result
         self._cache_prompt(cache_key, prompt)
-        
+
         # Update statistics
         self.stats["total_prompts_generated"] += 1
         self.stats["cache_misses"] += 1
         template.usage_count += 1
-        
+
         return prompt
-    
+
     def get_user_prompt(
-        self, 
-        name: str, 
-        unit: str, 
+        self,
+        name: str,
+        unit: str,
         material_hint: Optional[str] = None,
         is_block: bool = False
     ) -> str:
@@ -358,21 +360,21 @@ Output only the descriptive embedding string, nothing else.
             str: User prompt
         """
         cache_key = f"user_prompt_{hash((name, unit, material_hint, is_block))}"
-        
+
         # Check cache first
         if cache_key in self._prompt_cache:
             self.stats["cache_hits"] += 1
             return self._prompt_cache[cache_key]
-        
+
         # Generate prompt
         template = self._templates.get("material_parsing_user")
         if not template:
             raise ValueError("User prompt template not found")
-        
+
         # Prepare variables
         hint_text = f"\\nПодсказка по материалу: {material_hint}" if material_hint else ""
         block_hint = "\\nВНИМАНИЕ: Это блочный материал - используй м3 (объем)!" if is_block else ""
-        
+
         # Render template
         prompt = template.render(
             name=name,
@@ -380,17 +382,17 @@ Output only the descriptive embedding string, nothing else.
             material_hint=hint_text,
             is_block=block_hint
         )
-        
+
         # Cache result
         self._cache_prompt(cache_key, prompt)
-        
+
         # Update statistics
         self.stats["total_prompts_generated"] += 1
         self.stats["cache_misses"] += 1
         template.usage_count += 1
-        
+
         return prompt
-    
+
     def get_embeddings_prompt(self) -> str:
         """
         Get embeddings generation prompt.
@@ -399,29 +401,29 @@ Output only the descriptive embedding string, nothing else.
             str: Embeddings prompt
         """
         cache_key = "embeddings_prompt"
-        
+
         # Check cache first
         if cache_key in self._prompt_cache:
             self.stats["cache_hits"] += 1
             return self._prompt_cache[cache_key]
-        
+
         # Generate prompt
         template = self._templates.get("embeddings_generation")
         if not template:
             raise ValueError("Embeddings prompt template not found")
-        
+
         prompt = template.render()
-        
+
         # Cache result
         self._cache_prompt(cache_key, prompt)
-        
+
         # Update statistics
         self.stats["total_prompts_generated"] += 1
         self.stats["cache_misses"] += 1
         template.usage_count += 1
-        
+
         return prompt
-    
+
     def get_specialized_prompt(self, material_type: str) -> str:
         """
         Get specialized prompt for material type.
@@ -434,16 +436,16 @@ Output only the descriptive embedding string, nothing else.
         """
         template_name = f"specialized_{material_type}"
         template = self._templates.get(template_name)
-        
+
         if not template:
             self.logger.warning(f"Specialized prompt for '{material_type}' not found")
             return ""
-        
+
         return template.render()
-    
+
     async def optimize_prompt(
-        self, 
-        base_prompt: str, 
+        self,
+        base_prompt: str,
         context: Optional[PromptOptimizationContext] = None
     ) -> str:
         """
@@ -457,33 +459,33 @@ Output only the descriptive embedding string, nothing else.
             str: Optimized prompt
         """
         opt_context = context or self._default_context
-        
+
         # Track optimization request
         self.stats["optimization_requests"] += 1
-        
+
         # Simple optimization strategies
         optimized_prompt = base_prompt
-        
+
         # Language-specific optimizations
         if opt_context.language == "russian":
             optimized_prompt = self._optimize_for_russian(optimized_prompt)
-        
+
         # Domain-specific optimizations
         if opt_context.domain == "construction":
             optimized_prompt = self._optimize_for_construction(optimized_prompt)
-        
+
         # Material-specific optimizations
         if opt_context.material_type:
             specialized = self.get_specialized_prompt(opt_context.material_type)
             if specialized:
                 optimized_prompt = f"{optimized_prompt}\n\n{specialized}"
-        
+
         # Confidence targeting
         if opt_context.target_confidence > 0.8:
             optimized_prompt = self._add_confidence_boosters(optimized_prompt)
-        
+
         return optimized_prompt
-    
+
     def _optimize_for_russian(self, prompt: str) -> str:
         """Optimize prompt for Russian language"""
         # Add Russian-specific instructions
@@ -492,10 +494,10 @@ Output only the descriptive embedding string, nothing else.
             "Учитывай склонения русских слов",
             "Обращай внимание на сокращения: м, кг, л, шт"
         ]
-        
+
         optimization_text = "\n".join(f"- {opt}" for opt in optimizations)
         return f"{prompt}\n\nРУССКИЕ ОСОБЕННОСТИ:\n{optimization_text}"
-    
+
     def _optimize_for_construction(self, prompt: str) -> str:
         """Optimize prompt for construction domain"""
         # Add construction-specific context
@@ -506,7 +508,7 @@ Output only the descriptive embedding string, nothing else.
 - Используй отраслевые сокращения и термины
 """
         return f"{prompt}\n\n{construction_context}"
-    
+
     def _add_confidence_boosters(self, prompt: str) -> str:
         """Add confidence boosting instructions"""
         confidence_boosters = """
@@ -517,7 +519,7 @@ Output only the descriptive embedding string, nothing else.
 - Будь консервативен в оценке confidence при сомнениях
 """
         return f"{prompt}\n\n{confidence_boosters}"
-    
+
     def _cache_prompt(self, key: str, prompt: str) -> None:
         """Cache prompt with size limit"""
         if len(self._prompt_cache) >= self._cache_max_size:
@@ -525,13 +527,13 @@ Output only the descriptive embedding string, nothing else.
             keys_to_remove = list(self._prompt_cache.keys())[:len(self._prompt_cache) // 2]
             for key_to_remove in keys_to_remove:
                 del self._prompt_cache[key_to_remove]
-        
+
         self._prompt_cache[key] = prompt
-    
+
     def create_template(
-        self, 
-        name: str, 
-        prompt_type: PromptType, 
+        self,
+        name: str,
+        prompt_type: PromptType,
         template: str,
         variables: List[str] = None,
         description: str = ""
@@ -557,17 +559,17 @@ Output only the descriptive embedding string, nothing else.
                 variables=variables or [],
                 description=description
             )
-            
+
             self._templates[name] = prompt_template
             self.stats["template_updates"] += 1
-            
+
             self.logger.info(f"Created new template: {name}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error creating template: {e}")
             return False
-    
+
     def update_template(self, name: str, **updates) -> bool:
         """
         Update existing template.
@@ -582,27 +584,27 @@ Output only the descriptive embedding string, nothing else.
         if name not in self._templates:
             self.logger.error(f"Template '{name}' not found")
             return False
-        
+
         try:
             template = self._templates[name]
-            
+
             for key, value in updates.items():
                 if hasattr(template, key):
                     setattr(template, key, value)
-            
+
             template.updated_at = time.time()
             self.stats["template_updates"] += 1
-            
+
             # Clear cache to ensure new template is used
             self.clear_cache()
-            
+
             self.logger.info(f"Updated template: {name}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error updating template: {e}")
             return False
-    
+
     def delete_template(self, name: str) -> bool:
         """
         Delete template.
@@ -616,18 +618,18 @@ Output only the descriptive embedding string, nothing else.
         if name not in self._templates:
             self.logger.error(f"Template '{name}' not found")
             return False
-        
+
         try:
             del self._templates[name]
             self.clear_cache()
-            
+
             self.logger.info(f"Deleted template: {name}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error deleting template: {e}")
             return False
-    
+
     def export_templates(self, output_path: Union[str, Path]) -> bool:
         """
         Export templates to file.
@@ -639,11 +641,11 @@ Output only the descriptive embedding string, nothing else.
             bool: True if successful
         """
         output_path = Path(output_path)
-        
+
         try:
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Create export data
             export_data = {
                 "metadata": {
@@ -665,18 +667,18 @@ Output only the descriptive embedding string, nothing else.
                     for name, template in self._templates.items()
                 }
             }
-            
+
             # Write to file
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(export_data, f, ensure_ascii=False, indent=2)
-            
+
             self.logger.info(f"Templates exported to: {output_path}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error exporting templates: {e}")
             return False
-    
+
     def import_templates(self, input_path: Union[str, Path]) -> bool:
         """
         Import templates from file.
@@ -688,22 +690,22 @@ Output only the descriptive embedding string, nothing else.
             bool: True if successful
         """
         input_path = Path(input_path)
-        
+
         try:
             # Check if file exists
             if not input_path.exists():
                 self.logger.error(f"Templates file not found: {input_path}")
                 return False
-            
+
             # Load templates file
             with open(input_path, encoding='utf-8') as f:
                 import_data = json.load(f)
-            
+
             # Validate import data
             if "templates" not in import_data:
                 self.logger.error("Invalid templates file format")
                 return False
-            
+
             # Import templates
             imported_count = 0
             for name, template_data in import_data["templates"].items():
@@ -718,28 +720,28 @@ Output only the descriptive embedding string, nothing else.
                         usage_count=template_data.get("usage_count", 0),
                         success_rate=template_data.get("success_rate", 0.0)
                     )
-                    
+
                     self._templates[name] = template
                     imported_count += 1
-                    
+
                 except Exception as e:
                     self.logger.warning(f"Error importing template {name}: {e}")
-            
+
             # Clear cache to ensure new templates are used
             self.clear_cache()
-            
+
             self.logger.info(f"Imported {imported_count} templates")
             return imported_count > 0
-            
+
         except Exception as e:
             self.logger.error(f"Error importing templates: {e}")
             return False
-    
+
     def clear_cache(self) -> None:
         """Clear prompt cache"""
         self._prompt_cache.clear()
         self.logger.info("Prompt cache cleared")
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """
         Get prompts manager statistics.
@@ -753,7 +755,7 @@ Output only the descriptive embedding string, nothing else.
             "total_templates": len(self._templates),
             "cache_size": len(self._prompt_cache),
             "cache_hit_rate": (
-                self.stats["cache_hits"] / 
+                self.stats["cache_hits"] /
                 (self.stats["cache_hits"] + self.stats["cache_misses"])
                 if (self.stats["cache_hits"] + self.stats["cache_misses"]) > 0 else 0.0
             ),
@@ -766,7 +768,7 @@ Output only the descriptive embedding string, nothing else.
             },
             "statistics": self.stats.copy()
         }
-    
+
     def get_template_info(self, name: str) -> Optional[Dict[str, Any]]:
         """
         Get template information.
@@ -780,7 +782,7 @@ Output only the descriptive embedding string, nothing else.
         template = self._templates.get(name)
         if not template:
             return None
-        
+
         return {
             "name": template.name,
             "type": template.type.value,
@@ -792,7 +794,7 @@ Output only the descriptive embedding string, nothing else.
             "created_at": template.created_at,
             "updated_at": template.updated_at
         }
-    
+
     def list_templates(self) -> List[str]:
         """
         Get list of available templates.
@@ -800,7 +802,7 @@ Output only the descriptive embedding string, nothing else.
         Returns:
             List[str]: List of template names
         """
-        return list(self._templates.keys()) 
+        return list(self._templates.keys())
 
 _prompts_manager_instance = None
 
@@ -815,4 +817,4 @@ def get_prompts_manager(config: Optional[ParserConfig] = None) -> SystemPromptsM
     global _prompts_manager_instance
     if _prompts_manager_instance is None:
         _prompts_manager_instance = SystemPromptsManager(config)
-    return _prompts_manager_instance 
+    return _prompts_manager_instance

@@ -23,9 +23,9 @@ class MaterialInput(BaseModel):
     id: str = Field(..., description="Уникальный идентификатор материала")
     name: str = Field(..., min_length=1, max_length=500, description="Название материала")
     unit: str = Field(..., min_length=1, max_length=100, description="Единица измерения")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": "mat_001",
                 "name": "Кирпич керамический белый",
@@ -38,7 +38,7 @@ class BatchMaterialsRequest(BaseModel):
     """Запрос на batch обработку материалов."""
     request_id: str = Field(..., description="Уникальный идентификатор запроса")
     materials: List[MaterialInput] = Field(..., min_items=1, max_items=10000, description="Список материалов для обработки")
-    
+
     @validator('materials')
     def validate_materials_unique_ids(cls, v):
         """Проверить уникальность ID материалов."""
@@ -46,9 +46,9 @@ class BatchMaterialsRequest(BaseModel):
         if len(ids) != len(set(ids)):
             raise ValueError("Все ID материалов должны быть уникальными")
         return v
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "request_id": "req_12345",
                 "materials": [
@@ -65,9 +65,9 @@ class BatchProcessingResponse(BaseModel):
     request_id: str = Field(..., description="Идентификатор запроса")
     materials_count: int = Field(..., description="Количество материалов к обработке")
     estimated_completion: Optional[datetime] = Field(None, description="Предполагаемое время завершения")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "status": "accepted",
                 "request_id": "req_12345",
@@ -82,9 +82,9 @@ class BatchValidationError(BaseModel):
     status: str = Field("validation_error", description="Статус ошибки")
     errors: List[str] = Field(..., description="Список ошибок валидации")
     rejected_materials: List[str] = Field(..., description="Список ID отклоненных материалов")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "status": "validation_error",
                 "errors": ["Material name is required", "Unit must be valid"],
@@ -99,9 +99,9 @@ class ProcessingProgress(BaseModel):
     completed: int = Field(..., description="Количество завершенных")
     failed: int = Field(..., description="Количество неудачных")
     pending: int = Field(..., description="Количество ожидающих обработки")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "total": 150,
                 "completed": 120,
@@ -119,9 +119,9 @@ class ProcessingStatusResponse(BaseModel):
     estimated_completion: Optional[datetime] = Field(None, description="Предполагаемое время завершения")
     started_at: Optional[datetime] = Field(None, description="Время начала обработки")
     completed_at: Optional[datetime] = Field(None, description="Время завершения обработки")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "request_id": "req_12345",
                 "status": "processing",
@@ -146,14 +146,14 @@ class MaterialProcessingResult(BaseModel):
     processing_status: ProcessingStatus = Field(..., description="Статус обработки")
     error_message: Optional[str] = Field(None, description="Сообщение об ошибке")
     processed_at: Optional[datetime] = Field(None, description="Время обработки")
-    
+
     # Дополнительные поля для анализа
     normalized_color: Optional[str] = Field(None, description="Нормализованный цвет")
     normalized_unit: Optional[str] = Field(None, description="Нормализованная единица")
     unit_coefficient: Optional[float] = Field(None, description="Коэффициент единицы")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "material_id": "mat_001",
                 "original_name": "Кирпич керамический белый",
@@ -173,9 +173,9 @@ class ProcessingResultsResponse(BaseModel):
     total_materials: int = Field(..., description="Общее количество материалов")
     results: List[MaterialProcessingResult] = Field(..., description="Результаты обработки")
     summary: Dict[str, int] = Field(..., description="Сводка по статусам")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "request_id": "req_12345",
                 "total_materials": 2,
@@ -212,9 +212,9 @@ class ProcessingJobConfig(BaseModel):
     similarity_threshold: float = Field(0.70, description="Порог сходства для поиска SKU")
     max_retries: int = Field(3, description="Максимум попыток повторной обработки")
     retry_delay: int = Field(60, description="Задержка между попытками (секунды)")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "max_materials_per_request": 10000,
                 "batch_processing_size": 50,
@@ -233,9 +233,9 @@ class ProcessingStatistics(BaseModel):
     total_materials_processed: int = Field(..., description="Общее количество обработанных материалов")
     average_processing_time: float = Field(..., description="Среднее время обработки (секунды)")
     success_rate: float = Field(..., description="Процент успешности")
-    
+
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "total_requests": 25,
                 "active_requests": 3,
@@ -249,4 +249,4 @@ class ProcessingStatistics(BaseModel):
 
 
 # Union типы для API responses
-BatchResponse = Union[BatchProcessingResponse, BatchValidationError] 
+BatchResponse = Union[BatchProcessingResponse, BatchValidationError]
